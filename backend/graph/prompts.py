@@ -99,21 +99,24 @@ Round {current_round} of {max_rounds}
 === NEARBY CHARACTERS (within 2 tiles of you) ===
 {nearby_npcs}
 
+=== PEOPLE YOU CARE ABOUT (not nearby) ===
+{social_targets}
+
 === WHAT NEARBY CHARACTERS DID LAST ROUND ===
 {neighbor_events}
 
 === YOUR TASK ===
 Think through three steps as this character:
 
-1. **PERCEIVE**: What stands out to you about the policy and what your neighbors are doing? What rumors or news have you heard? How does this affect your daily life?
+1. **PERCEIVE**: What stands out to you about the policy and what the people around you are doing? Pay attention to people you have relationships with — friends, family, and colleagues matter more than strangers.
 
-2. **REACT**: How do you emotionally and economically respond? Consider your personality, income, political views, and relationships. Are you scared? Angry? Opportunistic? Resigned? People are complex — show that.
+2. **REACT**: How do you emotionally and economically respond? Consider your personality, income, political views, and social connections. If a friend or family member is nearby, you're more likely to engage with them. If someone you care about is far away, you might want to move toward them.
 
-3. **ACT**: What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character.
+3. **ACT**: What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character. Prefer interacting with people you have relationships with over strangers. Your social connections act as a gravitational pull.
 
 Action types:
-- **chat**: Say something to a nearby character (must be within 2 tiles of you) or make a public statement. Include who you're talking to if applicable.
-- **move**: Walk one tile in any direction (you can only move 1 step per round). Provide new x,y coordinates within 1 tile of your current position.
+- **chat**: Say something to a nearby character (must be within 2 tiles of you) or make a public statement. Prefer talking to friends, family, or colleagues over strangers when possible.
+- **move**: Walk one tile in any direction (you can only move 1 step per round). Consider moving toward people you care about who aren't nearby yet — check the "People you care about" section for directions.
 - **protest**: Organize or join a protest. Describe the sign/chant.
 - **price_change**: If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason.
 - **mood_shift**: Your mood changes. Include old_mood, new_mood, and the trigger.

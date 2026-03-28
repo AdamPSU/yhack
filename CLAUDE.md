@@ -90,9 +90,40 @@ User → Policy Text → FastAPI POST /simulate → LangGraph Orchestrator
 6. **Event queuing**: Frontend queues events with delays (500ms-1s) so simulation plays back cinematically.
 
 ## Agent Design (Core Loop per NPC)
-- **Perceive**: Read policy summary + neighbor reactions from last round
+- **Perceive**: Read policy summary + nearby NPC info (with relationship annotations) + neighbor reactions from last round
 - **React**: LLM decides emotional/economic reaction based on persona
 - **Act**: Output action — chat message, movement, protest, price adjustment, discuss with neighbor
+- **Post-round influence**: Opinion dynamics applied after all NPCs act (see below)
+
+## Opinion Dynamics (Peralta et al. 2022)
+Based on "Opinion dynamics in social networks: From models to data" ([arXiv:2201.01322](https://arxiv.org/abs/2201.01322)).
+Implementation in `backend/graph/nodes/run_round.py` → `_apply_opinion_dynamics()`.
+
+### Models Implemented
+1. **Deffuant Bounded Confidence** (Eq. 1-2): Pairwise opinion convergence
+   - `x_j(t+1) = x_j(t) + μ · I_ij · [x_i(t) - x_j(t)]`
+   - Only when `|x_i - x_j| < ε` (confidence bound)
+   - Applied to both political leaning ([-1,1]) and mood ([0,1] continuous)
+   - μ_political=0.3, μ_mood=0.4, ε_political=0.7, ε_mood=1.1
+
+2. **Baumann Controversy Amplification** (Eq. 6): Polarization under controversy
+   - `drift = 0.02 · tanh(α · x_i)` pushes opinions toward extremes
+   - α mapped from policy controversy_level: low=1.0, medium=2.0, high=3.5
+   - Applied globally to all NPCs each round when α > 1.5
+
+3. **Keep/Compromise/Adopt Classification** (Sec. 3.3, Chacoma & Zanette 2015)
+   - I_ij < 0.25 → **Keep** (no change, strangers/weak ties)
+   - 0.25 ≤ I_ij < 0.85 → **Compromise** (Deffuant partial convergence)
+   - I_ij ≥ 0.85 → **Adopt** (copy speaker's opinion, strong family ties)
+
+### Influence Factor I_ij (Fig. 1c)
+`I_ij = min(1.0, relationship_strength × type_weight)` where type_weight:
+family=1.5, friend=1.2, employer=1.0, colleague=0.8, neighbor=0.5. Strangers=0.1.
+
+### Spatial Constraints
+- NPCs only communicate within Chebyshev distance ≤ 2 (proximity-based, not social graph)
+- Movement clamped to 1 tile per round
+- Social targets section in prompt tells NPCs where distant friends/family are
 
 ## Config & Constants
 - **Grid**: 20×15 (`GRID_WIDTH`, `GRID_HEIGHT` in `config.py`)

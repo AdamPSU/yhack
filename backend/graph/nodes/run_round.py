@@ -1,8 +1,15 @@
-"""Node: execute one simulation round — every NPC perceives, reacts, and acts."""
+"""Node: execute one simulation round — every NPC perceives, reacts, and acts.
+
+Opinion dynamics based on Peralta, Kertész & Iñiguez (2022),
+"Opinion dynamics in social networks: From models to data" (arXiv:2201.01322).
+Implements Deffuant bounded confidence (Eq. 1-2), Baumann controversy
+amplification (Eq. 6), and keep/compromise/adopt behavioral classification.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import math
 
 from langchain_openai import ChatOpenAI
 
@@ -26,6 +33,50 @@ def _political_label(value: float) -> str:
     return "strongly conservative"
 
 
+_TYPE_WEIGHTS = {
+    "family": 1.5,
+    "friend": 1.2,
+    "employer": 1.0,
+    "colleague": 0.8,
+    "neighbor": 0.5,
+}
+
+# --- Opinion dynamics constants (Peralta et al. 2022) ---
+
+# Mood represented as continuous value in [0, 1] for Deffuant dynamics.
+_MOOD_LADDER = ["angry", "anxious", "worried", "neutral", "hopeful", "excited"]
+_MOOD_TO_CONTINUOUS = {m: i / (len(_MOOD_LADDER) - 1) for i, m in enumerate(_MOOD_LADDER)}
+_MOOD_BREAKPOINTS = [i / (len(_MOOD_LADDER) - 1) for i in range(len(_MOOD_LADDER))]
+
+# Deffuant bounded confidence parameters (Eq. 1-2).
+_MU_POLITICAL = 0.3  # Convergence rate for political leaning.
+_MU_MOOD = 0.4  # Convergence rate for mood (moods shift faster than politics).
+_EPSILON_POLITICAL = 0.7  # Confidence bound: only interact if |x_i - x_j| < ε.
+_EPSILON_MOOD = 1.1  # No effective bound for mood (emotions are always contagious).
+
+# Baumann controversy amplification (Eq. 6): α parameter per controversy level.
+_CONTROVERSY_ALPHA = {"low": 1.0, "medium": 2.0, "high": 3.5}
+
+# Keep/compromise/adopt thresholds from Chacoma & Zanette (2015), Sec. 3.3.
+_ADOPT_THRESHOLD = 0.85  # I_ij above this → adopt (copy opinion).
+_COMPROMISE_THRESHOLD = 0.25  # I_ij above this → compromise (Deffuant update).
+
+
+def _build_relationship_map(
+    relationships: list[dict],
+) -> dict[str, list[tuple[str, str, float]]]:
+    """Pre-index relationships as {npc_id: [(other_id, rel_type, strength), ...]}."""
+    rel_map: dict[str, list[tuple[str, str, float]]] = {}
+    for rel in relationships:
+        src = rel.get("source_id", "")
+        tgt = rel.get("target_id", "")
+        rtype = rel.get("rel_type", "neighbor")
+        strength = rel.get("strength", 0.5)
+        rel_map.setdefault(src, []).append((tgt, rtype, strength))
+        rel_map.setdefault(tgt, []).append((src, rtype, strength))
+    return rel_map
+
+
 def _build_neighbor_ids(npc: dict, all_npcs: list[dict], radius: int = 2) -> list[str]:
     """Return IDs of NPCs within *radius* tiles (Chebyshev distance)."""
     npc_id = npc.get("id", "")
@@ -42,17 +93,74 @@ def _build_neighbor_ids(npc: dict, all_npcs: list[dict], radius: int = 2) -> lis
     return neighbors
 
 
-def _format_nearby_npcs(neighbor_ids: list[str], all_npcs: list[dict]) -> str:
-    """List nearby NPCs with name, role, and mood."""
+def _format_nearby_npcs(
+    neighbor_ids: list[str],
+    all_npcs: list[dict],
+    npc_rels: list[tuple[str, str, float]],
+) -> str:
+    """List nearby NPCs with name, role, mood, and relationship annotation."""
     if not neighbor_ids:
         return "Nobody is nearby right now."
     id_set = set(neighbor_ids)
+    rel_lookup = {other_id: (rtype, strength) for other_id, rtype, strength in npc_rels}
     lines: list[str] = []
     for other in all_npcs:
-        if other.get("id") in id_set:
-            lines.append(
-                f"- {other.get('name', '?')} ({other.get('role', '?')}, mood: {other.get('mood', '?')})"
-            )
+        oid = other.get("id")
+        if oid in id_set:
+            line = f"- {other.get('name', '?')} ({other.get('role', '?')}, mood: {other.get('mood', '?')})"
+            if oid in rel_lookup:
+                rtype, strength = rel_lookup[oid]
+                line += f" [your {rtype}, closeness: {strength:.1f}]"
+            else:
+                line += " [stranger]"
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _format_social_targets(
+    npc: dict,
+    npc_rels: list[tuple[str, str, float]],
+    neighbor_ids: list[str],
+    all_npcs: list[dict],
+) -> str:
+    """Identify strong social ties not currently nearby, with direction hints."""
+    if not npc_rels:
+        return "You have no strong social connections in town."
+
+    npc_x, npc_y = npc.get("x", 0), npc.get("y", 0)
+    neighbor_set = set(neighbor_ids)
+    npc_lookup = {n.get("id"): n for n in all_npcs}
+
+    candidates: list[tuple[float, str, str, float, str, int]] = []
+    for other_id, rtype, strength in npc_rels:
+        if other_id in neighbor_set:
+            continue
+        other = npc_lookup.get(other_id)
+        if not other:
+            continue
+        ox, oy = other.get("x", 0), other.get("y", 0)
+        dist = max(abs(ox - npc_x), abs(oy - npc_y))
+        pull = strength * _TYPE_WEIGHTS.get(rtype, 0.5)
+        dx, dy = ox - npc_x, oy - npc_y
+        dirs: list[str] = []
+        if dy < 0:
+            dirs.append("north")
+        if dy > 0:
+            dirs.append("south")
+        if dx > 0:
+            dirs.append("east")
+        if dx < 0:
+            dirs.append("west")
+        direction = "-".join(dirs) if dirs else "here"
+        candidates.append((pull, other.get("name", "?"), rtype, strength, direction, dist))
+
+    if not candidates:
+        return "All your social connections are nearby already."
+
+    candidates.sort(key=lambda c: c[0], reverse=True)
+    lines: list[str] = []
+    for _, name, rtype, strength, direction, dist in candidates[:3]:
+        lines.append(f"- {name} (your {rtype}, closeness: {strength:.1f}) — {dist} tiles {direction}")
     return "\n".join(lines)
 
 
@@ -131,6 +239,7 @@ async def _simulate_single_npc(
     neighbor_events_str: str,
     round_context: str,
     nearby_npcs: str,
+    social_targets: str,
 ) -> list[dict]:
     """Run the Perceive-React-Act loop for one NPC and return its events."""
 
@@ -152,6 +261,7 @@ async def _simulate_single_npc(
         max_rounds=max_rounds,
         round_context=round_context,
         nearby_npcs=nearby_npcs,
+        social_targets=social_targets,
         neighbor_events=neighbor_events_str,
     )
 
@@ -188,6 +298,125 @@ async def _simulate_single_npc(
     return sim_events
 
 
+def _mood_to_continuous(mood: str) -> float:
+    """Map a discrete mood string to [0, 1] for Deffuant dynamics."""
+    return _MOOD_TO_CONTINUOUS.get(mood, 0.5)
+
+
+def _continuous_to_mood(value: float) -> str:
+    """Map a continuous [0, 1] value back to the closest discrete mood."""
+    value = max(0.0, min(1.0, value))
+    best_idx = 0
+    best_dist = abs(value - _MOOD_BREAKPOINTS[0])
+    for i in range(1, len(_MOOD_BREAKPOINTS)):
+        dist = abs(value - _MOOD_BREAKPOINTS[i])
+        if dist < best_dist:
+            best_dist = dist
+            best_idx = i
+    return _MOOD_LADDER[best_idx]
+
+
+def _compute_influence_factor(
+    speaker_id: str,
+    target_id: str,
+    rel_map: dict[str, list[tuple[str, str, float]]],
+) -> float:
+    """Compute I_ij influence factor from relationship data (Fig. 1c)."""
+    rels = rel_map.get(speaker_id, [])
+    rel_match = next(((rt, s) for oid, rt, s in rels if oid == target_id), None)
+    if rel_match:
+        rtype, strength = rel_match
+        return min(1.0, strength * _TYPE_WEIGHTS.get(rtype, 0.5))
+    return 0.1  # Stranger base influence.
+
+
+def _apply_opinion_dynamics(
+    npcs: list[dict],
+    events: list[dict],
+    current_round: int,
+    rel_map: dict[str, list[tuple[str, str, float]]],
+    controversy: str,
+) -> list[dict]:
+    """Apply opinion dynamics from Peralta et al. (2022) to NPC interactions.
+
+    Combines three mechanisms:
+    1. Deffuant bounded confidence (Eq. 1-2) for pairwise chat interactions.
+    2. Baumann controversy amplification (Eq. 6) pushing opinions to extremes.
+    3. Keep/compromise/adopt behavioral classification (Sec. 3.3).
+    """
+    npc_lookup = {n.get("id", ""): dict(n) for n in npcs}
+    alpha = _CONTROVERSY_ALPHA.get(controversy, 2.0)
+
+    chat_events = [
+        e for e in events
+        if e.get("round") == current_round and e.get("event_type") == "chat"
+    ]
+
+    for ev in chat_events:
+        speaker_id = ev.get("npc_id", "")
+        target_id = ev.get("data", {}).get("target_npc_id", "")
+        if not target_id or target_id not in npc_lookup or speaker_id not in npc_lookup:
+            continue
+
+        speaker = npc_lookup[speaker_id]
+        target = npc_lookup[target_id]
+        i_ij = _compute_influence_factor(speaker_id, target_id, rel_map)
+
+        # --- Classify behavior: keep / compromise / adopt (Sec. 3.3) ---
+        if i_ij < _COMPROMISE_THRESHOLD:
+            continue  # Keep: no opinion change.
+
+        # --- Political leaning: Deffuant bounded confidence (Eq. 1-2) ---
+        # x_i, x_j ∈ [-1, 1] — we normalize to [0, 1] for Deffuant, then back.
+        x_i = (float(speaker.get("political_leaning", 0.0)) + 1.0) / 2.0
+        x_j = (float(target.get("political_leaning", 0.0)) + 1.0) / 2.0
+
+        if abs(x_i - x_j) < _EPSILON_POLITICAL:
+            if i_ij >= _ADOPT_THRESHOLD:
+                # Adopt: target copies speaker's opinion.
+                new_x_j = x_i
+            else:
+                # Compromise: Deffuant update — x_j(t+1) = x_j + μ·I_ij·(x_i - x_j)
+                new_x_j = x_j + _MU_POLITICAL * i_ij * (x_i - x_j)
+
+            # Baumann controversy amplification (Eq. 6):
+            # Nudge toward extremes proportional to tanh(α·x_j).
+            # Discretized: x_j += dt · tanh(α · (2·x_j - 1)) where dt is small.
+            centered = 2.0 * new_x_j - 1.0  # Map [0,1] back to [-1,1] for tanh.
+            controversy_push = 0.05 * math.tanh(alpha * centered)
+            new_x_j = max(0.0, min(1.0, new_x_j + controversy_push))
+
+            # Map back to [-1, 1].
+            npc_lookup[target_id]["political_leaning"] = round(new_x_j * 2.0 - 1.0, 4)
+
+        # --- Mood: Deffuant bounded confidence on continuous mood ---
+        m_i = _mood_to_continuous(speaker.get("mood", "neutral"))
+        m_j = _mood_to_continuous(target.get("mood", "neutral"))
+
+        if abs(m_i - m_j) < _EPSILON_MOOD:
+            if i_ij >= _ADOPT_THRESHOLD:
+                new_m_j = m_i
+            else:
+                # Negative moods spread more easily (asymmetric contagion).
+                mu_effective = _MU_MOOD * (1.3 if m_i < m_j else 1.0)
+                new_m_j = m_j + mu_effective * i_ij * (m_i - m_j)
+
+            new_m_j = max(0.0, min(1.0, new_m_j))
+            npc_lookup[target_id]["mood"] = _continuous_to_mood(new_m_j)
+
+    # --- Baumann global controversy drift (Eq. 6) for all NPCs ---
+    # Even without interaction, high-controversy policies push opinions outward.
+    # dx_i/dt = -x_i + Σ A_ij · tanh(α · x_j)  →  simplified self-reinforcement term.
+    if alpha > 1.5:
+        for npc_id, npc in npc_lookup.items():
+            x = float(npc.get("political_leaning", 0.0))
+            # Self-reinforcement: opinions drift away from center under controversy.
+            drift = 0.02 * math.tanh(alpha * x)
+            npc["political_leaning"] = round(max(-1.0, min(1.0, x + drift)), 4)
+
+    return list(npc_lookup.values())
+
+
 async def run_round(state: SimState) -> dict:
     """Run one simulation round for all 25 NPCs in parallel."""
 
@@ -200,13 +429,17 @@ async def run_round(state: SimState) -> dict:
 
     policy_text = _policy_summary(state.get("entities", []))
     round_context = _build_round_context(current_round, max_rounds, events)
+    rel_map = _build_relationship_map(state.get("relationships", []))
 
     # Build per-NPC tasks.
     tasks = []
     for npc in npcs:
+        npc_id = npc.get("id", "")
+        npc_rels = rel_map.get(npc_id, [])
         neighbor_ids = _build_neighbor_ids(npc, npcs)
         neighbor_events_str = _format_neighbor_events(neighbor_ids, events, current_round)
-        nearby_npcs_str = _format_nearby_npcs(neighbor_ids, npcs)
+        nearby_npcs_str = _format_nearby_npcs(neighbor_ids, npcs, npc_rels)
+        social_targets_str = _format_social_targets(npc, npc_rels, neighbor_ids, npcs)
 
         tasks.append(
             _simulate_single_npc(
@@ -217,6 +450,7 @@ async def run_round(state: SimState) -> dict:
                 neighbor_events_str=neighbor_events_str,
                 round_context=round_context,
                 nearby_npcs=nearby_npcs_str,
+                social_targets=social_targets_str,
             )
         )
 
@@ -227,6 +461,11 @@ async def run_round(state: SimState) -> dict:
     all_events: list[dict] = []
     for npc_events in results:
         all_events.extend(npc_events)
+
+    # Apply opinion dynamics (Peralta et al. 2022) from chat interactions.
+    entities = state.get("entities", [])
+    controversy = entities[0].get("controversy_level", "medium") if entities else "medium"
+    npcs = _apply_opinion_dynamics(npcs, all_events, current_round, rel_map, controversy)
 
     # Build position lookup for movement clamping.
     npc_positions = {npc.get("id", ""): (npc.get("x", 0), npc.get("y", 0)) for npc in npcs}

@@ -60,6 +60,39 @@ Row 0: 270, 271
 Row 1: 310, 311
 ```
 
+#### Hospital (4 wide × 4 tall, top rows mix with grass)
+```
+Row 0: 178, 179, 180, 181
+Row 1: 218, 219, 220, 221
+Row 2: 258, 259, 260, 261
+Row 3: 298, 299, 300, 301
+```
+
+#### Concrete Building (4 wide × 4 tall, top rows mix with grass)
+```
+Row 0: 164, 165, 166, 167
+Row 1: 204, 205, 206, 207
+Row 2: 244, 245, 246, 247
+Row 3: 284, 285, 286, 287
+```
+
+### Ground / Paving
+| Element | Tile ID(s) | Notes |
+|---------|-----------|-------|
+| Gray concrete floor | 290, 291 | 1×2 pair, use for parking lots and plazas |
+| Parking (car facing north) | 250, 251 | 1×2 pair, car in parking space |
+
+### Road Details
+| Element | Tile ID(s) | Notes |
+|---------|-----------|-------|
+| Road top edge | 350 | Horizontal road, top lane |
+| Road bottom edge | 390 | Horizontal road, bottom lane |
+| Road (no edge) | 354 | Plain road fill (interior) |
+| Road bottom-right corner | 395 | Corner piece |
+| Crossing X-axis | 282, 283 | Pedestrian crossing, horizontal |
+| Crossing Y-axis (right) | 321, 361 | Pedestrian crossing, vertical right |
+| Crossing Y-axis (left) | 324, 364 | Pedestrian crossing, vertical left |
+
 ### Nature
 | Element | Tile ID(s) | Notes |
 |---------|-----------|-------|

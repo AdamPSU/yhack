@@ -37,17 +37,6 @@ const PHASE_LABELS: Record<number, string> = {
   3: "Social Crisis & Reckoning",
 };
 
-// Fallback positions (game coords) when Phaser NPCs aren't available.
-// Deterministic per agentId so bubbles appear at consistent locations.
-function getFallbackGamePos(agentId: string): { x: number; y: number } {
-  let hash = 0;
-  for (let i = 0; i < agentId.length; i++) hash = (hash * 31 + agentId.charCodeAt(i)) | 0;
-  return {
-    x: 80 + Math.abs(hash % 480),
-    y: 80 + Math.abs((hash >> 8) % 320),
-  };
-}
-
 const SENTIMENT_LABEL: Record<NPCHoverInfo["sentiment"], { symbol: string; color: string }> = {
   happy: { symbol: "+", color: "text-[#5ab85a]" },
   neutral: { symbol: "~", color: "text-[#8a7a62]" },
@@ -87,21 +76,17 @@ export default function SimulatePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
-  // Track whether Phaser NPC system is active (has emitted at least one position)
-  const phaserActiveRef = useRef(false);
-
   // Auto-start on mount
   useEffect(() => {
     sim.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for NPC position updates from Phaser — primary bubble source
+  // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
     let cleanup: (() => void) | undefined;
     import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
       const handler = (npc: NPCState) => {
-        phaserActiveRef.current = true;
         setBubbles((prev) => {
           const next = new Map(prev);
           if (npc.message) {
@@ -140,44 +125,6 @@ export default function SimulatePage() {
     return () => cleanup?.();
   }, []);
 
-  // Fallback: create bubbles from sim events when Phaser NPCs aren't active
-  useEffect(() => {
-    const event = sim.latestEvent;
-    if (!event || event.type === "phase_change") return;
-    // If Phaser is emitting NPC positions, let it handle bubbles
-    if (phaserActiveRef.current) return;
-
-    const pos = getFallbackGamePos(event.agentId);
-    const bubble: BubbleState = {
-      npcId: event.agentId,
-      agentName: event.agentName,
-      message: event.message,
-      x: pos.x * SCALE_FACTOR,
-      y: pos.y * SCALE_FACTOR,
-    };
-
-    setBubbles((prev) => {
-      const next = new Map(prev);
-      next.set(event.agentId, bubble);
-      // Keep at most 4 bubbles in fallback mode
-      if (next.size > 4) {
-        const firstKey = next.keys().next().value;
-        if (firstKey !== undefined) next.delete(firstKey);
-      }
-      return next;
-    });
-
-    // Auto-remove fallback bubble after 4 seconds
-    const timer = setTimeout(() => {
-      setBubbles((prev) => {
-        const next = new Map(prev);
-        next.delete(event.agentId);
-        return next;
-      });
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, [sim.latestEvent]);
 
   // Fullscreen toggle
   const toggleFullscreen = useCallback(() => {

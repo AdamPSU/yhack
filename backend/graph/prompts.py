@@ -96,7 +96,10 @@ Current position: ({npc_x}, {npc_y})
 Round {current_round} of {max_rounds}
 {round_context}
 
-=== WHAT YOUR NEIGHBORS DID LAST ROUND ===
+=== NEARBY CHARACTERS (within 2 tiles of you) ===
+{nearby_npcs}
+
+=== WHAT NEARBY CHARACTERS DID LAST ROUND ===
 {neighbor_events}
 
 === YOUR TASK ===
@@ -109,8 +112,8 @@ Think through three steps as this character:
 3. **ACT**: What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character.
 
 Action types:
-- **chat**: Say something to a neighbor or make a public statement. Include who you're talking to if applicable.
-- **move**: Physically go somewhere meaningful (e.g., town hall, market, neighbor's house). Provide new x,y coordinates within the grid (0-19, 0-14).
+- **chat**: Say something to a nearby character (must be within 2 tiles of you) or make a public statement. Include who you're talking to if applicable.
+- **move**: Walk one tile in any direction (you can only move 1 step per round). Provide new x,y coordinates within 1 tile of your current position.
 - **protest**: Organize or join a protest. Describe the sign/chant.
 - **price_change**: If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason.
 - **mood_shift**: Your mood changes. Include old_mood, new_mood, and the trigger.

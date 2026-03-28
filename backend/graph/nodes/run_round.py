@@ -26,15 +26,34 @@ def _political_label(value: float) -> str:
     return "strongly conservative"
 
 
-def _build_neighbor_ids(npc_id: str, relationships: list[dict]) -> list[str]:
-    """Return IDs of NPCs connected to *npc_id* via any relationship."""
+def _build_neighbor_ids(npc: dict, all_npcs: list[dict], radius: int = 2) -> list[str]:
+    """Return IDs of NPCs within *radius* tiles (Chebyshev distance)."""
+    npc_id = npc.get("id", "")
+    nx, ny = npc.get("x", 0), npc.get("y", 0)
     neighbors: list[str] = []
-    for rel in relationships:
-        if rel["source_id"] == npc_id:
-            neighbors.append(rel["target_id"])
-        elif rel["target_id"] == npc_id:
-            neighbors.append(rel["source_id"])
+    for other in all_npcs:
+        oid = other.get("id", "")
+        if oid == npc_id:
+            continue
+        dx = abs(other.get("x", 0) - nx)
+        dy = abs(other.get("y", 0) - ny)
+        if max(dx, dy) <= radius:
+            neighbors.append(oid)
     return neighbors
+
+
+def _format_nearby_npcs(npc: dict, all_npcs: list[dict], radius: int = 2) -> str:
+    """List nearby NPCs with name, role, and mood."""
+    neighbor_ids = set(_build_neighbor_ids(npc, all_npcs, radius))
+    if not neighbor_ids:
+        return "Nobody is nearby right now."
+    lines: list[str] = []
+    for other in all_npcs:
+        if other.get("id") in neighbor_ids:
+            lines.append(
+                f"- {other.get('name', '?')} ({other.get('role', '?')}, mood: {other.get('mood', '?')})"
+            )
+    return "\n".join(lines)
 
 
 def _format_neighbor_events(
@@ -111,6 +130,7 @@ async def _simulate_single_npc(
     policy_text: str,
     neighbor_events_str: str,
     round_context: str,
+    nearby_npcs: str,
 ) -> list[dict]:
     """Run the Perceive-React-Act loop for one NPC and return its events."""
 
@@ -131,6 +151,7 @@ async def _simulate_single_npc(
         current_round=current_round + 1,  # Display as 1-indexed for the LLM.
         max_rounds=max_rounds,
         round_context=round_context,
+        nearby_npcs=nearby_npcs,
         neighbor_events=neighbor_events_str,
     )
 
@@ -173,7 +194,6 @@ async def run_round(state: SimState) -> dict:
     llm = get_llm(max_tokens=2048)
 
     npcs = state["npcs"]
-    relationships = state["relationships"]
     events = state.get("events", [])
     current_round = state["current_round"]
     max_rounds = state["max_rounds"]
@@ -184,9 +204,9 @@ async def run_round(state: SimState) -> dict:
     # Build per-NPC tasks.
     tasks = []
     for npc in npcs:
-        npc_id = npc.get("id", "")
-        neighbor_ids = _build_neighbor_ids(npc_id, relationships)
+        neighbor_ids = _build_neighbor_ids(npc, npcs)
         neighbor_events_str = _format_neighbor_events(neighbor_ids, events, current_round)
+        nearby_npcs_str = _format_nearby_npcs(npc, npcs)
 
         tasks.append(
             _simulate_single_npc(
@@ -196,6 +216,7 @@ async def run_round(state: SimState) -> dict:
                 policy_text=policy_text,
                 neighbor_events_str=neighbor_events_str,
                 round_context=round_context,
+                nearby_npcs=nearby_npcs_str,
             )
         )
 
@@ -206,6 +227,9 @@ async def run_round(state: SimState) -> dict:
     all_events: list[dict] = []
     for npc_events in results:
         all_events.extend(npc_events)
+
+    # Build position lookup for movement clamping.
+    npc_positions = {npc.get("id", ""): (npc.get("x", 0), npc.get("y", 0)) for npc in npcs}
 
     # Update NPC moods based on mood_shift events from this round.
     mood_updates: dict[str, str] = {}
@@ -219,10 +243,11 @@ async def run_round(state: SimState) -> dict:
             to_x = ev.get("data", {}).get("to_x")
             to_y = ev.get("data", {}).get("to_y")
             if to_x is not None and to_y is not None:
-                move_updates[ev["npc_id"]] = (
-                    max(0, min(MAX_X, int(to_x))),
-                    max(0, min(MAX_Y, int(to_y))),
-                )
+                cur_x, cur_y = npc_positions.get(ev["npc_id"], (0, 0))
+                # Clamp to 1-tile step, then clamp to grid bounds.
+                clamped_x = max(0, min(MAX_X, max(cur_x - 1, min(cur_x + 1, int(to_x)))))
+                clamped_y = max(0, min(MAX_Y, max(cur_y - 1, min(cur_y + 1, int(to_y)))))
+                move_updates[ev["npc_id"]] = (clamped_x, clamped_y)
 
     updated_npcs = []
     for npc in npcs:

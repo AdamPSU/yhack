@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 # Grid dimensions used across the simulation (pixel-art world size).
 GRID_WIDTH = 20
 GRID_HEIGHT = 15
-MAX_X = GRID_WIDTH - 1   # 19
+MAX_X = GRID_WIDTH - 1  # 19
 MAX_Y = GRID_HEIGHT - 1  # 14
 
 MAX_NPCS = 25
@@ -12,7 +12,7 @@ MAX_NPCS = 25
 class Settings(BaseSettings):
     xai_api_key: str = ""
     k2_api_key: str = ""
-    model_name: str = "grok-3-think-v2"
+    model_name: str = "grok-4.20-non-reasoning"
     max_rounds: int = 5
 
     model_config = {"env_file": ".env"}

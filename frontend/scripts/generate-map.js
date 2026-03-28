@@ -270,8 +270,8 @@ function assignZones(blocks) {
     }
     // Waterfront: blocks adjacent to rivers
     else if (
-      (b.r2 >= RIVER1_EDGE_TOP - 2 && b.r1 <= RIVER1_EDGE_BOTTOM + 2) ||
-      (b.r2 >= RIVER2_EDGE_TOP - 2 && b.r1 <= RIVER2_EDGE_BOTTOM + 2)
+      (b.r2 >= RIVER1_EDGE_TOP - 1 && b.r1 <= RIVER1_EDGE_BOTTOM + 1) ||
+      (b.r2 >= RIVER2_EDGE_TOP - 1 && b.r1 <= RIVER2_EDGE_BOTTOM + 1)
     ) {
       b.zone = ZONE.WATERFRONT;
     }
@@ -416,6 +416,8 @@ function fillGovernment(r1, c1, r2, c2) {
 }
 
 function fillPark(r1, c1, r2, c2) {
+  // Re-seed PRNG per block so each park is unique
+  _seed = (r1 * 1000 + c1 * 37 + 42) % 2147483647;
   // Scatter trees and rocks with minimum 1-tile spacing
   for (let r = r1; r <= r2 - 1; r += 2) {
     for (let c = c1; c <= c2 - 1; c += 2) {
@@ -482,6 +484,8 @@ function fillWaterfront(r1, c1, r2, c2) {
 }
 
 function packBuildings(r1, c1, r2, c2, palette, zone) {
+  // Re-seed PRNG per block so each block gets unique buildings
+  _seed = (r1 * 1000 + c1 * 37 + 42) % 2147483647;
   // Shuffle palette for variety per block
   const localPalette = shuffle([...palette]);
 
@@ -547,37 +551,7 @@ for (let r = 0; r < MAP_ROWS; r++) {
   }
 }
 
-// Step 2: Place crossings at intersections
-for (const [hr1, hr2] of H_ROAD_PAIRS) {
-  for (const [vc1, vc2] of V_ROAD_PAIRS) {
-    // Horizontal crossings: on the H-road rows, just before/after the V-road cols
-    // Place crossing tiles 1 tile outside the intersection on each side
-    const crossLeft = vc1 - 1;
-    const crossRight = vc2 + 1;
-    if (crossLeft >= 0) {
-      ground[hr1][crossLeft] = gid(CROSSING_X_L);
-      ground[hr2][crossLeft] = gid(CROSSING_X_R);
-    }
-    if (crossRight < MAP_COLS) {
-      ground[hr1][crossRight] = gid(CROSSING_X_L);
-      ground[hr2][crossRight] = gid(CROSSING_X_R);
-    }
-
-    // Vertical crossings: on the V-road cols, just before/after the H-road rows
-    const crossAbove = hr1 - 1;
-    const crossBelow = hr2 + 1;
-    if (crossAbove >= 0 && !isRiverRow(crossAbove)) {
-      ground[crossAbove][vc1] = gid(CROSSING_Y_LEFT_TOP);
-      ground[crossAbove][vc2] = gid(CROSSING_Y_RIGHT_TOP);
-    }
-    if (crossBelow < MAP_ROWS && !isRiverRow(crossBelow)) {
-      ground[crossBelow][vc1] = gid(CROSSING_Y_LEFT_BOT);
-      ground[crossBelow][vc2] = gid(CROSSING_Y_RIGHT_BOT);
-    }
-  }
-}
-
-// Step 3: Rivers
+// Step 2: Rivers (crossings removed — clean roads look better)
 function layRiverRow(r, tileId) {
   for (let c = 0; c < MAP_COLS; c++) {
     if (isVRoadCol(c)) {

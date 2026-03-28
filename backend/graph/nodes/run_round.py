@@ -42,14 +42,14 @@ def _build_neighbor_ids(npc: dict, all_npcs: list[dict], radius: int = 2) -> lis
     return neighbors
 
 
-def _format_nearby_npcs(npc: dict, all_npcs: list[dict], radius: int = 2) -> str:
+def _format_nearby_npcs(neighbor_ids: list[str], all_npcs: list[dict]) -> str:
     """List nearby NPCs with name, role, and mood."""
-    neighbor_ids = set(_build_neighbor_ids(npc, all_npcs, radius))
     if not neighbor_ids:
         return "Nobody is nearby right now."
+    id_set = set(neighbor_ids)
     lines: list[str] = []
     for other in all_npcs:
-        if other.get("id") in neighbor_ids:
+        if other.get("id") in id_set:
             lines.append(
                 f"- {other.get('name', '?')} ({other.get('role', '?')}, mood: {other.get('mood', '?')})"
             )
@@ -206,7 +206,7 @@ async def run_round(state: SimState) -> dict:
     for npc in npcs:
         neighbor_ids = _build_neighbor_ids(npc, npcs)
         neighbor_events_str = _format_neighbor_events(neighbor_ids, events, current_round)
-        nearby_npcs_str = _format_nearby_npcs(npc, npcs)
+        nearby_npcs_str = _format_nearby_npcs(neighbor_ids, npcs)
 
         tasks.append(
             _simulate_single_npc(
@@ -244,10 +244,12 @@ async def run_round(state: SimState) -> dict:
             to_y = ev.get("data", {}).get("to_y")
             if to_x is not None and to_y is not None:
                 cur_x, cur_y = npc_positions.get(ev["npc_id"], (0, 0))
-                # Clamp to 1-tile step, then clamp to grid bounds.
-                clamped_x = max(0, min(MAX_X, max(cur_x - 1, min(cur_x + 1, int(to_x)))))
-                clamped_y = max(0, min(MAX_Y, max(cur_y - 1, min(cur_y + 1, int(to_y)))))
-                move_updates[ev["npc_id"]] = (clamped_x, clamped_y)
+                stepped_x = max(cur_x - 1, min(cur_x + 1, int(to_x)))
+                stepped_y = max(cur_y - 1, min(cur_y + 1, int(to_y)))
+                move_updates[ev["npc_id"]] = (
+                    max(0, min(MAX_X, stepped_x)),
+                    max(0, min(MAX_Y, stepped_y)),
+                )
 
     updated_npcs = []
     for npc in npcs:

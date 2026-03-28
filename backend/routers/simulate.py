@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from graph.builder import build_graph
 from models.schemas import PolicyInput
+from models.state import SimState
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
 
     graph = build_graph()
 
-    initial_state = {
+    initial_state: SimState = {
         "policy_text": policy.text,
         "max_rounds": policy.num_rounds,
         "entities": [],
@@ -44,7 +45,15 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
 
     try:
         async for chunk in graph.astream(initial_state):
-            if "generate_npcs" in chunk:
+            if "parse_policy" in chunk:
+                update = chunk["parse_policy"]
+                await websocket.send_json(
+                    {
+                        "type": "policy_analysis",
+                        "entities": update["entities"],
+                    }
+                )
+            elif "generate_npcs" in chunk:
                 update = chunk["generate_npcs"]
                 await websocket.send_json(
                     {
@@ -60,6 +69,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
                         "type": "round",
                         "round": update["current_round"] - 1,
                         "events": update["events"],
+                        "npcs": update["npcs"],
                     }
                 )
 

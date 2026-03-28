@@ -1,3 +1,5 @@
+from typing import Any
+
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
@@ -13,7 +15,7 @@ def should_continue(state: SimState) -> str:
     return END
 
 
-def build_graph() -> CompiledStateGraph:
+def build_graph() -> CompiledStateGraph[Any, Any, Any, Any]:  # type: ignore[type-arg]
     graph = StateGraph(SimState)
     graph.add_node("parse_policy", parse_policy)
     graph.add_node("generate_npcs", generate_npcs)

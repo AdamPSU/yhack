@@ -41,6 +41,16 @@ export interface NPCState {
   message?: string;
 }
 
+export interface NPCHoverInfo {
+  id: string;
+  name: string;
+  role: string;
+  x: number;
+  y: number;
+  sentiment: "happy" | "neutral" | "worried" | "angry";
+  state: NPCState["state"];
+}
+
 export interface BuildingPositions {
   government: { x: number; y: number };
   shops: { id: string; x: number; y: number }[];

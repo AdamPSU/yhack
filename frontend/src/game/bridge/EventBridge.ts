@@ -1,8 +1,13 @@
-import Phaser from "phaser";
-import type { NPCState, SimEvent } from "@/lib/types";
+import type { NPCHoverInfo, NPCState, SimEvent } from "@/lib/types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Listener = (...args: any[]) => void;
 
 /**
  * Singleton event bus bridging React ↔ Phaser.
+ *
+ * Uses a lightweight custom emitter instead of Phaser.Events.EventEmitter
+ * so it can be imported safely during SSR (Phaser requires browser APIs).
  *
  * React side emits:
  *   sim:event        (SimEvent)       → Phaser receives and triggers game effects
@@ -11,18 +16,43 @@ import type { NPCState, SimEvent } from "@/lib/types";
  * Phaser side emits:
  *   sim:npc-position (NPCState)       → React renders DOM chat bubbles
  */
-class EventBridge extends Phaser.Events.EventEmitter {
+class EventBridge {
   private static instance: EventBridge;
+  private listeners = new Map<string, Set<{ fn: Listener; ctx: unknown }>>();
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   static getInstance(): EventBridge {
     if (!EventBridge.instance) {
       EventBridge.instance = new EventBridge();
     }
     return EventBridge.instance;
+  }
+
+  on(event: string, fn: Listener, context?: unknown) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add({ fn, ctx: context });
+  }
+
+  off(event: string, fn: Listener, context?: unknown) {
+    const set = this.listeners.get(event);
+    if (!set) return;
+    for (const entry of set) {
+      if (entry.fn === fn && entry.ctx === context) {
+        set.delete(entry);
+        break;
+      }
+    }
+  }
+
+  emit(event: string, ...args: unknown[]) {
+    const set = this.listeners.get(event);
+    if (!set) return;
+    for (const { fn, ctx } of set) {
+      fn.apply(ctx, args);
+    }
   }
 
   // React → Phaser
@@ -34,9 +64,22 @@ class EventBridge extends Phaser.Events.EventEmitter {
     this.emit("sim:phase-change", { phase, month });
   }
 
+  // React → Phaser
+  emitCameraPan(dx: number, dy: number) {
+    this.emit("sim:camera-pan", { dx, dy });
+  }
+
   // Phaser → React
   emitNPCPosition(npc: NPCState) {
     this.emit("sim:npc-position", npc);
+  }
+
+  emitNPCHover(info: NPCHoverInfo) {
+    this.emit("sim:npc-hover", info);
+  }
+
+  emitNPCHoverOut() {
+    this.emit("sim:npc-hover-out");
   }
 }
 

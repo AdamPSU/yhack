@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+import * as Phaser from "phaser";
 
 export const TILE_SIZE = 16;
 export const MAP_COLS = 40;
@@ -22,6 +22,6 @@ export function createGameConfig(
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: scenes,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#1a1510",
   };
 }

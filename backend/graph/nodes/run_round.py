@@ -44,7 +44,7 @@ _TYPE_WEIGHTS = {
 # --- Opinion dynamics constants (Peralta et al. 2022) ---
 
 # Mood represented as continuous value in [0, 1] for Deffuant dynamics.
-_MOOD_LADDER = ["angry", "anxious", "worried", "neutral", "hopeful", "excited"]
+_MOOD_LADDER = ["angry", "anxious", "worried", "skeptical", "neutral", "determined", "hopeful", "excited"]
 _MOOD_TO_CONTINUOUS = {m: i / (len(_MOOD_LADDER) - 1) for i, m in enumerate(_MOOD_LADDER)}
 _MOOD_BREAKPOINTS = [i / (len(_MOOD_LADDER) - 1) for i in range(len(_MOOD_LADDER))]
 
@@ -107,7 +107,7 @@ def _format_nearby_npcs(
     for other in all_npcs:
         oid = other.get("id")
         if oid in id_set:
-            line = f"- {other.get('name', '?')} ({other.get('role', '?')}, mood: {other.get('mood', '?')})"
+            line = f"- {other.get('name', '?')} ({other.get('profession', '?')})"
             if oid in rel_lookup:
                 rtype, strength = rel_lookup[oid]
                 line += f" [your {rtype}, closeness: {strength:.1f}]"
@@ -248,16 +248,19 @@ async def _simulate_single_npc(
 
     prompt = NPC_ROUND_PROMPT.format(
         npc_name=npc.get("name", "Unknown"),
-        npc_role=npc.get("role", "worker"),
-        npc_industry=npc.get("industry", "general"),
+        npc_gender=npc.get("gender", ""),
+        npc_profession=npc.get("profession", "local resident"),
+        npc_country=npc.get("country", "USA"),
+        npc_mbti=npc.get("mbti", ""),
+        npc_bio=npc.get("bio", ""),
+        npc_persona=npc.get("persona", ""),
+        npc_interested_topics=", ".join(npc.get("interested_topics", [])),
         npc_income=npc.get("income_level", "medium"),
         npc_leaning=f'{npc.get("political_leaning", 0.0)} ({_political_label(npc.get("political_leaning", 0.0))})',
-        npc_personality=npc.get("personality", "Ordinary person."),
-        npc_mood=npc.get("mood", "neutral"),
         npc_x=npc.get("x", 0),
         npc_y=npc.get("y", 0),
         policy_summary=policy_text,
-        current_round=current_round + 1,  # Display as 1-indexed for the LLM.
+        current_round=current_round + 1,
         max_rounds=max_rounds,
         round_context=round_context,
         nearby_npcs=nearby_npcs,

@@ -8,23 +8,17 @@ from config import MAX_X, MAX_Y
 class NPC(BaseModel):
     id: str
     name: str
-    role: Literal[
-        "worker",
-        "business_owner",
-        "politician",
-        "student",
-        "retiree",
-        "activist",
-        "farmer",
-        "shopkeeper",
-    ]
+    gender: str
+    bio: str
+    persona: str
+    mbti: str
+    country: str
+    profession: str
+    interested_topics: list[str]
     income_level: Literal["low", "medium", "high"]
     political_leaning: float = Field(ge=-1, le=1)
-    industry: str
-    personality: str
     x: int = Field(ge=0, le=MAX_X)
     y: int = Field(ge=0, le=MAX_Y)
-    mood: str = "neutral"
 
 
 class Relationship(BaseModel):

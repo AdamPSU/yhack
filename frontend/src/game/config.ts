@@ -1,10 +1,10 @@
 import * as Phaser from "phaser";
 
 export const TILE_SIZE = 16;
-export const MAP_COLS = 40;
-export const MAP_ROWS = 30;
-export const GAME_WIDTH = MAP_COLS * TILE_SIZE; // 640
-export const GAME_HEIGHT = MAP_ROWS * TILE_SIZE; // 480
+export const MAP_COLS = 80;
+export const MAP_ROWS = 60;
+export const GAME_WIDTH = MAP_COLS * TILE_SIZE; // 1280
+export const GAME_HEIGHT = MAP_ROWS * TILE_SIZE; // 960
 export const SCALE_FACTOR = 2; // render at 2x for crisp pixels
 
 export function createGameConfig(

@@ -22,6 +22,9 @@ export class NPC extends Phaser.GameObjects.Sprite {
   /** True while a movement tween is running */
   isMoving = false;
 
+  /** True while the pointer is over this NPC */
+  isHovered = false;
+
   /** Active bob tween, stopped on walk completion */
   private bobTween?: Phaser.Tweens.Tween;
 
@@ -108,6 +111,11 @@ export class NPC extends Phaser.GameObjects.Sprite {
         y: targetY,
         duration: 300,
         ease: "Linear",
+        onUpdate: () => {
+          if (this.isHovered) {
+            this.emitHoverEvent();
+          }
+        },
         onComplete: () => {
           // Stop bob and reset to neutral
           this.bobTween?.stop();
@@ -121,7 +129,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
     });
   }
 
-  private onHover() {
+  private emitHoverEvent() {
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
@@ -133,7 +141,13 @@ export class NPC extends Phaser.GameObjects.Sprite {
     });
   }
 
+  private onHover() {
+    this.isHovered = true;
+    this.emitHoverEvent();
+  }
+
   private onHoverOut() {
+    this.isHovered = false;
     eventBridge.emitNPCHoverOut();
   }
 

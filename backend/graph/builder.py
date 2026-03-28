@@ -3,7 +3,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from graph.nodes.generate_npcs import generate_npcs
+from graph.nodes.npc_orchestrator import generate_npcs
 from graph.nodes.parse_policy import parse_policy
 from graph.nodes.run_round import run_round
 from models.state import SimState

@@ -34,58 +34,113 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 }}
 </output_format>"""
 
-GENERATE_NPCS_PROMPT = """\
-You are a creative world-builder designing characters for an economic policy simulation set in a small American town called Millfield.
+EXTRACT_CHARACTERS_PROMPT = """\
+You are a character analyst. Your job is to extract named individuals or richly-described archetypes from the source text below and map them to simulation personas.
 
 <task>
-Based on the policy analysis below, generate exactly 25 diverse NPC personas who live and work in this town. These characters should represent a realistic cross-section of people who would be affected by the policy. Also generate 30-40 relationships between them.
+Read the source text carefully. Extract every named person or clearly-described archetype (e.g. "the single mother who runs a diner", "the retired steelworker") that has enough detail to form a character. Return only what you can genuinely infer — do not invent details not present in the text.
 </task>
 
-<policy_analysis>
+<source_text>
+{source_text}
+</source_text>
+
+<policy_context>
 {entities_json}
-</policy_analysis>
+</policy_context>
 
-<npc_requirements>
-<requirement>Each NPC needs a unique, memorable name and distinct personality</requirement>
-<requirement>Include a realistic mix of: workers, business owners, politicians, students, retirees, activists, farmers, and shopkeepers</requirement>
-<requirement>Vary income levels (low/medium/high), political leanings (-1.0 far left to 1.0 far right), and industries</requirement>
-<requirement>Each personality should be 1-2 sentences capturing how they think, what they care about, and how they might react to change</requirement>
-<requirement>Assign grid positions (x: 0-19, y: 0-14) — spread characters across the map, clustering related characters near each other (e.g., shopkeepers near each other in a "downtown" area, farmers on the outskirts)</requirement>
-<requirement>Starting mood should reflect their likely initial reaction to the policy: "hopeful", "anxious", "angry", "neutral", "excited", "worried", "skeptical", or "determined"</requirement>
-</npc_requirements>
+<output_format>
+Respond ONLY with valid JSON (no markdown fences, no commentary).
+Omit any field you cannot reasonably infer — only include fields with real signal from the text:
+{{
+  "characters": [
+    {{
+      "name": "Full Name or descriptive label",
+      "gender": "male|female|nonbinary (if determinable)",
+      "bio": "what the text tells us about their history",
+      "persona": "how they present themselves based on the text",
+      "mbti": "MBTI type if strongly implied by described behavior",
+      "country": "country if mentioned",
+      "profession": "job or occupation if mentioned",
+      "interested_topics": ["topics they clearly care about"],
+      "income_level": "low|medium|high (if inferable)",
+      "political_leaning": -1.0
+    }}
+  ]
+}}
+</output_format>"""
 
-<relationship_requirements>
-<requirement>Types: "friend", "family", "employer", "neighbor", "colleague"</requirement>
-<requirement>Strength: 0.0 to 1.0 (how much influence they have on each other)</requirement>
-<requirement>Make the social network realistic — family clusters, workplace connections, neighborhood proximity, unlikely friendships</requirement>
-</relationship_requirements>
+GENERATE_RANDOM_NPC_PROMPT = """\
+You are a creative character designer for an economic policy simulation set in a small American town called Millfield.
+
+<task>
+Generate exactly one fully-specified NPC persona for this simulation. The character should feel like a real person who lives in this town and would be affected by the policy context below. Do not repeat any of the names listed as already taken.
+</task>
+
+<policy_context>
+{entities_json}
+</policy_context>
+
+<taken_names>
+{existing_names}
+</taken_names>
+
+<requirements>
+<req>Unique name not in taken_names</req>
+<req>Role should be specific (e.g. "retired schoolteacher", "grain elevator operator")</req>
+<req>Bio: 2-3 sentences of life history grounded in this town and the policy's world</req>
+<req>Persona: how they come across to others — speech style, mannerisms, reputation</req>
+<req>interested_topics: 2-4 topics this person genuinely cares about</req>
+<req>Grid position x: 0-19, y: 0-14 — place them somewhere that fits their role</req>
+<req>Mood reflects their initial reaction to the policy: hopeful|anxious|angry|neutral|excited|worried|skeptical|determined</req>
+</requirements>
 
 <output_format>
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
-  "npcs": [
-    {{
-      "id": "npc_01",
-      "name": "Full Name",
-      "role": "worker|business_owner|politician|student|retiree|activist|farmer|shopkeeper",
-      "income_level": "low|medium|high",
-      "political_leaning": -1.0 to 1.0,
-      "industry": "specific industry",
-      "personality": "1-2 sentence personality description",
-      "x": 0-19,
-      "y": 0-14,
-      "mood": "initial mood"
-    }},
-    ...
-  ],
+  "name": "Full Name",
+  "gender": "male|female|nonbinary",
+  "bio": "2-3 sentence life history",
+  "persona": "how they present to others",
+  "mbti": "one of the 16 MBTI types",
+  "country": "country of origin",
+  "profession": "specific job title",
+  "interested_topics": ["topic1", "topic2"],
+  "income_level": "low|medium|high",
+  "political_leaning": 0.0,
+  "x": 10,
+  "y": 7
+}}
+</output_format>"""
+
+GENERATE_RELATIONSHIPS_PROMPT = """\
+You are a social network designer for a small-town simulation.
+
+<task>
+Given the list of NPCs below, generate 30-40 realistic relationships that form a believable social fabric — family clusters, coworker bonds, neighborhood ties, and a few unlikely friendships.
+</task>
+
+<npcs>
+{npcs_summary}
+</npcs>
+
+<requirements>
+<req>Types: "friend", "family", "employer", "neighbor", "colleague"</req>
+<req>Strength 0.0–1.0: how much influence they have on each other</req>
+<req>Each NPC should have at least 1 relationship</req>
+<req>Cluster by profession/industry for colleague/employer ties, by proximity for neighbor ties</req>
+</requirements>
+
+<output_format>
+Respond ONLY with valid JSON (no markdown fences, no commentary):
+{{
   "relationships": [
     {{
       "source_id": "npc_01",
       "target_id": "npc_02",
       "rel_type": "friend|family|employer|neighbor|colleague",
-      "strength": 0.0-1.0
-    }},
-    ...
+      "strength": 0.7
+    }}
   ]
 }}
 </output_format>"""
@@ -95,12 +150,15 @@ You are simulating the behavior of a single person in a small town reacting to a
 
 <character>
 <name>{npc_name}</name>
-<role>{npc_role}</role>
-<industry>{npc_industry}</industry>
+<gender>{npc_gender}</gender>
+<profession>{npc_profession}</profession>
+<country>{npc_country}</country>
+<mbti>{npc_mbti}</mbti>
+<bio>{npc_bio}</bio>
+<persona>{npc_persona}</persona>
+<interested_topics>{npc_interested_topics}</interested_topics>
 <income_level>{npc_income}</income_level>
 <political_leaning description="-1 = far left, 1 = far right">{npc_leaning}</political_leaning>
-<personality>{npc_personality}</personality>
-<current_mood>{npc_mood}</current_mood>
 <position x="{npc_x}" y="{npc_y}"/>
 </character>
 

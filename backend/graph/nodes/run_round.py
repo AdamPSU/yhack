@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 
 from config import MAX_X, MAX_Y
 from graph.llm import get_llm
@@ -107,7 +107,7 @@ def _policy_summary(entities: list[dict]) -> str:
 async def _simulate_single_npc(
     npc: dict,
     state: SimState,
-    llm: ChatAnthropic,
+    llm: ChatOpenAI,
     policy_text: str,
     neighbor_events_str: str,
     round_context: str,

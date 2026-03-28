@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from graph.builder import build_graph
 from models.schemas import PolicyInput
+from models.state import SimState
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
 
     graph = build_graph()
 
-    initial_state = {
+    initial_state: SimState = {
         "policy_text": policy.text,
         "max_rounds": policy.num_rounds,
         "entities": [],

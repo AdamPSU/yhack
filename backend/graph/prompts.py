@@ -136,7 +136,7 @@ Think through three steps as this character:
 </instructions>
 
 <action_types>
-<action type="chat">Say something to a nearby character (must be within 2 tiles of you) or make a public statement. Prefer talking to friends, family, or colleagues over strangers when possible.</action>
+<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). Prefer talking to friends, family, or colleagues over strangers when possible.</action>
 <action type="move">Walk one tile in any direction (you can only move 1 step per round). Consider moving toward people you care about who aren't nearby yet — check the distant_connections section for directions.</action>
 <action type="protest">Organize or join a protest. Describe the sign/chant.</action>
 <action type="price_change">If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason.</action>

@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from graph.llm import invoke_llm_json
+import logging
+from typing import Any
+
+from graph.llm import invoke_llm_structured
 from graph.prompts import PARSE_POLICY_PROMPT
+from models.schemas import PolicyAnalysis
 from models.state import SimState
 
-_EMPTY_ENTITIES = {
+logger = logging.getLogger(__name__)
+
+_EMPTY_ENTITIES: dict[str, Any] = {
     "sectors": [],
     "stakeholders": [],
     "economic_impacts": [],
@@ -14,10 +20,15 @@ _EMPTY_ENTITIES = {
 }
 
 
-async def parse_policy(state: SimState) -> dict:
+async def parse_policy(state: SimState) -> dict[str, Any]:
     """Analyse raw policy text and extract sectors, stakeholders, and impacts."""
 
     prompt = PARSE_POLICY_PROMPT.format(policy_text=state["policy_text"])
-    entities = await invoke_llm_json(prompt, max_tokens=4096, fallback=_EMPTY_ENTITIES)
+    try:
+        result = await invoke_llm_structured(prompt, PolicyAnalysis, max_tokens=4096)
+        entities = result.model_dump()
+    except Exception:
+        logger.exception("parse_policy: structured output failed, using fallback")
+        entities = dict(_EMPTY_ENTITIES)
 
     return {"entities": [entities]}

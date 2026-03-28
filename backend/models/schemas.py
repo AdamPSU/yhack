@@ -1,8 +1,11 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from config import MAX_X, MAX_Y
+
+# Canonical mood values used throughout the simulation.
+MoodLiteral = Literal["angry", "anxious", "worried", "neutral", "hopeful", "excited"]
 
 
 class NPC(BaseModel):
@@ -24,7 +27,7 @@ class NPC(BaseModel):
     personality: str
     x: int = Field(ge=0, le=MAX_X)
     y: int = Field(ge=0, le=MAX_Y)
-    mood: str = "neutral"
+    mood: MoodLiteral = "neutral"
 
 
 class Relationship(BaseModel):
@@ -39,9 +42,51 @@ class SimEvent(BaseModel):
     npc_id: str
     event_type: Literal["chat", "move", "protest", "price_change", "mood_shift"]
     message: str
-    data: dict = Field(default_factory=dict)
+    data: dict[str, Any] = Field(default_factory=dict)
 
 
 class PolicyInput(BaseModel):
     text: str = Field(max_length=3000)
     num_rounds: int = 5
+
+
+# --- Structured output response models for LLM calls ---
+
+
+class StakeholderInfo(BaseModel):
+    name: str
+    type: Literal["individual", "group", "institution"]
+    impact: str
+
+
+class EconomicImpact(BaseModel):
+    description: str
+    direction: Literal["positive", "negative"]
+    magnitude: Literal["low", "medium", "high"]
+    timeframe: Literal["immediate", "short-term", "long-term"]
+
+
+class PolicyAnalysis(BaseModel):
+    """Structured response from the policy parsing LLM call."""
+    sectors: list[str]
+    stakeholders: list[StakeholderInfo]
+    economic_impacts: list[EconomicImpact]
+    controversy_level: Literal["low", "medium", "high"]
+
+
+class NPCGenerationResponse(BaseModel):
+    """Structured response from the NPC generation LLM call."""
+    npcs: list[NPC]
+    relationships: list[Relationship]
+
+
+class RawNPCEvent(BaseModel):
+    """A single event produced by an NPC during a simulation round."""
+    event_type: Literal["chat", "move", "protest", "price_change", "mood_shift"]
+    message: str
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class NPCRoundResponse(BaseModel):
+    """Structured response from a single NPC's round simulation."""
+    events: list[RawNPCEvent]

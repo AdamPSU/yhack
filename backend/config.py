@@ -12,9 +12,9 @@ MAX_NPCS = 25
 class Settings(BaseSettings):
     xai_api_key: str = ""
     k2_api_key: str = ""
-    model_name: str = "grok-4.20-non-reasoning"
+    model_name: str = "grok-4.20"
 
-    model_config = {"env_file": ".env"}
+    model_config: dict[str, tuple[str, str]] = {"env_file": (".env", ".env.local")}  # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
     def _is_k2_model(self) -> bool:

@@ -47,7 +47,7 @@ class SimEvent(BaseModel):
 
 class PolicyInput(BaseModel):
     text: str = Field(max_length=3000)
-    num_rounds: int = 5
+    num_rounds: int = 75
 
 
 # --- Structured output response models for LLM calls ---

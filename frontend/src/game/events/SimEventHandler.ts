@@ -6,40 +6,6 @@ import { ProtestEffect } from "../effects/ProtestEffect";
 import type { NPCManager } from "../systems/NPCManager";
 
 /**
- * Maps mock-data agentIds → NPC roster IDs.
- * Mock events use human-readable IDs like "gov-official",
- * but NPCManager keys NPCs by roster IDs like "gov_federal".
- */
-const AGENT_TO_NPC: Record<string, string> = {
-  "gov-official": "gov_federal",
-  journalist: "media_outlet",
-  "corp-exec": "corp_manufacturing",
-  steelworker: "hh_poor_1",
-  household: "hh_mc_1",
-  "household-2": "hh_hnw_1",
-  "auto-dealer": "corp_retail",
-  "auto-plant": "corp_retail",
-  "sme-owner": "sme_shop",
-  "union-rep": "labor_union",
-  economist: "gov_central_bank",
-  "appliance-mfg": "corp_manufacturing",
-  "grocery-store": "sme_shop",
-  "construction-co": "corp_manufacturing",
-  community: "labor_union",
-};
-
-/** Agent IDs that join protests */
-const PROTEST_NPCS = [
-  "labor_union",
-  "hh_mc_1",
-  "hh_poor_1",
-  "sme_shop",
-  "media_outlet",
-];
-/** Agent IDs that join strikes (at factory) */
-const STRIKE_NPCS = ["labor_union", "corp_manufacturing", "hh_poor_1"];
-
-/**
  * Listens for SimEvents via EventBridge and dispatches visual effects.
  * Connects the event stream from React/useSimulation to the Phaser world.
  */
@@ -65,8 +31,8 @@ export class SimEventHandler {
   private onSimEvent(event: SimEvent) {
     // Always show chat bubble if there's a message and an agent
     if (event.message && event.agentId !== "system") {
-      // Resolve mock agentId → NPC roster ID
-      const npcId = AGENT_TO_NPC[event.agentId] ?? event.agentId;
+      // Use agentId directly — backend NPC IDs match NPCManager keys
+      const npcId = event.agentId;
       this.npcManager.showMessage(npcId, event.message);
 
       // Detect NPC-to-NPC conversation: if a different NPC spoke recently, walk them together
@@ -96,28 +62,51 @@ export class SimEventHandler {
       case "price_change":
         this.handlePriceChange(event.message);
         break;
+      case "mood_shift":
+        // No additional visual effect — chat bubble already shown above
+        break;
     }
   }
 
   private handleProtest() {
-    this.protestEffect.trigger(PROTEST_NPCS);
+    // Dynamically pick angry/worried NPCs for the protest (up to 5)
+    const allNPCs = this.npcManager.getAllNPCs();
+    const protestNPCIds = allNPCs
+      .filter((n) => n.sentiment === "angry" || n.sentiment === "worried")
+      .slice(0, 5)
+      .map((n) => n.npcId);
+    // Fallback: if nobody is angry/worried, pick first 3 NPCs
+    if (protestNPCIds.length === 0) {
+      protestNPCIds.push(...allNPCs.slice(0, 3).map((n) => n.npcId));
+    }
+    this.protestEffect.trigger(protestNPCIds);
   }
 
   private handleStrike() {
-    // Strike: workers go to factory instead of government
+    // Strike: gather NPCs whose role contains "worker" (up to 3)
+    const allNPCs = this.npcManager.getAllNPCs();
+    const strikeNPCs = allNPCs
+      .filter((n) => n.role.toLowerCase().includes("worker"))
+      .slice(0, 3);
+    // Fallback: pick first 2 NPCs if no workers found
+    if (strikeNPCs.length === 0) {
+      strikeNPCs.push(...allNPCs.slice(0, 2));
+    }
+    const strikeIds = strikeNPCs.map((n) => n.npcId);
+
     const buildings = this.npcManager.getBuildings();
     const factory = buildings.factories[0];
     if (!factory) return;
 
-    for (const id of STRIKE_NPCS) {
-      const targetCol = factory.x + (STRIKE_NPCS.indexOf(id) % 3);
+    for (const id of strikeIds) {
+      const targetCol = factory.x + (strikeIds.indexOf(id) % 3);
       const targetRow = factory.y + 2;
       this.npcManager.sendTo(id, targetCol, targetRow);
     }
 
     // Release after a while
     this.scene.time.delayedCall(8000, () => {
-      for (const id of STRIKE_NPCS) {
+      for (const id of strikeIds) {
         this.npcManager.releaseNPC(id);
       }
     });

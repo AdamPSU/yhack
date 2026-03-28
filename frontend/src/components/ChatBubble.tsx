@@ -15,7 +15,9 @@ export function ChatBubble({ agentName, message, x, y }: ChatBubbleProps) {
       data-testid="chat-bubble"
     >
       <div className="rpg-panel px-2.5 py-1.5">
-        <div className="text-[9px] font-mono font-bold text-[#e8a43a]">{agentName}</div>
+        <div className="text-[9px] font-mono font-bold text-[#e8a43a]">
+          {agentName}
+        </div>
         <p className="mt-0.5 text-[10px] font-mono leading-snug text-[#c4b490]">
           {message.length > 80 ? `${message.slice(0, 80)}...` : message}
         </p>

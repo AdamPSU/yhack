@@ -69,6 +69,21 @@ class EventBridge {
     this.emit("sim:camera-pan", { dx, dy });
   }
 
+  // React → Phaser: initialize NPCs from backend
+  emitInitNPCs(npcs: unknown[]) {
+    this.emit("sim:init-npcs", npcs);
+  }
+
+  // React → Phaser: move an NPC to new position
+  emitNPCMove(npcId: string, toX: number, toY: number) {
+    this.emit("sim:npc-move", { npcId, toX, toY });
+  }
+
+  // React → Phaser: update NPC mood
+  emitNPCMood(npcId: string, mood: string) {
+    this.emit("sim:npc-mood", { npcId, mood });
+  }
+
   // Phaser → React
   emitNPCPosition(npc: NPCState) {
     this.emit("sim:npc-position", npc);

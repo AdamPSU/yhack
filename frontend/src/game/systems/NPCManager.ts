@@ -1,51 +1,26 @@
 import type * as Phaser from "phaser";
+import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
+import type { BackendNPC } from "@/lib/backendTypes";
 import type { BuildingPositions } from "@/lib/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { NPC } from "../entities/NPC";
 import { MovementSystem } from "./MovementSystem";
 
-/** NPC roster: id → display name + character sprite index */
-const NPC_ROSTER: { id: string; name: string; charIndex: number }[] = [
-  { id: "gov_federal", name: "Director Chen", charIndex: 0 },
-  { id: "gov_central_bank", name: "Chair Powell", charIndex: 1 },
-  { id: "corp_manufacturing", name: "CEO Martinez", charIndex: 2 },
-  { id: "corp_retail", name: "Jim's Auto", charIndex: 3 },
-  { id: "sme_shop", name: "Aisha Patel", charIndex: 4 },
-  { id: "media_outlet", name: "Reporter Davis", charIndex: 5 },
-  { id: "labor_union", name: "Tony Russo", charIndex: 6 },
-  { id: "hh_hnw_1", name: "James Park", charIndex: 7 },
-  { id: "hh_mc_1", name: "Maria Santos", charIndex: 8 },
-  { id: "hh_poor_1", name: "Frank Kowalski", charIndex: 9 },
-];
-
-/** Zone assignment — where each NPC prefers to spawn */
-type Zone = "government" | "commercial" | "industrial" | "residential";
-
-const ZONE_MAP: Record<string, Zone> = {
-  gov_federal: "government",
-  gov_central_bank: "government",
-  corp_manufacturing: "industrial",
-  corp_retail: "commercial",
-  sme_shop: "commercial",
-  media_outlet: "commercial",
-  labor_union: "industrial",
-  hh_hnw_1: "residential",
-  hh_mc_1: "residential",
-  hh_poor_1: "residential",
-};
-
-const ROLE_MAP: Record<string, string> = {
-  gov_federal: "Federal Policy Director",
-  gov_central_bank: "Central Bank Chair",
-  corp_manufacturing: "Manufacturing CEO",
-  corp_retail: "Auto Shop Owner",
-  sme_shop: "Corner Store Owner",
-  media_outlet: "News Reporter",
-  labor_union: "Union Leader",
-  hh_hnw_1: "Wealthy Investor",
-  hh_mc_1: "Middle-Class Worker",
-  hh_poor_1: "Low-Income Worker",
-};
+function roleToZone(role: string): string {
+  switch (role) {
+    case "politician":
+    case "activist":
+      return "government";
+    case "shopkeeper":
+    case "business_owner":
+      return "commercial";
+    case "worker":
+    case "farmer":
+      return "industrial";
+    default:
+      return "residential";
+  }
+}
 
 export class NPCManager {
   private scene: Phaser.Scene;
@@ -53,10 +28,12 @@ export class NPCManager {
   private movement: MovementSystem;
   private buildingPositions: BuildingPositions;
   private isWalkable: (col: number, row: number) => boolean;
+  private groundGrid: number[][];
+  /** Track assigned zone per NPC for releaseNPC */
+  private npcZones: Map<string, string> = new Map();
 
   constructor(
     scene: Phaser.Scene,
-    walkableTiles: { x: number; y: number }[],
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
     groundGrid: number[][],
@@ -64,52 +41,88 @@ export class NPCManager {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
     this.isWalkable = isWalkable;
+    this.groundGrid = groundGrid;
     this.movement = new MovementSystem(scene, isWalkable, groundGrid);
 
-    const walkableByZone = this.partitionByZone(walkableTiles);
+    // Listen for dynamic NPC init from backend via EventBridge
+    eventBridge.on("sim:init-npcs", this.onInitNPCs, this);
+    eventBridge.on("sim:npc-move", this.onNPCMove, this);
+    eventBridge.on("sim:npc-mood", this.onNPCMood, this);
+  }
 
-    // Spawn each NPC on a road/sidewalk tile near their preferred zone
-    for (const entry of NPC_ROSTER) {
-      const zone = ZONE_MAP[entry.id] ?? "residential";
-      const candidates = walkableByZone.get(zone) ?? walkableTiles;
+  private onInitNPCs(backendNPCs: unknown[]) {
+    // Clear any existing NPCs (sprites + movement timers)
+    this.movement.destroy();
+    for (const npc of this.npcs.values()) {
+      npc.destroy();
+    }
+    this.npcs.clear();
+    this.npcZones.clear();
 
-      // Prefer spawning on road/sidewalk tiles
-      const roadTiles = candidates.filter((t) =>
-        this.isRoadOrSidewalk(groundGrid, t.x, t.y),
-      );
-      const pool = roadTiles.length > 0 ? roadTiles : candidates;
-      const spawn = pool[Math.floor(Math.random() * pool.length)];
+    // Re-create movement system (timers were destroyed)
+    this.movement = new MovementSystem(
+      this.scene,
+      this.isWalkable,
+      this.groundGrid,
+    );
 
-      if (!spawn) continue;
+    const npcs = backendNPCs as BackendNPC[];
 
-      const npc = new NPC(
-        scene,
-        entry.id,
-        entry.name,
-        entry.charIndex,
-        spawn.x,
-        spawn.y,
-      );
-      npc.role = ROLE_MAP[entry.id] ?? "Citizen";
-      this.npcs.set(entry.id, npc);
+    for (let i = 0; i < npcs.length; i++) {
+      const bn = npcs[i];
+
+      let tileX = bn.x * COORD_SCALE;
+      let tileY = bn.y * COORD_SCALE;
+
+      // Snap to nearest walkable tile if landed on a building
+      if (!this.isWalkable(tileX, tileY)) {
+        const snapped = this.findNearestWalkable(tileX, tileY);
+        if (snapped) {
+          tileX = snapped.x;
+          tileY = snapped.y;
+        }
+      }
+
+      const charIndex = i % 16;
+      const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+      npc.role = bn.role;
+      npc.sentiment = moodToSentiment(bn.mood);
+      this.npcs.set(bn.id, npc);
+
+      const zone = roleToZone(bn.role);
+      this.npcZones.set(bn.id, zone);
       this.movement.startRoaming(npc, zone);
     }
   }
 
-  private isRoadOrSidewalk(
-    ground: number[][],
-    col: number,
-    row: number,
-  ): boolean {
-    const tile = ground[row]?.[col];
-    // Road and sidewalk tile indices from TileRegistry
-    return (
-      tile === 355 || // ROAD_H
-      tile === 358 || // ROAD_V
-      tile === 94 || // ROAD_CROSS / intersections
-      tile === 86 || // SIDEWALK / CONCRETE
-      tile === 87 // CONCRETE_ALT
-    );
+  private onNPCMove(data: { npcId: string; toX: number; toY: number }) {
+    const npc = this.npcs.get(data.npcId);
+    if (!npc) return;
+    const targetX = data.toX * COORD_SCALE;
+    const targetY = data.toY * COORD_SCALE;
+    this.stepToward(npc, targetX, targetY, 5);
+  }
+
+  private onNPCMood(data: { npcId: string; mood: string }) {
+    const npc = this.npcs.get(data.npcId);
+    if (!npc) return;
+    npc.sentiment = moodToSentiment(data.mood);
+  }
+
+  private findNearestWalkable(
+    x: number,
+    y: number,
+  ): { x: number; y: number } | null {
+    for (let r = 1; r <= 5; r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (this.isWalkable(x + dx, y + dy)) {
+            return { x: x + dx, y: y + dy };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   getNPC(id: string): NPC | undefined {
@@ -136,7 +149,7 @@ export class NPCManager {
     if (!npc) return;
     npc.npcState = "idle";
     this.movement.release(npcId);
-    this.movement.startRoaming(npc, ZONE_MAP[npcId]);
+    this.movement.startRoaming(npc, this.npcZones.get(npcId));
   }
 
   /** Show chat bubble via EventBridge → React */
@@ -244,37 +257,15 @@ export class NPCManager {
     return this.buildingPositions;
   }
 
-  /** Partition walkable tiles into zones based on row ranges */
-  private partitionByZone(
-    tiles: { x: number; y: number }[],
-  ): Map<Zone, { x: number; y: number }[]> {
-    const zones = new Map<Zone, { x: number; y: number }[]>();
-    zones.set("government", []);
-    zones.set("commercial", []);
-    zones.set("industrial", []);
-    zones.set("residential", []);
-
-    for (const tile of tiles) {
-      // Zone by row: government 3-10, commercial 11-16, industrial 19-24, residential everywhere else
-      if (tile.y >= 3 && tile.y <= 10) {
-        zones.get("government")?.push(tile);
-      } else if (tile.y >= 11 && tile.y <= 16) {
-        zones.get("commercial")?.push(tile);
-      } else if (tile.y >= 19 && tile.y <= 24) {
-        zones.get("industrial")?.push(tile);
-      } else {
-        zones.get("residential")?.push(tile);
-      }
-    }
-
-    return zones;
-  }
-
   destroy() {
+    eventBridge.off("sim:init-npcs", this.onInitNPCs, this);
+    eventBridge.off("sim:npc-move", this.onNPCMove, this);
+    eventBridge.off("sim:npc-mood", this.onNPCMood, this);
     this.movement.destroy();
     for (const npc of this.npcs.values()) {
       npc.destroy();
     }
     this.npcs.clear();
+    this.npcZones.clear();
   }
 }

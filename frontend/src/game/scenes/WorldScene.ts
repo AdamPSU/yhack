@@ -1,12 +1,7 @@
 import * as Phaser from "phaser";
 import type { BuildingPositions } from "@/lib/types";
 import { eventBridge } from "../bridge/EventBridge";
-import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  MAP_COLS,
-  MAP_ROWS,
-} from "../config";
+import { GAME_HEIGHT, GAME_WIDTH, MAP_COLS, MAP_ROWS } from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
 import { NPCManager } from "../systems/NPCManager";
 
@@ -72,7 +67,6 @@ export class WorldScene extends Phaser.Scene {
     // ─── NPC System (Agent C) ───
     this.npcManager = new NPCManager(
       this,
-      this.getWalkableTiles(),
       this.getBuildingPositions(),
       this.isWalkable.bind(this),
       this.getGroundGrid(),
@@ -81,20 +75,6 @@ export class WorldScene extends Phaser.Scene {
 
     // Emit ready state
     this.events.emit("world-ready");
-  }
-
-  // ─── Public API for Agent C (NPC system) ───
-
-  getWalkableTiles(): { x: number; y: number }[] {
-    const tiles: { x: number; y: number }[] = [];
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
-        if (this.isWalkable(c, r)) {
-          tiles.push({ x: c, y: r });
-        }
-      }
-    }
-    return tiles;
   }
 
   getBuildingPositions(): BuildingPositions {
@@ -129,7 +109,11 @@ export class WorldScene extends Phaser.Scene {
         const g = tile.index;
 
         if (g === FACTORY_TL) {
-          positions.factories.push({ id: `factory-${factoryIdx++}`, x: c, y: r });
+          positions.factories.push({
+            id: `factory-${factoryIdx++}`,
+            x: c,
+            y: r,
+          });
         } else if (g === SHOP1_TL || g === SHOP2_TL || g === LONG_SHOP_TL) {
           positions.shops.push({ id: `shop-${shopIdx++}`, x: c, y: r });
         } else if (g === HOUSE_TL) {

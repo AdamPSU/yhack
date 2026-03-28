@@ -212,7 +212,8 @@ export function generateCity(): CityGrid {
   // Government: 4 wide × 2 tall using gray roof + gov walls
   for (let dc = 0; dc < 4; dc++) {
     buildings[govRow][govCol + dc] = Tiles.GOV_ROOF;
-    buildings[govRow + 1][govCol + dc] = dc === 1 ? Tiles.GOV_DOOR : Tiles.GOV_WALL;
+    buildings[govRow + 1][govCol + dc] =
+      dc === 1 ? Tiles.GOV_DOOR : Tiles.GOV_WALL;
     walkable[govRow][govCol + dc] = false;
     walkable[govRow + 1][govCol + dc] = false;
   }
@@ -242,10 +243,14 @@ export function generateCity(): CityGrid {
     if (isRoad(h.row, h.col) || isRoad(h.row + 2, h.col)) continue;
     if (ground[h.row][h.col] === Tiles.SIDEWALK) continue;
     placeBuilding2x2(
-      buildings, walkable,
-      h.row, h.col,
-      Tiles.ROOF_RED_TL, Tiles.ROOF_RED_TR,
-      Tiles.WALL_WINDOW, Tiles.WALL_DOOR,
+      buildings,
+      walkable,
+      h.row,
+      h.col,
+      Tiles.ROOF_RED_TL,
+      Tiles.ROOF_RED_TR,
+      Tiles.WALL_WINDOW,
+      Tiles.WALL_DOOR,
     );
     positions.houses.push({ id: h.id, x: h.col, y: h.row });
   }
@@ -270,10 +275,16 @@ export function generateCity(): CityGrid {
   for (const s of shopConfigs) {
     if (isRoad(s.row, s.col) || isRoad(s.row + 2, s.col)) continue;
     placeBuilding3x2(
-      buildings, walkable,
-      s.row, s.col,
-      Tiles.ROOF_GRAY_TL, Tiles.ROOF_GRAY_T, Tiles.ROOF_GRAY_TR,
-      Tiles.WALL_SHOP_FRONT, Tiles.WALL_SHOP_DOOR, Tiles.WALL_SHOP_WINDOW,
+      buildings,
+      walkable,
+      s.row,
+      s.col,
+      Tiles.ROOF_GRAY_TL,
+      Tiles.ROOF_GRAY_T,
+      Tiles.ROOF_GRAY_TR,
+      Tiles.WALL_SHOP_FRONT,
+      Tiles.WALL_SHOP_DOOR,
+      Tiles.WALL_SHOP_WINDOW,
     );
     positions.shops.push({ id: s.id, x: s.col, y: s.row });
   }
@@ -294,10 +305,14 @@ export function generateCity(): CityGrid {
     if (h.col >= MAP_COLS - 1) continue;
     if (isRoad(h.row, h.col) || isRoad(h.row + 2, h.col)) continue;
     placeBuilding2x2(
-      buildings, walkable,
-      h.row, h.col,
-      Tiles.ROOF_RED_TL, Tiles.ROOF_RED_TR,
-      Tiles.WALL_WINDOW, Tiles.WALL_DOOR,
+      buildings,
+      walkable,
+      h.row,
+      h.col,
+      Tiles.ROOF_RED_TL,
+      Tiles.ROOF_RED_TR,
+      Tiles.WALL_WINDOW,
+      Tiles.WALL_DOOR,
     );
     positions.houses.push({ id: h.id, x: h.col, y: h.row });
   }
@@ -315,10 +330,16 @@ export function generateCity(): CityGrid {
   for (const f of factoryConfigs) {
     if (isRoad(f.row, f.col) || isRoad(f.row + 2, f.col)) continue;
     placeBuilding3x2(
-      buildings, walkable,
-      f.row, f.col,
-      Tiles.ROOF_GRAY_TL, Tiles.ROOF_GRAY_T, Tiles.ROOF_GRAY_TR,
-      Tiles.FACTORY_WALL, Tiles.FACTORY_DOOR, Tiles.FACTORY_CHIMNEY,
+      buildings,
+      walkable,
+      f.row,
+      f.col,
+      Tiles.ROOF_GRAY_TL,
+      Tiles.ROOF_GRAY_T,
+      Tiles.ROOF_GRAY_TR,
+      Tiles.FACTORY_WALL,
+      Tiles.FACTORY_DOOR,
+      Tiles.FACTORY_CHIMNEY,
     );
     positions.factories.push({ id: f.id, x: f.col, y: f.row });
   }
@@ -339,10 +360,14 @@ export function generateCity(): CityGrid {
     if (h.col + 1 >= MAP_COLS) continue;
     if (isRoad(h.row, h.col) || isRoad(h.row + 2, h.col)) continue;
     placeBuilding2x2(
-      buildings, walkable,
-      h.row, h.col,
-      Tiles.ROOF_GREEN_TL, Tiles.ROOF_GREEN_TR,
-      Tiles.WALL_BRICK_WINDOW, Tiles.WALL_DOOR,
+      buildings,
+      walkable,
+      h.row,
+      h.col,
+      Tiles.ROOF_GREEN_TL,
+      Tiles.ROOF_GREEN_TR,
+      Tiles.WALL_BRICK_WINDOW,
+      Tiles.WALL_DOOR,
     );
     positions.houses.push({ id: h.id, x: h.col, y: h.row });
   }

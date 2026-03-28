@@ -100,7 +100,9 @@ export function EventFeed({ events }: EventFeedProps) {
               data-testid="event-item"
             >
               <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-mono ${eventAccent(event.type)}`}>
+                <span
+                  className={`text-[10px] font-mono ${eventAccent(event.type)}`}
+                >
                   {eventIcon(event.type)}
                 </span>
                 <span className="text-[10px] font-mono font-bold text-[#c4b490]">

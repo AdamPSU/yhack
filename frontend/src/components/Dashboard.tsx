@@ -30,7 +30,9 @@ function MetricCard({ label, value, trend, severity }: MetricCardProps) {
       <span className="text-[10px] font-mono uppercase text-[#8a7a62]">
         {label}
       </span>
-      <span className={`text-xs font-mono font-bold tabular-nums ${severityColor}`}>
+      <span
+        className={`text-xs font-mono font-bold tabular-nums ${severityColor}`}
+      >
         {trendArrow} {value}
       </span>
     </div>

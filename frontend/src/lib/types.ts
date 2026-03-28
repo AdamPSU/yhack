@@ -8,7 +8,8 @@ export type SimEventType =
   | "closure"
   | "strike"
   | "policy_response"
-  | "phase_change";
+  | "phase_change"
+  | "mood_shift";
 
 export interface SimEvent {
   id: string;

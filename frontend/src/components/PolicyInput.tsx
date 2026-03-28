@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { POLICY_PRESETS } from "@/lib/mockData";
 
 export function PolicyInput() {
@@ -10,7 +10,8 @@ export function PolicyInput() {
 
   function handleSimulate() {
     if (text.trim().length < 20) return;
-    router.push(`/simulate?policy=${encodeURIComponent(text.slice(0, 200))}`);
+    sessionStorage.setItem("agora-policy", text);
+    router.push("/simulate");
   }
 
   return (

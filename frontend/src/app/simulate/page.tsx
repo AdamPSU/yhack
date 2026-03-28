@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSimulation } from "@/hooks/useSimulation";
+import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
-import { ChatBubble } from "@/components/ChatBubble";
+import { useSimulation } from "@/hooks/useSimulation";
 import type { NPCHoverInfo, NPCState } from "@/lib/types";
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
@@ -16,7 +16,8 @@ const SCALE_FACTOR = 2;
 
 // Phaser requires browser APIs — must be client-only
 const GameCanvas = dynamic(
-  () => import("@/components/GameCanvas").then((m) => ({ default: m.GameCanvas })),
+  () =>
+    import("@/components/GameCanvas").then((m) => ({ default: m.GameCanvas })),
   { ssr: false, loading: () => <GameCanvasPlaceholder /> },
 );
 
@@ -24,7 +25,10 @@ function GameCanvasPlaceholder() {
   return (
     <div
       className="rpg-panel flex items-center justify-center box-border"
-      style={{ width: GAME_WIDTH * SCALE_FACTOR + 4, height: GAME_HEIGHT * SCALE_FACTOR + 4 }}
+      style={{
+        width: GAME_WIDTH * SCALE_FACTOR + 4,
+        height: GAME_HEIGHT * SCALE_FACTOR + 4,
+      }}
     >
       <span className="text-xs font-mono text-[#5a4a32]">Loading world...</span>
     </div>
@@ -41,14 +45,18 @@ const PHASE_LABELS: Record<number, string> = {
 // Deterministic per agentId so bubbles appear at consistent locations.
 function getFallbackGamePos(agentId: string): { x: number; y: number } {
   let hash = 0;
-  for (let i = 0; i < agentId.length; i++) hash = (hash * 31 + agentId.charCodeAt(i)) | 0;
+  for (let i = 0; i < agentId.length; i++)
+    hash = (hash * 31 + agentId.charCodeAt(i)) | 0;
   return {
     x: 80 + Math.abs(hash % 480),
     y: 80 + Math.abs((hash >> 8) % 320),
   };
 }
 
-const SENTIMENT_LABEL: Record<NPCHoverInfo["sentiment"], { symbol: string; color: string }> = {
+const SENTIMENT_LABEL: Record<
+  NPCHoverInfo["sentiment"],
+  { symbol: string; color: string }
+> = {
   happy: { symbol: "+", color: "text-[#5ab85a]" },
   neutral: { symbol: "~", color: "text-[#8a7a62]" },
   worried: { symbol: "?", color: "text-[#e8a43a]" },
@@ -60,12 +68,19 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
   return (
     <div
       className="pointer-events-none absolute z-50"
-      style={{ left: info.x * SCALE_FACTOR + 16, top: info.y * SCALE_FACTOR - 4 }}
+      style={{
+        left: info.x * SCALE_FACTOR + 16,
+        top: info.y * SCALE_FACTOR - 4,
+      }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono font-bold text-[#e8a43a]">{info.name}</span>
-          <span className={`text-[10px] font-mono font-bold ${sent.color}`}>[{sent.symbol}]</span>
+          <span className="text-[10px] font-mono font-bold text-[#e8a43a]">
+            {info.name}
+          </span>
+          <span className={`text-[10px] font-mono font-bold ${sent.color}`}>
+            [{sent.symbol}]
+          </span>
         </div>
         <div className="text-[9px] font-mono text-[#8a7a62]">{info.role}</div>
       </div>
@@ -82,19 +97,31 @@ interface BubbleState {
 }
 
 export default function SimulatePage() {
-  const sim = useSimulation();
+  const [policyText, setPolicyText] = useState<string>("");
+  const sim = useSimulation(policyText);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   // Track whether Phaser NPC system is active (has emitted at least one position)
   const phaserActiveRef = useRef(false);
+  const hasStartedRef = useRef(false);
 
-  // Auto-start on mount
+  // Read policy from sessionStorage on mount
   useEffect(() => {
-    sim.start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const stored = sessionStorage.getItem("agora-policy");
+    if (stored) {
+      setPolicyText(stored);
+    }
   }, []);
+
+  // Auto-start when policyText becomes available (once only)
+  useEffect(() => {
+    if (policyText && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      sim.start();
+    }
+  }, [policyText, sim.start]);
 
   // Listen for NPC position updates from Phaser — primary bubble source
   useEffect(() => {
@@ -248,9 +275,15 @@ export default function SimulatePage() {
   const bubbleList = Array.from(bubbles.values());
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-[#1a1510]" data-testid="simulate-page">
+    <div
+      className="relative flex h-screen flex-col overflow-hidden bg-[#1a1510]"
+      data-testid="simulate-page"
+    >
       {/* Phase indicator bar */}
-      <div className="rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4" data-testid="phase-bar">
+      <div
+        className="rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4"
+        data-testid="phase-bar"
+      >
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
             AGORA
@@ -325,7 +358,11 @@ export default function SimulatePage() {
 
         {/* Right: Dashboard */}
         <div className="shrink-0">
-          <Dashboard metrics={sim.metrics} phase={sim.phase} month={sim.month} />
+          <Dashboard
+            metrics={sim.metrics}
+            phase={sim.phase}
+            month={sim.month}
+          />
         </div>
       </div>
     </div>

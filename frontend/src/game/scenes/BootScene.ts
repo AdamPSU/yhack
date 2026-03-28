@@ -30,7 +30,11 @@ export class BootScene extends Phaser.Scene {
     });
     text.setOrigin(0.5);
 
-    // Load tileset spritesheet
+    // Load Tiled JSON map + CCity tileset image
+    this.load.tilemapTiledJSON("city", "/assets/maps/city.json");
+    this.load.image("urban", "/assets/citymap_tilesets/CCity_mockup.png");
+
+    // Keep old spritesheet for NPC sprites (still uses Kenney RPG Urban Pack)
     this.load.spritesheet("city-tiles", "/assets/tilesets/tilemap_packed.png", {
       frameWidth: 16,
       frameHeight: 16,

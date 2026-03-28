@@ -6,14 +6,12 @@ import {
   GAME_WIDTH,
   MAP_COLS,
   MAP_ROWS,
-  TILE_SIZE,
 } from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
-import { type CityGrid, generateCity } from "../map/CityGenerator";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
-  private city!: CityGrid;
+  private map!: Phaser.Tilemaps.Tilemap;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private buildingLayer!: Phaser.Tilemaps.TilemapLayer;
   private phaseOverlay!: Phaser.GameObjects.Rectangle;
@@ -25,63 +23,31 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    // Generate the procedural city
-    this.city = generateCity();
+    // Load the Tiled JSON map
+    const map = this.make.tilemap({ key: "city" });
+    this.map = map;
 
-    // Create tilemap from data
-    const map = this.make.tilemap({
-      tileWidth: TILE_SIZE,
-      tileHeight: TILE_SIZE,
-      width: MAP_COLS,
-      height: MAP_ROWS,
-    });
-
-    const tileset = map.addTilesetImage(
-      "city-tiles",
-      "city-tiles",
-      TILE_SIZE,
-      TILE_SIZE,
-      0,
-      0,
-    );
+    const tileset = map.addTilesetImage("urban", "urban");
 
     if (!tileset) {
       console.error("Failed to load tileset");
       return;
     }
 
-    // Create ground layer
-    const groundLayer = map.createBlankLayer("ground", tileset, 0, 0);
+    // Create layers from the Tiled JSON data
+    const groundLayer = map.createLayer("ground", tileset);
     if (!groundLayer) {
       console.error("Failed to create ground layer");
       return;
     }
     this.groundLayer = groundLayer;
 
-    // Create building/overlay layer
-    const buildingLayer = map.createBlankLayer("buildings", tileset, 0, 0);
+    const buildingLayer = map.createLayer("buildings", tileset);
     if (!buildingLayer) {
       console.error("Failed to create building layer");
       return;
     }
     this.buildingLayer = buildingLayer;
-
-    // Paint ground tiles
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
-        this.groundLayer.putTileAt(this.city.ground[r][c], c, r);
-      }
-    }
-
-    // Paint building tiles
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
-        const tile = this.city.buildings[r][c];
-        if (tile !== -1) {
-          this.buildingLayer.putTileAt(tile, c, r);
-        }
-      }
-    }
 
     // Set building layer depth above ground
     this.buildingLayer.setDepth(1);
@@ -123,7 +89,7 @@ export class WorldScene extends Phaser.Scene {
     const tiles: { x: number; y: number }[] = [];
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
-        if (this.city.walkable[r][c]) {
+        if (this.isWalkable(c, r)) {
           tiles.push({ x: c, y: r });
         }
       }
@@ -132,16 +98,66 @@ export class WorldScene extends Phaser.Scene {
   }
 
   getBuildingPositions(): BuildingPositions {
-    return this.city.buildingPositions;
+    // Derive building positions from the buildings layer data
+    // Scan for known building top-left GIDs
+    const positions: BuildingPositions = {
+      government: { x: 9, y: 5 },
+      shops: [],
+      factories: [],
+      houses: [],
+    };
+
+    // Shop#1 top-left GID = 177 (tile 176 + 1)
+    // Shop#2 top-left GID = 249 (tile 248 + 1)
+    // Long Shop top-left GID = 253 (tile 252 + 1)
+    // Factory top-left GID = 227 (tile 226 + 1)
+    // House top-left GID = 271 (tile 270 + 1)
+    const SHOP1_TL = 177;
+    const SHOP2_TL = 249;
+    const LONG_SHOP_TL = 253;
+    const FACTORY_TL = 227;
+    const HOUSE_TL = 271;
+
+    let shopIdx = 0;
+    let factoryIdx = 0;
+    let houseIdx = 0;
+
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        const tile = this.buildingLayer.getTileAt(c, r);
+        if (!tile) continue;
+        const g = tile.index;
+
+        if (g === FACTORY_TL) {
+          positions.factories.push({ id: `factory-${factoryIdx++}`, x: c, y: r });
+        } else if (g === SHOP1_TL || g === SHOP2_TL || g === LONG_SHOP_TL) {
+          positions.shops.push({ id: `shop-${shopIdx++}`, x: c, y: r });
+        } else if (g === HOUSE_TL) {
+          positions.houses.push({ id: `house-${houseIdx++}`, x: c, y: r });
+        }
+      }
+    }
+
+    return positions;
   }
 
   getGroundGrid(): number[][] {
-    return this.city.ground;
+    const grid: number[][] = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < MAP_COLS; c++) {
+        const tile = this.groundLayer.getTileAt(c, r);
+        grid[r][c] = tile ? tile.index : 0;
+      }
+    }
+    return grid;
   }
 
   isWalkable(col: number, row: number): boolean {
     if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return false;
-    return this.city.walkable[row][col];
+    // getTileAt returns null for empty cells (GID 0 in Tiled JSON → index -1 internally → null when nonNull=false)
+    // A non-null tile means a building occupies this cell
+    return !this.buildingLayer.getTileAt(col, row);
   }
 
   // ─── Internal event handlers ───

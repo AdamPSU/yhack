@@ -13,21 +13,22 @@ class Settings(BaseSettings):
     xai_api_key: str = ""
     k2_api_key: str = ""
     model_name: str = "grok-4.20-non-reasoning"
-    max_rounds: int = 5
 
     model_config = {"env_file": ".env"}
 
     @property
+    def _is_k2_model(self) -> bool:
+        return self.model_name.startswith("k2")
+
+    @property
     def llm_api_key(self) -> str:
         """Return the API key for the currently selected model."""
-        if self.model_name.startswith("k2"):
-            return self.k2_api_key
-        return self.xai_api_key
+        return self.k2_api_key if self._is_k2_model else self.xai_api_key
 
     @property
     def llm_base_url(self) -> str:
         """Return the base URL for the currently selected model."""
-        if self.model_name.startswith("k2"):
+        if self._is_k2_model:
             return "https://api.k2think.ai/v1"
         return "https://api.x.ai/v1"
 

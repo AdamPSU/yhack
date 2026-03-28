@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from graph.llm import get_llm
+from graph.llm import invoke_llm_json
 from graph.prompts import PARSE_POLICY_PROMPT
-from graph.utils import parse_llm_json
 from models.state import SimState
 
 _EMPTY_ENTITIES = {
@@ -18,12 +17,7 @@ _EMPTY_ENTITIES = {
 async def parse_policy(state: SimState) -> dict:
     """Analyse raw policy text and extract sectors, stakeholders, and impacts."""
 
-    llm = get_llm(max_tokens=4096)
-
     prompt = PARSE_POLICY_PROMPT.format(policy_text=state["policy_text"])
-    response = await llm.ainvoke(prompt)
-    content: str = response.content  # type: ignore[assignment]
-
-    entities = parse_llm_json(content, fallback=_EMPTY_ENTITIES)
+    entities = await invoke_llm_json(prompt, max_tokens=4096, fallback=_EMPTY_ENTITIES)
 
     return {"entities": [entities]}

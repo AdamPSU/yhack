@@ -11,12 +11,11 @@ from __future__ import annotations
 import asyncio
 import math
 
-from langchain_openai import ChatOpenAI
-
 from config import MAX_X, MAX_Y
-from graph.llm import get_llm
+from graph.llm import get_llm, invoke_llm_json
 from graph.prompts import NPC_ROUND_PROMPT
-from graph.utils import parse_llm_json
+from graph.utils import clamp
+from models.schemas import SimEvent
 from models.state import SimState
 
 
@@ -265,10 +264,7 @@ async def _simulate_single_npc(
         neighbor_events=neighbor_events_str,
     )
 
-    response = await llm.ainvoke(prompt)
-    content: str = response.content  # type: ignore[assignment]
-
-    data = parse_llm_json(content, fallback={"events": []})
+    data = await invoke_llm_json(prompt, fallback={"events": []}, llm=llm)
 
     raw_events: list[dict] = data.get("events", [])
     if not raw_events:
@@ -281,19 +277,21 @@ async def _simulate_single_npc(
             }
         ]
 
-    # Tag each event with round and NPC id.
+    # Tag each event with round and NPC id, validating through SimEvent.
     npc_id = npc.get("id", "unknown")
     sim_events: list[dict] = []
     for ev in raw_events:
-        sim_events.append(
-            {
-                "round": current_round,
-                "npc_id": npc_id,
-                "event_type": ev.get("event_type", "chat"),
-                "message": ev.get("message", ""),
-                "data": ev.get("data", {}),
-            }
-        )
+        try:
+            event = SimEvent(
+                round=current_round,
+                npc_id=npc_id,
+                event_type=ev.get("event_type", "chat"),
+                message=ev.get("message", ""),
+                data=ev.get("data", {}),
+            )
+            sim_events.append(event.model_dump())
+        except Exception:
+            continue
 
     return sim_events
 
@@ -305,7 +303,7 @@ def _mood_to_continuous(mood: str) -> float:
 
 def _continuous_to_mood(value: float) -> str:
     """Map a continuous [0, 1] value back to the closest discrete mood."""
-    value = max(0.0, min(1.0, value))
+    value = clamp(value, 0.0, 1.0)
     best_idx = 0
     best_dist = abs(value - _MOOD_BREAKPOINTS[0])
     for i in range(1, len(_MOOD_BREAKPOINTS)):
@@ -384,7 +382,7 @@ def _apply_opinion_dynamics(
             # Discretized: x_j += dt · tanh(α · (2·x_j - 1)) where dt is small.
             centered = 2.0 * new_x_j - 1.0  # Map [0,1] back to [-1,1] for tanh.
             controversy_push = 0.05 * math.tanh(alpha * centered)
-            new_x_j = max(0.0, min(1.0, new_x_j + controversy_push))
+            new_x_j = clamp(new_x_j + controversy_push, 0.0, 1.0)
 
             # Map back to [-1, 1].
             npc_lookup[target_id]["political_leaning"] = round(new_x_j * 2.0 - 1.0, 4)
@@ -401,7 +399,7 @@ def _apply_opinion_dynamics(
                 mu_effective = _MU_MOOD * (1.3 if m_i < m_j else 1.0)
                 new_m_j = m_j + mu_effective * i_ij * (m_i - m_j)
 
-            new_m_j = max(0.0, min(1.0, new_m_j))
+            new_m_j = clamp(new_m_j, 0.0, 1.0)
             npc_lookup[target_id]["mood"] = _continuous_to_mood(new_m_j)
 
     # --- Baumann global controversy drift (Eq. 6) for all NPCs ---
@@ -412,7 +410,7 @@ def _apply_opinion_dynamics(
             x = float(npc.get("political_leaning", 0.0))
             # Self-reinforcement: opinions drift away from center under controversy.
             drift = 0.02 * math.tanh(alpha * x)
-            npc["political_leaning"] = round(max(-1.0, min(1.0, x + drift)), 4)
+            npc["political_leaning"] = round(clamp(x + drift, -1.0, 1.0), 4)
 
     return list(npc_lookup.values())
 
@@ -486,8 +484,8 @@ async def run_round(state: SimState) -> dict:
                 stepped_x = max(cur_x - 1, min(cur_x + 1, int(to_x)))
                 stepped_y = max(cur_y - 1, min(cur_y + 1, int(to_y)))
                 move_updates[ev["npc_id"]] = (
-                    max(0, min(MAX_X, stepped_x)),
-                    max(0, min(MAX_Y, stepped_y)),
+                    clamp(stepped_x, 0, MAX_X),
+                    clamp(stepped_y, 0, MAX_Y),
                 )
 
     updated_npcs = []

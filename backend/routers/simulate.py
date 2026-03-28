@@ -44,7 +44,15 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
 
     try:
         async for chunk in graph.astream(initial_state):
-            if "generate_npcs" in chunk:
+            if "parse_policy" in chunk:
+                update = chunk["parse_policy"]
+                await websocket.send_json(
+                    {
+                        "type": "policy_analysis",
+                        "entities": update["entities"],
+                    }
+                )
+            elif "generate_npcs" in chunk:
                 update = chunk["generate_npcs"]
                 await websocket.send_json(
                     {
@@ -60,6 +68,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
                         "type": "round",
                         "round": update["current_round"] - 1,
                         "events": update["events"],
+                        "npcs": update["npcs"],
                     }
                 )
 

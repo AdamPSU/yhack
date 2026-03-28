@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 def parse_llm_json(content: str, fallback: dict | None = None) -> dict:
@@ -29,3 +34,25 @@ def parse_llm_json(content: str, fallback: dict | None = None) -> dict:
             pass
 
     return fallback
+
+
+def clamp(value: float | int, lo: float | int, hi: float | int) -> float | int:
+    """Clamp *value* to the range [lo, hi]."""
+    return max(lo, min(hi, value))
+
+
+def validate_and_collect(
+    raw_items: list[dict],
+    model_class: type[BaseModel],
+) -> list[dict]:
+    """Validate each dict against *model_class*, returning those that pass.
+
+    Invalid items are logged and skipped instead of silently swallowed.
+    """
+    results: list[dict] = []
+    for raw in raw_items:
+        try:
+            results.append(model_class(**raw).model_dump())
+        except Exception:
+            logger.warning("Validation failed for %s: %s", model_class.__name__, raw)
+    return results

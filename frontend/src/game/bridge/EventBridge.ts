@@ -74,6 +74,11 @@ class EventBridge {
     this.emit("sim:camera-pan", { dx, dy });
   }
 
+  // React → Phaser: zoom camera
+  emitCameraZoom(delta: number) {
+    this.emit("sim:camera-zoom", { delta });
+  }
+
   // React → Phaser: initialize NPCs from backend (sticky — replays for late listeners)
   emitInitNPCs(npcs: unknown[]) {
     this.sticky.set("sim:init-npcs", [npcs]);

@@ -215,6 +215,23 @@ export default function SimulatePage() {
     };
   }, []);
 
+  // Camera zoom via scroll wheel
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+        eventBridge.emitCameraZoom(delta);
+      });
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   const bubbleList = Array.from(bubbles.values());
 
   return (
@@ -273,15 +290,41 @@ export default function SimulatePage() {
           <div ref={canvasContainerRef} className="relative shrink-0">
             <GameCanvas />
 
-            {/* Fullscreen toggle */}
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="absolute top-2 right-2 z-40 rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? "[X]" : "[ ]"}
-            </button>
+            {/* Fullscreen toggle + Zoom controls */}
+            <div className="absolute top-2 right-2 z-40 flex gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+                    eventBridge.emitCameraZoom(1);
+                  });
+                }}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title="Zoom in"
+              >
+                [+]
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+                    eventBridge.emitCameraZoom(-1);
+                  });
+                }}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title="Zoom out"
+              >
+                [-]
+              </button>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? "[X]" : "[ ]"}
+              </button>
+            </div>
 
             {/* Chat bubbles anchored to NPCs */}
             {bubbleList.map((b) => (

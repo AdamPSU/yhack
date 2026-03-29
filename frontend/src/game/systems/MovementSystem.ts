@@ -1,4 +1,4 @@
-import { MAP_COLS, MAP_ROWS } from "../config";
+import { CENTER_BOUNDS, MAP_COLS, MAP_ROWS } from "../config";
 import type { NPC } from "../entities/NPC";
 import * as Tiles from "../map/TileRegistry";
 import type { OccupancyGrid } from "./OccupancyGrid";
@@ -50,6 +50,9 @@ export class MovementSystem {
   private scene: Phaser.Scene;
   private isWalkable: WalkableCheck;
   private groundGrid: number[][];
+  /** Offsets for ground grid indexing (grid[row - gridRowOffset][col - gridColOffset]) */
+  private gridRowOffset: number;
+  private gridColOffset: number;
   /** Last movement direction index per NPC (0=up,1=down,2=left,3=right) */
   private lastDir: Map<string, number> = new Map();
   /** Assigned zone per NPC */
@@ -63,11 +66,15 @@ export class MovementSystem {
     isWalkable: WalkableCheck,
     groundGrid: number[][],
     occupancy: OccupancyGrid,
+    gridRowOffset = 0,
+    gridColOffset = 0,
   ) {
     this.scene = scene;
     this.isWalkable = isWalkable;
     this.groundGrid = groundGrid;
     this.occupancy = occupancy;
+    this.gridRowOffset = gridRowOffset;
+    this.gridColOffset = gridColOffset;
   }
 
   /** Start random roaming for an NPC */
@@ -99,8 +106,11 @@ export class MovementSystem {
   }
 
   private isRoadTile(col: number, row: number): boolean {
-    if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return false;
-    return ROAD_TILES.has(this.groundGrid[row][col]);
+    const gr = row - this.gridRowOffset;
+    const gc = col - this.gridColOffset;
+    if (gr < 0 || gr >= this.groundGrid.length) return false;
+    if (gc < 0 || gc >= (this.groundGrid[0]?.length ?? 0)) return false;
+    return ROAD_TILES.has(this.groundGrid[gr][gc]);
   }
 
   private step(npc: NPC) {
@@ -155,6 +165,10 @@ export class MovementSystem {
 
       if (!this.isWalkable(nx, ny)) continue;
       if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
+
+      // Reject tiles outside center bounds
+      if (nx < CENTER_BOUNDS.minCol || nx > CENTER_BOUNDS.maxCol ||
+          ny < CENTER_BOUNDS.minRow || ny > CENTER_BOUNDS.maxRow) continue;
 
       let score = 1;
 

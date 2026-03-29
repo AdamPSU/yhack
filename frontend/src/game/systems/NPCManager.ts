@@ -3,6 +3,7 @@ import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
 import type { BackendNPC } from "@/types/backend";
 import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
+import { CENTER_BOUNDS } from "../config";
 import { NPC } from "../entities/NPC";
 import { MovementSystem } from "./MovementSystem";
 import { OccupancyGrid } from "./OccupancyGrid";
@@ -31,6 +32,8 @@ export class NPCManager {
   private buildingPositions: BuildingPositions;
   private isWalkable: (col: number, row: number) => boolean;
   private groundGrid: number[][];
+  private gridRowOffset: number;
+  private gridColOffset: number;
   private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
@@ -40,18 +43,17 @@ export class NPCManager {
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
     groundGrid: number[][],
+    gridRowOffset = 0,
+    gridColOffset = 0,
   ) {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
     this.isWalkable = isWalkable;
     this.groundGrid = groundGrid;
+    this.gridRowOffset = gridRowOffset;
+    this.gridColOffset = gridColOffset;
     this.occupancy = new OccupancyGrid();
-    this.movement = new MovementSystem(
-      scene,
-      isWalkable,
-      groundGrid,
-      this.occupancy,
-    );
+    this.movement = new MovementSystem(scene, isWalkable, groundGrid, this.occupancy, gridRowOffset, gridColOffset);
 
     // Listen for dynamic NPC init from backend via EventBridge
     eventBridge.on("sim:init-npcs", this.onInitNPCs, this);
@@ -75,6 +77,8 @@ export class NPCManager {
       this.isWalkable,
       this.groundGrid,
       this.occupancy,
+      this.gridRowOffset,
+      this.gridColOffset,
     );
 
     const npcs = backendNPCs as BackendNPC[];
@@ -84,6 +88,10 @@ export class NPCManager {
 
       let tileX = bn.x * COORD_SCALE;
       let tileY = bn.y * COORD_SCALE;
+
+      // Clamp to center bounds so NPCs stay in the demo-visible area
+      tileX = Math.max(CENTER_BOUNDS.minCol, Math.min(CENTER_BOUNDS.maxCol, tileX));
+      tileY = Math.max(CENTER_BOUNDS.minRow, Math.min(CENTER_BOUNDS.maxRow, tileY));
 
       // Snap to nearest walkable tile if landed on a building
       if (!this.isWalkable(tileX, tileY)) {

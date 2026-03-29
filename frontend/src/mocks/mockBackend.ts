@@ -7,10 +7,11 @@
  */
 
 import type {
+  BackendInfluenceEvent,
   BackendMood,
   BackendNPC,
-  BackendRelType,
   BackendRelationship,
+  BackendRelType,
   BackendRole,
   BackendSimEvent,
   WSInitMsg,
@@ -157,7 +158,8 @@ function generateNPCs(): BackendNPC[] {
     npcs.push({
       id: uid(),
       name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
-      role: i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
+      role:
+        i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
       income_level: pick(["low", "medium", "high"]),
       political_leaning: Math.round((Math.random() * 2 - 1) * 100) / 100,
       industry: INDUSTRIES[i % INDUSTRIES.length],
@@ -188,7 +190,7 @@ function generateRelationships(npcs: BackendNPC[]): BackendRelationship[] {
 
   while (rels.length < count) {
     const a = randInt(0, npcs.length - 1);
-    let b = randInt(0, npcs.length - 1);
+    const b = randInt(0, npcs.length - 1);
     if (a === b) continue;
     const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
     if (seen.has(key)) continue;
@@ -263,9 +265,14 @@ const PRICE_CHANGE_MESSAGES = [
 
 function generateRoundEvents(
   npcs: BackendNPC[],
+  relationships: BackendRelationship[],
   round: number,
   maxRounds: number,
-): { events: BackendSimEvent[]; updatedNpcs: BackendNPC[] } {
+): {
+  events: BackendSimEvent[];
+  updatedNpcs: BackendNPC[];
+  influenceEvents: BackendInfluenceEvent[];
+} {
   const third = Math.floor(maxRounds / 3);
   const phase = round < third ? 1 : round < third * 2 ? 2 : 3;
   const events: BackendSimEvent[] = [];
@@ -312,18 +319,21 @@ function generateRoundEvents(
       });
       npc.mood = newMood;
     } else if (roll < protestThreshold) {
-      // Chat
+      // Chat — pick a random other NPC as target
+      const others = updated.filter((n) => n.id !== npc.id);
+      const target = pick(others);
       const msgs = CHAT_MESSAGES_BY_PHASE[phase];
       events.push({
         round,
         npc_id: npc.id,
         event_type: "chat",
         message: pick(msgs),
-        data: {},
+        data: { target_npc_id: target.id },
       });
 
       // Sprinkle in layoff/closure keywords for later phases
       if (phase >= 2 && Math.random() < 0.15) {
+        const target2 = pick(others);
         events.push({
           round,
           npc_id: npc.id,
@@ -332,7 +342,7 @@ function generateRoundEvents(
             npc.role === "business_owner"
               ? "I might have to close up shop if this continues."
               : "I heard they're planning layoffs at the factory next week.",
-          data: {},
+          data: { target_npc_id: target2.id },
         });
       }
     } else if (roll < protestThreshold + (1 - protestThreshold) * 0.6) {
@@ -363,7 +373,39 @@ function generateRoundEvents(
     }
   }
 
-  return { events, updatedNpcs: updated };
+  // Generate influence events from chat events
+  const BEHAVIORS: BackendInfluenceEvent["behavior"][] = [
+    "keep",
+    "compromise",
+    "adopt",
+  ];
+  const influenceEvents: BackendInfluenceEvent[] = events
+    .filter((e) => e.event_type === "chat" && e.data.target_npc_id)
+    .map((e) => {
+      const behavior = pick(BEHAVIORS);
+      const influence =
+        behavior === "keep"
+          ? Math.random() * 0.24
+          : behavior === "adopt"
+            ? 0.85 + Math.random() * 0.15
+            : 0.25 + Math.random() * 0.6;
+      return {
+        speaker_id: e.npc_id,
+        target_id: e.data.target_npc_id as string,
+        influence: Math.round(influence * 1000) / 1000,
+        behavior,
+        political_delta:
+          behavior === "keep"
+            ? 0
+            : Math.round((Math.random() * 0.2 - 0.1) * 1000) / 1000,
+        mood_delta:
+          behavior === "keep"
+            ? 0
+            : Math.round((Math.random() * 0.3 - 0.15) * 1000) / 1000,
+      };
+    });
+
+  return { events, updatedNpcs: updated, influenceEvents };
 }
 
 // ── Public API ──────────────────────────────────────────────
@@ -374,10 +416,10 @@ export interface MockSimulation {
 }
 
 /**
- * Generate a complete mock simulation: init + 75 rounds of events.
+ * Generate a complete mock simulation: init + rounds of events.
  * Data shapes match the real backend WebSocket messages exactly.
  */
-export function generateMockSimulation(maxRounds = 75): MockSimulation {
+export function generateMockSimulation(maxRounds = 15): MockSimulation {
   _id = 0; // reset for deterministic-ish IDs
   let npcs = generateNPCs();
   const relationships = generateRelationships(npcs);
@@ -390,13 +432,19 @@ export function generateMockSimulation(maxRounds = 75): MockSimulation {
 
   const rounds: WSRoundMsg[] = [];
   for (let r = 0; r < maxRounds; r++) {
-    const { events, updatedNpcs } = generateRoundEvents(npcs, r, maxRounds);
+    const { events, updatedNpcs, influenceEvents } = generateRoundEvents(
+      npcs,
+      relationships,
+      r,
+      maxRounds,
+    );
     npcs = updatedNpcs;
     rounds.push({
       type: "round",
       round: r,
       events,
       npcs: npcs.map((n) => ({ ...n })),
+      influence_events: influenceEvents,
     });
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GAME_WIDTH, GAME_HEIGHT, SCALE_FACTOR } from "@/game/config";
+import { GAME_HEIGHT, GAME_WIDTH, SCALE_FACTOR } from "@/game/config";
 
 /**
  * GameCanvas wraps the Phaser game instance.
@@ -19,7 +19,20 @@ export function GameCanvas() {
 
     async function initGame() {
       const Phaser = await import("phaser");
-      const { createGameConfig } = await import("@/game/config");
+      const { createGameConfig, setSelectedMap } = await import("@/game/config");
+
+      // Read map param from URL and set before Phaser initializes
+      const params = new URLSearchParams(window.location.search);
+      const mapParam = params.get("map");
+      if (mapParam === "pico8" || mapParam === "ccity" || mapParam === "citypack") {
+        setSelectedMap(mapParam);
+      }
+
+      const proceduralParam = params.get("procedural");
+      if (proceduralParam === "true") {
+        const { setProceduralMap } = await import("@/game/config");
+        setProceduralMap(true);
+      }
 
       // Try to load the real scenes from Agent A's build
       // turbopackOptional suppresses build errors when these files don't exist yet
@@ -113,8 +126,8 @@ export function GameCanvas() {
       data-testid="game-canvas"
       className="rpg-panel overflow-hidden pixel-crisp box-border"
       style={{
-        width: GAME_WIDTH * SCALE_FACTOR + 4,
-        height: GAME_HEIGHT * SCALE_FACTOR + 4,
+        width: GAME_WIDTH * SCALE_FACTOR,
+        height: GAME_HEIGHT * SCALE_FACTOR,
       }}
     />
   );

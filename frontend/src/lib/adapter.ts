@@ -2,6 +2,7 @@
 
 import type { SimEvent, SimEventType } from "@/types";
 import type { BackendNPC, BackendSimEvent } from "@/types/backend";
+import { getMapConfig } from "@/game/constants";
 
 export const LAYOFF_RE = /layoff|fired|let\s+go|cut.*jobs|furlough/i;
 export const CLOSURE_RE =
@@ -124,8 +125,13 @@ export function adaptEvent(
   };
 }
 
-/** Backend 20x15 → Phaser 40x30 */
-export const COORD_SCALE = 2;
+/** Get scaling factor from backend 20x15 grid to current Phaser map dimensions */
+export function getCoordScale(): number {
+  const mc = getMapConfig();
+  // Map 20 logical units to map width (cols).
+  // ccity: 80/20=4, citypack: 100/20=5, pico8: 55/20=2.75
+  return Math.floor(mc.cols / 20);
+}
 
 export function moodToSentiment(
   mood: string,

@@ -1,18 +1,35 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
+import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
-import type { NPCHoverInfo, NPCState } from "@/types";
+import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
+import { type MapType, GAME_WIDTH, GAME_HEIGHT, SCALE_FACTOR, setSelectedMap } from "@/game/constants";
+
+const SocialGraph = dynamic(
+  () =>
+    import("@/components/SocialGraph").then((m) => ({
+      default: m.SocialGraph,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-[10px] font-mono text-[#5a4a32]">
+        Loading graph...
+      </div>
+    ),
+  },
+);
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
-const GAME_WIDTH = 640;
-const GAME_HEIGHT = 480;
-const SCALE_FACTOR = 2;
+const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only
 const GameCanvas = dynamic(
@@ -26,8 +43,8 @@ function GameCanvasPlaceholder() {
     <div
       className="rpg-panel flex items-center justify-center box-border"
       style={{
-        width: GAME_WIDTH * SCALE_FACTOR + 4,
-        height: GAME_HEIGHT * SCALE_FACTOR + 4,
+        width: GAME_WIDTH * SCALE_FACTOR,
+        height: GAME_HEIGHT * SCALE_FACTOR,
       }}
     >
       <span className="text-xs font-mono text-[#5a4a32]">Loading world...</span>
@@ -57,8 +74,8 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
     <div
       className="pointer-events-none absolute z-50"
       style={{
-        left: info.x * SCALE_FACTOR + 16,
-        top: info.y * SCALE_FACTOR - 4,
+        left: info.x * SCALE_FACTOR + BORDER_WIDTH + 16,
+        top: info.y * SCALE_FACTOR + BORDER_WIDTH - 4,
       }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
@@ -89,23 +106,39 @@ export default function SimulatePage() {
   const [numNpcs, setNumNpcs] = useState<number>(25);
   const [numRounds, setNumRounds] = useState<number>(5);
   const [objective, setObjective] = useState<string>("");
-  const sim = useSimulation(policyText, numNpcs, numRounds, objective);
+  const [mapId, setMapId] = useState<string>("ccity");
+  
+  const sim = useSimulation(policyText, numNpcs, numRounds, objective, mapId);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
+  const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
+
+  const handleEventClick = useCallback(
+    (event: SimEvent) => setSelectedNpcId(event.agentId),
+    [],
+  );
+
+  const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
-  // Auto-start on mount
+  const [showGraph, setShowGraph] = useState(false);
+
+  // Auto-start simulation once we have a simulation ID (or immediately in mock mode)
   useEffect(() => {
     const storedPolicy = sessionStorage.getItem("agora-policy");
     const storedNumNpcs = sessionStorage.getItem("agora-num-npcs");
-    if (storedPolicy) {
-      setPolicyText(storedPolicy);
-    }
-    if (storedNumNpcs) setNumNpcs(Number.parseInt(storedNumNpcs, 10));
     const storedNumRounds = sessionStorage.getItem("agora-num-rounds");
-    if (storedNumRounds) setNumRounds(Number.parseInt(storedNumRounds, 10));
     const storedObjective = sessionStorage.getItem("agora-objective");
+    const storedMapId = sessionStorage.getItem("agora-map-id");
+
+    if (storedPolicy) setPolicyText(storedPolicy);
+    if (storedNumNpcs) setNumNpcs(Number.parseInt(storedNumNpcs, 10));
+    if (storedNumRounds) setNumRounds(Number.parseInt(storedNumRounds, 10));
     if (storedObjective) setObjective(storedObjective);
+    if (storedMapId) {
+      setMapId(storedMapId);
+      setSelectedMap(storedMapId as MapType);
+    }
   }, []);
 
   // Trigger simulation start once policy text is loaded
@@ -127,8 +160,8 @@ export default function SimulatePage() {
               npcId: npc.id,
               agentName: npc.name,
               message: npc.message,
-              x: npc.x * SCALE_FACTOR,
-              y: npc.y * SCALE_FACTOR,
+              x: npc.x,
+              y: npc.y,
             });
           } else {
             next.delete(npc.id);
@@ -224,7 +257,60 @@ export default function SimulatePage() {
     };
   }, []);
 
+  // Close graph modal on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowGraph(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Camera zoom via scroll wheel
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+        eventBridge.emitCameraZoom(delta);
+      });
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   const bubbleList = Array.from(bubbles.values());
+
+  const hasPolicy = policyText && policyText.length > 0;
+
+  if (!hasPolicy) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
+        <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
+          <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
+            AGORA
+          </span>
+          <p className="text-sm font-mono text-[#d4c4a0]">
+            No policy specified.
+          </p>
+          <p className="text-xs font-mono text-[#8a7a62]">
+            Please describe an economic policy on the home page before running a
+            simulation.
+          </p>
+          <Link
+            href="/"
+            className="rpg-panel mt-2 px-6 py-2 text-xs font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)]"
+          >
+            {">> Enter Policy <<"}
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -273,8 +359,23 @@ export default function SimulatePage() {
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
-        <div className="shrink-0">
-          <EventFeed events={sim.events} />
+        <div className="rpg-panel flex h-full w-64 shrink-0 flex-col">
+          <div className="flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
+            <h2 className="text-[10px] font-mono font-bold uppercase text-[#e8a43a]">
+              Event Log
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowGraph(true)}
+              className="text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+              title="Open Social Graph"
+            >
+              [Graph]
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <EventFeed events={sim.events} onEventClick={handleEventClick} />
+          </div>
         </div>
 
         {/* Center: Game canvas with chat bubble overlays */}
@@ -282,15 +383,45 @@ export default function SimulatePage() {
           <div ref={canvasContainerRef} className="relative shrink-0">
             <GameCanvas />
 
-            {/* Fullscreen toggle */}
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="absolute top-2 right-2 z-40 rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? "[X]" : "[ ]"}
-            </button>
+            {/* Fullscreen toggle + Zoom controls */}
+            <div className="absolute top-2 right-2 z-40 flex gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  import("@/game/bridge/EventBridge").then(
+                    ({ eventBridge }) => {
+                      eventBridge.emitCameraZoom(1);
+                    },
+                  );
+                }}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title="Zoom in"
+              >
+                [+]
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  import("@/game/bridge/EventBridge").then(
+                    ({ eventBridge }) => {
+                      eventBridge.emitCameraZoom(-1);
+                    },
+                  );
+                }}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title="Zoom out"
+              >
+                [-]
+              </button>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? "[X]" : "[ ]"}
+              </button>
+            </div>
 
             {/* Chat bubbles anchored to NPCs */}
             {bubbleList.map((b) => (
@@ -298,8 +429,8 @@ export default function SimulatePage() {
                 key={b.npcId}
                 agentName={b.agentName}
                 message={b.message}
-                x={b.x + 8}
-                y={b.y}
+                x={b.x * SCALE_FACTOR + BORDER_WIDTH}
+                y={b.y * SCALE_FACTOR + BORDER_WIDTH}
               />
             ))}
 
@@ -312,11 +443,56 @@ export default function SimulatePage() {
         <div className="shrink-0">
           <Dashboard
             metrics={sim.metrics}
+            metricsHistory={sim.metricsHistory}
             phase={sim.phase}
             month={sim.month}
           />
         </div>
       </div>
+
+      {/* NPC Profile Modal */}
+      {selectedNpc && (
+        <NPCProfileModal
+          npc={selectedNpc}
+          onClose={() => setSelectedNpcId(null)}
+        />
+      )}
+
+      {/* Social Graph Modal */}
+      {showGraph && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGraph(false);
+          }}
+        >
+          <div
+            className="rpg-panel relative flex flex-col"
+            style={{ width: 700, height: 560 }}
+          >
+            <div className="flex items-center justify-between border-b border-[#3a2e1e] px-4 py-2">
+              <h2 className="text-[11px] font-mono font-bold uppercase text-[#e8a43a]">
+                Social Graph
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowGraph(false)}
+                className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+              >
+                [ESC]
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <SocialGraph
+                npcs={sim.graphData.npcs}
+                relationships={sim.graphData.relationships}
+                influenceEvents={sim.graphData.influenceEvents}
+                version={sim.graphData.version}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

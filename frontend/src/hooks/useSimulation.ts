@@ -8,9 +8,23 @@ import {
   updateMetrics,
 } from "@/lib/metricsEngine";
 import { generateMockSimulation } from "@/mocks/mockBackend";
-import { connectWebSocket, startSimulation } from "@/services/wsClient";
+import { connectSimulation, startSimulation } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
-import type { BackendNPC, WSRoundMsg } from "@/types/backend";
+import type {
+  BackendInfluenceEvent,
+  BackendNPC,
+  BackendRelationship,
+  BackendSimEvent,
+  WSNPCEventsMsg,
+  WSRoundMsg,
+} from "@/types/backend";
+
+export interface GraphData {
+  relationships: BackendRelationship[];
+  npcs: BackendNPC[];
+  influenceEvents: BackendInfluenceEvent[];
+  version: number;
+}
 
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
 
@@ -32,9 +46,13 @@ const PHASE_LABELS: Record<number, string> = {
 /** Cap EventFeed to last N events to avoid unbounded React state growth */
 const MAX_FEED_EVENTS = 200;
 
+/** Cap history to last N snapshots (one per round). */
+const MAX_HISTORY = 30;
+
 interface SimulationState {
   events: SimEvent[];
   metrics: SimMetrics;
+  metricsHistory: SimMetrics[];
   phase: number;
   month: number;
   isRunning: boolean;
@@ -67,10 +85,17 @@ function waitForQueueDrain(
   tick();
 }
 
-export function useSimulation(policyText?: string, numNpcs?: number, numRounds?: number, objective?: string) {
+export function useSimulation(
+  policyText?: string,
+  numNpcs?: number,
+  numRounds?: number,
+  objective?: string,
+  mapId?: string
+) {
   const [state, setState] = useState<SimulationState>({
     events: [],
     metrics: { ...INITIAL_METRICS },
+    metricsHistory: [{ ...INITIAL_METRICS }],
     phase: 0,
     month: 0,
     isRunning: false,
@@ -78,12 +103,21 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
     latestEvent: null,
   });
 
+  const [graphData, setGraphData] = useState<GraphData>({
+    relationships: [],
+    npcs: [],
+    influenceEvents: [],
+    version: 0,
+  });
+
   const cleanupRef = useRef<(() => void) | null>(null);
   const npcLookupRef = useRef<Map<string, BackendNPC>>(new Map());
+  const relationshipsRef = useRef<BackendRelationship[]>([]);
+  const influenceLogRef = useRef<BackendInfluenceEvent[]>([]);
   const metricsAccRef = useRef<MetricsAccumulator>(createAccumulator());
   const eventQueueRef = useRef<SimEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxRoundsRef = useRef(numRounds ?? 5);
+  const maxRoundsRef = useRef(numRounds ?? 75);
   const lastPhaseRef = useRef(0);
   const numNpcsRef = useRef(numNpcs ?? 25);
 
@@ -130,6 +164,45 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
       event.type === "phase_change" ? 2000 : 1200 + Math.random() * 600;
     timerRef.current = setTimeout(drainQueue, delay);
   }, []);
+
+  /** Process streamed NPC events that arrive before the full round completes. */
+  const processNPCEvents = useCallback(
+    (msg: WSNPCEventsMsg) => {
+      const lookup = npcLookupRef.current;
+
+      getBridge().then(({ eventBridge }) => {
+        for (const be of msg.events) {
+          if (
+            be.event_type === "move" &&
+            be.data.to_x != null &&
+            be.data.to_y != null
+          ) {
+            eventBridge.emitNPCMove(
+              be.npc_id,
+              Number(be.data.to_x),
+              Number(be.data.to_y),
+            );
+          }
+          if (be.event_type === "mood_shift" && be.data.new_mood) {
+            eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
+          }
+        }
+      });
+
+      for (const be of msg.events) {
+        const round = be.round ?? 0;
+        const adapted = adaptEvent(be, lookup, round, maxRoundsRef.current);
+        if (adapted) {
+          eventQueueRef.current.push(adapted);
+        }
+      }
+
+      if (!timerRef.current && eventQueueRef.current.length > 0) {
+        timerRef.current = setTimeout(drainQueue, 300);
+      }
+    },
+    [drainQueue],
+  );
 
   /** Feed a single WSRoundMsg through the same pipeline as the real backend. */
   const processRound = useCallback(
@@ -181,15 +254,32 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
         }
       }
 
+      if (msg.influence_events) {
+        influenceLogRef.current = [
+          ...influenceLogRef.current,
+          ...msg.influence_events,
+        ];
+      }
+      setGraphData((prev) => ({
+        relationships: relationshipsRef.current,
+        npcs: Array.from(npcLookupRef.current.values()),
+        influenceEvents: msg.influence_events || [],
+        version: prev.version + 1,
+      }));
+
       const newMetrics = updateMetrics(
         metricsAccRef.current,
         msg.npcs,
         msg.events,
       );
-      setState((prev) => ({
-        ...prev,
-        metrics: { ...prev.metrics, ...newMetrics },
-      }));
+      setState((prev) => {
+        const merged = { ...prev.metrics, ...newMetrics };
+        return {
+          ...prev,
+          metrics: merged,
+          metricsHistory: [...prev.metricsHistory, merged].slice(-MAX_HISTORY),
+        };
+      });
 
       if (!timerRef.current && eventQueueRef.current.length > 0) {
         timerRef.current = setTimeout(drainQueue, 800);
@@ -199,9 +289,12 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
   );
 
   const start = useCallback(async () => {
+    if (!policyText) return;
+
     setState({
       events: [],
       metrics: { ...INITIAL_METRICS },
+      metricsHistory: [{ ...INITIAL_METRICS }],
       phase: 0,
       month: 0,
       isRunning: true,
@@ -209,34 +302,41 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
       latestEvent: null,
     });
     npcLookupRef.current = new Map();
+    relationshipsRef.current = [];
+    influenceLogRef.current = [];
     metricsAccRef.current = createAccumulator();
     eventQueueRef.current = [];
     lastPhaseRef.current = 0;
+    setGraphData({
+      relationships: [],
+      npcs: [],
+      influenceEvents: [],
+      version: 0,
+    });
 
     // ── Mock backend path ──────────────────────────────────
     if (USE_MOCK) {
       const mock = generateMockSimulation(maxRoundsRef.current);
-
-      // Init NPCs
       const lookup = npcLookupRef.current;
-      for (const npc of mock.initMsg.npcs) {
-        lookup.set(npc.id, npc);
-      }
+      for (const npc of mock.initMsg.npcs) lookup.set(npc.id, npc);
+      relationshipsRef.current = mock.initMsg.relationships;
+      setGraphData((prev) => ({
+        ...prev,
+        relationships: mock.initMsg.relationships,
+        npcs: mock.initMsg.npcs,
+        version: prev.version + 1,
+      }));
       getBridge().then(({ eventBridge }) => {
         eventBridge.emitInitNPCs(mock.initMsg.npcs);
       });
-
-      // Drip-feed rounds with a small delay so the UI plays back naturally
       let i = 0;
       const feedNext = () => {
         if (i >= mock.rounds.length) {
           waitForQueueDrain(eventQueueRef, setState);
           return;
         }
-        processRound(mock.rounds[i]);
-        i++;
-        const delay = 150 + Math.random() * 100;
-        const t = setTimeout(feedNext, delay);
+        processRound(mock.rounds[i++]);
+        const t = setTimeout(feedNext, 150 + Math.random() * 100);
         cleanupRef.current = () => clearTimeout(t);
       };
       feedNext();
@@ -244,37 +344,70 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
     }
 
     // ── Real backend path ──────────────────────────────────
-    const text = policyText || "";
-    if (!text) return;
-
     try {
       const simId = await startSimulation(
-        text,
+        policyText,
         maxRoundsRef.current,
         numNpcsRef.current,
         objective,
+        mapId
       );
 
-      const cleanup = connectWebSocket(simId, {
-        onPolicyAnalysis: () => {},
+      const cleanup = connectSimulation(simId, {
+        onPolicyAnalysis: (msg) => {
+          console.log(
+            "[sim] policy_analysis received — %d entities",
+            msg.entities?.length ?? 0,
+          );
+        },
 
         onInit: (msg) => {
+          console.log(
+            "[sim] init received — %d NPCs, %d relationships",
+            msg.npcs.length,
+            msg.relationships.length,
+          );
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {
             lookup.set(npc.id, npc);
           }
+          relationshipsRef.current = msg.relationships;
+          setGraphData((prev) => ({
+            ...prev,
+            relationships: msg.relationships,
+            npcs: msg.npcs,
+            version: prev.version + 1,
+          }));
 
           getBridge().then(({ eventBridge }) => {
             eventBridge.emitInitNPCs(msg.npcs);
           });
         },
 
-        onRound: (msg: WSRoundMsg) => processRound(msg),
+        onRound: (msg: WSRoundMsg) => {
+          console.log(
+            "[sim] round %d — %d events, %d NPCs",
+            msg.round,
+            msg.events.length,
+            msg.npcs.length,
+          );
+          processRound(msg);
+        },
 
-        onDone: () => waitForQueueDrain(eventQueueRef, setState),
+        onNPCEvents: (msg) => {
+          processNPCEvents(msg);
+        },
+
+        onDone: () => {
+          console.log(
+            "[sim] done — draining event queue (%d remaining)",
+            eventQueueRef.current.length,
+          );
+          waitForQueueDrain(eventQueueRef, setState);
+        },
 
         onError: (message) => {
-          console.error("Simulation error:", message);
+          console.error("[sim] error:", message);
           setState((prev) => ({ ...prev, isRunning: false }));
         },
       });
@@ -284,7 +417,7 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
       console.error("Failed to start simulation:", err);
       setState((prev) => ({ ...prev, isRunning: false }));
     }
-  }, [policyText, processRound]);
+  }, [policyText, objective, mapId, processRound, processNPCEvents]);
 
   useEffect(() => {
     return () => {
@@ -293,8 +426,12 @@ export function useSimulation(policyText?: string, numNpcs?: number, numRounds?:
     };
   }, []);
 
+  const getNpc = useCallback((id: string) => npcLookupRef.current.get(id), []);
+
   return {
     ...state,
     start,
+    graphData,
+    getNpc,
   };
 }

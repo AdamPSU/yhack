@@ -1,19 +1,21 @@
-// WebSocket client for communicating with the FastAPI backend
+// Socket.IO client for communicating with the FastAPI backend
 
+import { io, type Socket } from "socket.io-client";
 import type {
+  BackendSimEvent,
   WSInitMsg,
-  WSMessage,
+  WSNPCEventsMsg,
   WSPolicyAnalysisMsg,
   WSRoundMsg,
 } from "@/types/backend";
 
 const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
 
 export interface WSCallbacks {
   onPolicyAnalysis: (msg: WSPolicyAnalysisMsg) => void;
   onInit: (msg: WSInitMsg) => void;
   onRound: (msg: WSRoundMsg) => void;
+  onNPCEvents?: (msg: WSNPCEventsMsg) => void;
   onDone: () => void;
   onError: (message: string) => void;
 }
@@ -35,15 +37,17 @@ export async function startSimulation(
   numRounds?: number,
   numNpcs?: number,
   objective?: string,
+  mapId?: string,
 ): Promise<string> {
   const res = await fetch(`${API_BASE}/simulate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       text: policyText,
-      num_rounds: numRounds ?? 5,
+      num_rounds: numRounds ?? 75,
       num_npcs: numNpcs ?? 25,
       objective: objective ?? "",
+      map_id: mapId ?? "ccity",
     }),
   });
 
@@ -56,59 +60,57 @@ export async function startSimulation(
 }
 
 /**
- * Open a WebSocket to stream simulation events.
- * Returns a cleanup function that closes the connection.
+ * Connect via Socket.IO and start streaming simulation events.
+ * Returns a cleanup function that disconnects the socket.
  */
-export function connectWebSocket(
+export function connectSimulation(
   simulationId: string,
   callbacks: WSCallbacks,
 ): () => void {
-  const ws = new WebSocket(`${WS_BASE}/simulate/${simulationId}/ws`);
+  const socket: Socket = io(API_BASE, {
+    transports: ["websocket"],
+    reconnection: false,
+  });
 
-  ws.onmessage = (event) => {
-    let msg: WSMessage;
-    try {
-      msg = JSON.parse(event.data);
-    } catch {
-      callbacks.onError("Failed to parse WebSocket message");
-      return;
+  socket.on("connect", () => {
+    socket.emit("start_sim", { simulation_id: simulationId });
+  });
+
+  socket.on("policy_analysis", (data: WSPolicyAnalysisMsg) => {
+    callbacks.onPolicyAnalysis(data);
+  });
+
+  socket.on("init", (data: WSInitMsg) => {
+    callbacks.onInit(data);
+  });
+
+  socket.on("round", (data: WSRoundMsg) => {
+    callbacks.onRound(data);
+  });
+
+  socket.on("npc_events", (data: WSNPCEventsMsg) => {
+    callbacks.onNPCEvents?.(data);
+  });
+
+  socket.on("done", () => {
+    callbacks.onDone();
+  });
+
+  socket.on("sim_error", (data: { message: string }) => {
+    callbacks.onError(data.message);
+  });
+
+  socket.on("connect_error", (err: Error) => {
+    callbacks.onError(`Connection error: ${err.message}`);
+  });
+
+  socket.on("disconnect", (reason: string) => {
+    if (reason !== "io client disconnect") {
+      callbacks.onError(`Disconnected: ${reason}`);
     }
-
-    switch (msg.type) {
-      case "policy_analysis":
-        callbacks.onPolicyAnalysis(msg);
-        break;
-      case "init":
-        callbacks.onInit(msg);
-        break;
-      case "round":
-        callbacks.onRound(msg);
-        break;
-      case "done":
-        callbacks.onDone();
-        break;
-      case "error":
-        callbacks.onError(msg.message);
-        break;
-    }
-  };
-
-  ws.onerror = () => {
-    callbacks.onError("WebSocket connection error");
-  };
-
-  ws.onclose = (event) => {
-    if (event.code !== 1000) {
-      callbacks.onError(`WebSocket closed unexpectedly (code ${event.code})`);
-    }
-  };
+  });
 
   return () => {
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CONNECTING
-    ) {
-      ws.close();
-    }
+    socket.disconnect();
   };
 }

@@ -11,6 +11,8 @@ export interface FormState {
   setNumRounds: (v: number) => void;
   objective: string;
   setObjective: (v: string) => void;
+  mapId: string;
+  setMapId: (v: string) => void;
   fileName: string | null;
   extracting: boolean;
   handleFile: (e: React.ChangeEvent<HTMLInputElement>) => void;

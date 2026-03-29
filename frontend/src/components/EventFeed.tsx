@@ -5,6 +5,7 @@ import type { SimEvent } from "@/types";
 
 interface EventFeedProps {
   events: SimEvent[];
+  onEventClick?: (event: SimEvent) => void;
 }
 
 function eventIcon(type: SimEvent["type"]): string {
@@ -53,7 +54,7 @@ function eventAccent(type: SimEvent["type"]): string {
   }
 }
 
-export function EventFeed({ events }: EventFeedProps) {
+export function EventFeed({ events, onEventClick }: EventFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,17 +62,7 @@ export function EventFeed({ events }: EventFeedProps) {
   }, [events.length]);
 
   return (
-    <div
-      className="rpg-panel flex h-full w-64 flex-col"
-      data-testid="event-feed"
-    >
-      {/* Header */}
-      <div className="border-b border-[#3a2e1e] px-3 py-2">
-        <h2 className="text-[10px] font-mono font-bold uppercase text-[#e8a43a]">
-          Event Log
-        </h2>
-      </div>
-
+    <div className="flex h-full flex-col" data-testid="event-feed">
       {/* Events */}
       <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin">
         {events.length === 0 && (
@@ -96,8 +87,9 @@ export function EventFeed({ events }: EventFeedProps) {
           return (
             <div
               key={event.id}
-              className="mb-1 px-2 py-1.5"
+              className={`mb-1 px-2 py-1.5 rounded ${onEventClick ? "cursor-pointer hover:bg-[#251e15] transition-colors" : ""}`}
               data-testid="event-item"
+              onClick={onEventClick ? () => onEventClick(event) : undefined}
             >
               <div className="flex items-center gap-1.5">
                 <span

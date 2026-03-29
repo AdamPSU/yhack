@@ -1,9 +1,8 @@
-import { MAP_COLS, MAP_ROWS } from "../config";
+import { CENTER_BOUNDS } from "../config";
 import type { NPC } from "../entities/NPC";
-import * as Tiles from "../map/TileRegistry";
 import type { OccupancyGrid } from "./OccupancyGrid";
 
-type WalkableCheck = (col: number, row: number) => boolean;
+type TileCheck = (col: number, row: number) => boolean;
 
 /** Cardinal direction deltas */
 const DIRS = [
@@ -15,16 +14,6 @@ const DIRS = [
 
 /** Opposite direction index: up↔down, left↔right */
 const OPPOSITE = [1, 0, 3, 2] as const;
-
-/** Tile indices that count as road or sidewalk — NPCs should stay on these */
-const ROAD_TILES = new Set([
-  Tiles.ROAD_H,
-  Tiles.ROAD_V,
-  Tiles.ROAD_CROSS,
-  Tiles.SIDEWALK,
-  Tiles.CONCRETE,
-  Tiles.CONCRETE_ALT,
-]);
 
 interface ZoneBounds {
   minRow: number;
@@ -48,8 +37,8 @@ const ZONE_BOUNDS: Record<string, ZoneBounds> = {
 export class MovementSystem {
   private timers: Map<string, Phaser.Time.TimerEvent> = new Map();
   private scene: Phaser.Scene;
-  private isWalkable: WalkableCheck;
-  private groundGrid: number[][];
+  private isWalkable: TileCheck;
+  private isRoad: TileCheck;
   /** Last movement direction index per NPC (0=up,1=down,2=left,3=right) */
   private lastDir: Map<string, number> = new Map();
   /** Assigned zone per NPC */
@@ -60,13 +49,13 @@ export class MovementSystem {
 
   constructor(
     scene: Phaser.Scene,
-    isWalkable: WalkableCheck,
-    groundGrid: number[][],
+    isWalkable: TileCheck,
+    isRoad: TileCheck,
     occupancy: OccupancyGrid,
   ) {
     this.scene = scene;
     this.isWalkable = isWalkable;
-    this.groundGrid = groundGrid;
+    this.isRoad = isRoad;
     this.occupancy = occupancy;
   }
 
@@ -96,11 +85,6 @@ export class MovementSystem {
   /** Resume random movement */
   release(npcId: string) {
     this.overridden.delete(npcId);
-  }
-
-  private isRoadTile(col: number, row: number): boolean {
-    if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return false;
-    return ROAD_TILES.has(this.groundGrid[row][col]);
   }
 
   private step(npc: NPC) {
@@ -145,8 +129,9 @@ export class MovementSystem {
     const zone = this.npcZone.get(npc.npcId);
     const bounds = zone ? ZONE_BOUNDS[zone] : undefined;
 
-    // Score each direction
-    const scored: { idx: number; score: number }[] = [];
+    // Score each direction — road tiles only; non-road as last resort
+    const roadScored: { idx: number; score: number }[] = [];
+    const offRoadScored: { idx: number; score: number }[] = [];
 
     for (let i = 0; i < DIRS.length; i++) {
       const { dx, dy } = DIRS[i];
@@ -156,15 +141,17 @@ export class MovementSystem {
       if (!this.isWalkable(nx, ny)) continue;
       if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
 
-      let score = 1;
+      // Reject tiles outside center bounds
+      if (
+        nx < CENTER_BOUNDS.minCol ||
+        nx > CENTER_BOUNDS.maxCol ||
+        ny < CENTER_BOUNDS.minRow ||
+        ny > CENTER_BOUNDS.maxRow
+      )
+        continue;
 
-      // Strongly prefer road/sidewalk tiles
-      if (this.isRoadTile(nx, ny)) {
-        score += 10;
-      } else {
-        // Grass/other — heavily penalize but allow as last resort
-        score = 0.1;
-      }
+      const onRoad = this.isRoad(nx, ny);
+      let score = onRoad ? 10 : 1;
 
       // Momentum: prefer continuing in the same direction
       if (lastDirIdx !== undefined && i === lastDirIdx) {
@@ -197,8 +184,15 @@ export class MovementSystem {
         }
       }
 
-      scored.push({ idx: i, score });
+      if (onRoad) {
+        roadScored.push({ idx: i, score });
+      } else {
+        offRoadScored.push({ idx: i, score });
+      }
     }
+
+    // Prefer road tiles; only fall back to off-road if completely stuck
+    const scored = roadScored.length > 0 ? roadScored : offRoadScored;
 
     if (scored.length === 0) return null;
 

@@ -145,4 +145,9 @@ async def generate_npcs(state: SimState) -> dict:
     logger.info("generate_npcs: created %d relationships", len(relationships))
 
     npcs = _clamp_positions(npcs)
-    return {"npcs": npcs, "relationships": relationships, "current_round": 0}
+    return {
+        "npcs": npcs,
+        "relationships": relationships,
+        "current_round": 0,
+        "memory_streams": {npc["id"]: [] for npc in npcs},
+    }

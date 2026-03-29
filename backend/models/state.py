@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import operator
-from typing import Annotated, Any, TypedDict
+from collections.abc import Awaitable, Callable
+from typing import Annotated, Any, NotRequired, TypedDict
 
 
 class SimState(TypedDict):
@@ -14,3 +15,6 @@ class SimState(TypedDict):
     current_round: int
     max_rounds: int
     num_npcs: int
+    map_id: NotRequired[str]
+    memory_streams: dict[str, list[dict[str, Any]]]
+    npc_stream_callback: NotRequired[Callable[[list[dict[str, Any]]], Awaitable[None]] | None]

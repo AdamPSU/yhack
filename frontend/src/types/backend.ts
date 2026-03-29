@@ -43,6 +43,10 @@ export interface BackendNPC {
   x: number; // 0..19
   y: number; // 0..14
   mood: BackendMood;
+  // Internal state from generative agents architecture (populated after round 1+)
+  perception?: string;
+  emotional_reaction?: string;
+  current_plan?: string;
 }
 
 export interface BackendSimEvent {
@@ -93,11 +97,26 @@ export interface WSInitMsg {
   relationships: BackendRelationship[];
 }
 
+export interface BackendInfluenceEvent {
+  speaker_id: string;
+  target_id: string;
+  influence: number;
+  behavior: "keep" | "compromise" | "adopt";
+  political_delta: number;
+  mood_delta: number;
+}
+
 export interface WSRoundMsg {
   type: "round";
   round: number;
   events: BackendSimEvent[];
   npcs: BackendNPC[];
+  influence_events?: BackendInfluenceEvent[];
+}
+
+export interface WSNPCEventsMsg {
+  type: "npc_events";
+  events: BackendSimEvent[];
 }
 
 export interface WSDoneMsg {
@@ -113,5 +132,6 @@ export type WSMessage =
   | WSPolicyAnalysisMsg
   | WSInitMsg
   | WSRoundMsg
+  | WSNPCEventsMsg
   | WSDoneMsg
   | WSErrorMsg;

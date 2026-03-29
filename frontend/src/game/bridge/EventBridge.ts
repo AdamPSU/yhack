@@ -19,6 +19,8 @@ type Listener = (...args: any[]) => void;
 class EventBridge {
   private static instance: EventBridge;
   private listeners = new Map<string, Set<{ fn: Listener; ctx: unknown }>>();
+  /** Sticky events: new listeners immediately receive the last emitted value. */
+  private sticky = new Map<string, unknown[]>();
 
   private constructor() {}
 
@@ -34,6 +36,9 @@ class EventBridge {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add({ fn, ctx: context });
+    // Replay sticky event for late subscribers
+    const last = this.sticky.get(event);
+    if (last) fn.apply(context, last);
   }
 
   off(event: string, fn: Listener, context?: unknown) {
@@ -69,8 +74,14 @@ class EventBridge {
     this.emit("sim:camera-pan", { dx, dy });
   }
 
-  // React → Phaser: initialize NPCs from backend
+  // React → Phaser: zoom camera
+  emitCameraZoom(delta: number) {
+    this.emit("sim:camera-zoom", { delta });
+  }
+
+  // React → Phaser: initialize NPCs from backend (sticky — replays for late listeners)
   emitInitNPCs(npcs: unknown[]) {
+    this.sticky.set("sim:init-npcs", [npcs]);
     this.emit("sim:init-npcs", npcs);
   }
 

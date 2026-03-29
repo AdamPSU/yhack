@@ -4,7 +4,7 @@ import NodeWrapper from './NodeWrapper';
 import { useForm } from './FormContext';
 
 export default function ConfigNode() {
-  const { numNpcs, setNumNpcs, numRounds, setNumRounds } = useForm();
+  const { numNpcs, setNumNpcs, numRounds, setNumRounds, mapId, setMapId } = useForm();
 
   return (
     <NodeWrapper badge="02" title="CONFIG" description="Slide to adjust agents and rounds.">
@@ -49,6 +49,34 @@ export default function ConfigNode() {
             className="rpg-slider"
             data-testid="rounds-slider"
           />
+        </div>
+
+        {/* Map Selection */}
+        <div className="space-y-1.5">
+          <div className="flex flex-col">
+            <span className="text-[8px] font-mono text-white/70 uppercase tracking-tight">World</span>
+            <label className="text-[10px] font-mono font-bold text-white uppercase">Topology</label>
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            {[
+              { id: 'ccity', label: 'URBAN' },
+              { id: 'citypack', label: 'MEGA' },
+              { id: 'pico8', label: 'MICRO' },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMapId(m.id as any)}
+                className={`
+                  text-[8px] font-mono py-1 border transition-all
+                  ${mapId === m.id 
+                    ? 'bg-purple-500/20 border-purple-400 text-white' 
+                    : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20'}
+                `}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </NodeWrapper>

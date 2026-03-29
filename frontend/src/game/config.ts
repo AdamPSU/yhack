@@ -1,22 +1,49 @@
 import * as Phaser from "phaser";
+import { 
+  type MapType, 
+  MAP_CONFIGS, 
+  GAME_WIDTH, 
+  GAME_HEIGHT,
+  SCALE_FACTOR,
+  CENTER_BOUNDS,
+  selectedMap,
+  proceduralMap,
+  setSelectedMap,
+  setProceduralMap,
+  getMapConfig,
+  TILE_SIZE,
+  MAP_COLS,
+  MAP_ROWS
+} from "./constants";
 
-export const TILE_SIZE = 16;
-export const MAP_COLS = 80;
-export const MAP_ROWS = 60;
-export const GAME_WIDTH = MAP_COLS * TILE_SIZE; // 1280
-export const GAME_HEIGHT = MAP_ROWS * TILE_SIZE; // 960
-export const SCALE_FACTOR = 2; // render at 2x for crisp pixels
+export { 
+  type MapType, 
+  MAP_CONFIGS, 
+  GAME_WIDTH, 
+  GAME_HEIGHT,
+  SCALE_FACTOR,
+  CENTER_BOUNDS,
+  selectedMap,
+  proceduralMap,
+  setSelectedMap,
+  setProceduralMap,
+  getMapConfig,
+  TILE_SIZE,
+  MAP_COLS,
+  MAP_ROWS
+};
 
 export function createGameConfig(
   parent: string | HTMLElement,
   scenes: Phaser.Types.Scenes.SceneType[],
 ): Phaser.Types.Core.GameConfig {
   return {
-    type: Phaser.AUTO,
+    type: Phaser.CANVAS,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     parent,
     pixelArt: true,
+    roundPixels: true,
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,

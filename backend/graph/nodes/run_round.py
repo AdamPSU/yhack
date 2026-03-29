@@ -1,5 +1,10 @@
 """Node: execute one simulation round — every NPC perceives, reacts, and acts.
 
+Agent architecture based on Park et al. (2023), "Generative Agents: Interactive
+Simulacra of Human Behavior" (arXiv:2304.03442).  Each NPC maintains a memory
+stream, retrieves relevant memories, reflects periodically, and follows/revises
+an internal plan.
+
 Opinion dynamics based on Peralta, Kertész & Iñiguez (2022),
 "Opinion dynamics in social networks: From models to data" (arXiv:2201.01322).
 Implements Deffuant bounded confidence (Eq. 1-2), Baumann controversy
@@ -11,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from dataclasses import dataclass, field
 from collections.abc import Coroutine
 from typing import Any
 
@@ -18,9 +24,17 @@ from langchain_openai import ChatOpenAI
 
 from config import MAX_X, MAX_Y
 from graph.llm import get_llm, invoke_llm_structured
-from graph.prompts import NPC_ROUND_PROMPT
+from graph.memory import (
+    create_memory,
+    format_memories_for_prompt,
+    get_current_plan,
+    heuristic_importance,
+    maybe_reflect,
+    retrieve_memories,
+)
+from graph.prompts import NPC_ROUND_PROMPT_V2
 from graph.utils import clamp, normalize_npc_id
-from models.schemas import NPCRoundResponse, SimEvent
+from models.schemas import NPCRoundResponseV2
 from models.state import SimState
 
 logger = logging.getLogger(__name__)
@@ -210,29 +224,6 @@ def _format_social_targets(
     return "\n".join(lines)
 
 
-def _format_neighbor_events(
-    neighbor_ids: list[str],
-    events: list[dict[str, Any]],
-    current_round: int,
-) -> str:
-    """Summarise what neighboring NPCs did in the previous round."""
-    if current_round == 0 or not events:
-        return "This is the first round — no neighbor actions yet."
-
-    prev_round = current_round - 1
-    relevant = [
-        e for e in events
-        if e.get("round") == prev_round and e.get("npc_id") in neighbor_ids
-    ]
-
-    if not relevant:
-        return "Your neighbors were quiet last round — nothing noteworthy happened nearby."
-
-    lines: list[str] = []
-    for ev in relevant:
-        lines.append(f"- [{ev.get('event_type', '?')}] {ev.get('message', '(no details)')}")
-    return "\n".join(lines)
-
 
 def _build_round_context(current_round: int, max_rounds: int, events: list[dict[str, Any]]) -> str:
     """Provide a brief high-level summary of how the simulation is going."""
@@ -277,24 +268,64 @@ def _policy_summary(entities: list[dict[str, Any]]) -> str:
     )
 
 
+@dataclass
+class NPCRoundResult:
+    """Output from a single NPC's round, including internals for memory creation."""
+    events: list[dict[str, Any]] = field(default_factory=list)
+    perception: str = ""
+    emotional_reaction: str = ""
+    plan_update: str | None = None
+
+
 async def _simulate_single_npc(
     npc: dict[str, Any],
-    state: SimState,
+    npc_memories: list[dict[str, Any]],
     llm: ChatOpenAI,
+    current_round: int,
+    max_rounds: int,
     policy_text: str,
-    neighbor_events_str: str,
     round_context: str,
-    nearby_npcs: str,
-    social_targets: str,
-    name_to_id: dict[str, str] | None = None,
-) -> list[dict[str, Any]]:
-    """Run the Perceive-React-Act loop for one NPC and return its events."""
+    neighbor_ids: list[str],
+    npc_rels: list[tuple[str, str, float]],
+    all_npcs: list[dict[str, Any]],
+    name_to_id: dict[str, str],
+    objective: str = "",
+) -> NPCRoundResult:
+    """Full per-agent cognitive loop (Park et al. 2023):
+    Retrieve → Reflect → Plan → Perceive/React/Act → Store memories.
+    """
+    npc_id: str = npc.get("id", "unknown")
+    npc_name: str = npc.get("name", "Unknown")
 
-    current_round = state["current_round"]
-    max_rounds = state["max_rounds"]
+    # ---- 1. Retrieve memories ----
+    neighbor_id_set = set(neighbor_ids)
+    neighbor_names = [
+        n.get("name", "") for n in all_npcs if n.get("id") in neighbor_id_set
+    ]
+    query = f"{policy_text} {' '.join(neighbor_names)} {round_context}"
+    retrieved = retrieve_memories(npc_memories, query, current_round)
+    memories_str = format_memories_for_prompt(retrieved)
 
-    prompt = NPC_ROUND_PROMPT.format(
-        npc_name=npc.get("name", "Unknown"),
+    # ---- 2. Reflect (if importance threshold met) ----
+    reflection_mems = await maybe_reflect(
+        npc_id=npc_id,
+        npc_name=npc_name,
+        npc_profession=npc.get("profession", ""),
+        memories=npc_memories,
+        current_round=current_round,
+        llm=llm,
+    )
+    npc_memories.extend(reflection_mems)
+
+    # ---- 3. Get current plan ----
+    plan_str = get_current_plan(npc_memories) or ""
+
+    # ---- 4. Build context and run main LLM call ----
+    nearby_npcs_str = _format_nearby_npcs(neighbor_ids, all_npcs, npc_rels)
+    social_targets_str = _format_social_targets(npc, npc_rels, neighbor_ids, all_npcs)
+
+    prompt = NPC_ROUND_PROMPT_V2.format(
+        npc_name=npc_name,
         npc_gender=npc.get("gender", ""),
         npc_profession=npc.get("profession", "local resident"),
         npc_country=npc.get("country", "USA"),
@@ -307,39 +338,44 @@ async def _simulate_single_npc(
         npc_x=npc.get("x", 0),
         npc_y=npc.get("y", 0),
         policy_summary=policy_text,
-        objective=state.get("objective", "") or "general economic and social impact",
+        objective=objective or "general economic and social impact",
         current_round=current_round + 1,
         max_rounds=max_rounds,
         round_context=round_context,
-        nearby_npcs=nearby_npcs,
-        social_targets=social_targets,
-        neighbor_events=neighbor_events_str,
+        nearby_npcs=nearby_npcs_str,
+        social_targets=social_targets_str,
+        retrieved_memories=memories_str,
+        current_plan=plan_str or "No plan yet — form one this round.",
     )
+
+    perception = ""
+    emotional_reaction = ""
+    plan_update = None
 
     try:
         result = await invoke_llm_structured(
-            prompt, NPCRoundResponse, llm=llm,
+            prompt, NPCRoundResponseV2, llm=llm,
         )
         raw_events = [ev.model_dump() for ev in result.events]
+        perception = result.perception
+        emotional_reaction = result.emotional_reaction
+        plan_update = result.plan_update
     except Exception:
-        logger.warning("NPC %s structured output failed, using fallback", npc.get("name"))
+        logger.warning("NPC %s structured output failed, using fallback", npc_name)
         raw_events = []
 
     if not raw_events:
-        # Guarantee at least one event per NPC per round.
         raw_events = [
             {
                 "event_type": "chat",
-                "message": f'{npc.get("name", "Someone")} is processing the news quietly.',
+                "message": f'{npc_name} is processing the news quietly.',
                 "data": {"dialogue": "Hmm, I need to think about this..."},
             }
         ]
 
     # Tag each event with round and NPC id.
-    npc_id: str = npc.get("id", "unknown")
     sim_events: list[dict[str, Any]] = []
     for ev in raw_events:
-        # Normalize target_npc_id so "npc_1" → "npc_01", "Citizen 2" → "npc_02", etc.
         ev_data = dict(ev.get("data", {}))
         if "target_npc_id" in ev_data:
             ev_data["target_npc_id"] = normalize_npc_id(
@@ -353,7 +389,35 @@ async def _simulate_single_npc(
             "data": ev_data,
         })
 
-    return sim_events
+    # ---- 5. Store memories from this round ----
+    if perception:
+        npc_memories.append(create_memory(
+            npc_id, perception, current_round, importance=6, mem_type="observation",
+        ))
+    if emotional_reaction:
+        npc_memories.append(create_memory(
+            npc_id, emotional_reaction, current_round, importance=6, mem_type="observation",
+        ))
+    for ev in sim_events:
+        npc_memories.append(create_memory(
+            npc_id, ev.get("message", ""), current_round,
+            importance=heuristic_importance(ev.get("event_type", "chat")),
+            mem_type="observation",
+        ))
+    if plan_update:
+        for mem in npc_memories:
+            if mem.get("mem_type") == "plan":
+                mem["importance"] = 3
+        npc_memories.append(create_memory(
+            npc_id, plan_update, current_round, importance=7, mem_type="plan",
+        ))
+
+    return NPCRoundResult(
+        events=sim_events,
+        perception=perception,
+        emotional_reaction=emotional_reaction,
+        plan_update=plan_update,
+    )
 
 
 def _mood_to_continuous(mood: str) -> float:
@@ -395,16 +459,20 @@ def _apply_opinion_dynamics(
     current_round: int,
     rel_map: dict[str, list[tuple[str, str, float]]],
     controversy: str,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Apply opinion dynamics from Peralta et al. (2022) to NPC interactions.
 
     Combines three mechanisms:
     1. Deffuant bounded confidence (Eq. 1-2) for pairwise chat interactions.
     2. Baumann controversy amplification (Eq. 6) pushing opinions to extremes.
     3. Keep/compromise/adopt behavioral classification (Sec. 3.3).
+
+    Returns (updated_npcs, influence_log) where influence_log records each
+    pairwise interaction for frontend visualization.
     """
     npc_lookup = {n.get("id", ""): dict(n) for n in npcs}
     alpha = _CONTROVERSY_ALPHA.get(controversy, 2.0)
+    influence_log: list[dict[str, Any]] = []
 
     chat_events = [
         e for e in events
@@ -423,12 +491,24 @@ def _apply_opinion_dynamics(
 
         # --- Classify behavior: keep / compromise / adopt (Sec. 3.3) ---
         if i_ij < _COMPROMISE_THRESHOLD:
+            influence_log.append({
+                "speaker_id": speaker_id,
+                "target_id": target_id,
+                "influence": round(i_ij, 4),
+                "behavior": "keep",
+                "political_delta": 0.0,
+                "mood_delta": 0.0,
+            })
             continue  # Keep: no opinion change.
+
+        old_political = float(target.get("political_leaning", 0.0))
+        old_mood = _mood_to_continuous(target.get("mood", "neutral"))
+        behavior = "adopt" if i_ij >= _ADOPT_THRESHOLD else "compromise"
 
         # --- Political leaning: Deffuant bounded confidence (Eq. 1-2) ---
         # x_i, x_j ∈ [-1, 1] — we normalize to [0, 1] for Deffuant, then back.
         x_i = (float(speaker.get("political_leaning", 0.0)) + 1.0) / 2.0
-        x_j = (float(target.get("political_leaning", 0.0)) + 1.0) / 2.0
+        x_j = (old_political + 1.0) / 2.0
 
         if abs(x_i - x_j) < _EPSILON_POLITICAL:
             if i_ij >= _ADOPT_THRESHOLD:
@@ -450,7 +530,7 @@ def _apply_opinion_dynamics(
 
         # --- Mood: Deffuant bounded confidence on continuous mood ---
         m_i = _mood_to_continuous(speaker.get("mood", "neutral"))
-        m_j = _mood_to_continuous(target.get("mood", "neutral"))
+        m_j = old_mood
 
         if abs(m_i - m_j) < _EPSILON_MOOD:
             if i_ij >= _ADOPT_THRESHOLD:
@@ -463,6 +543,17 @@ def _apply_opinion_dynamics(
             new_m_j = clamp(new_m_j, 0.0, 1.0)
             npc_lookup[target_id]["mood"] = _continuous_to_mood(new_m_j)
 
+        new_political = float(npc_lookup[target_id].get("political_leaning", 0.0))
+        new_mood = _mood_to_continuous(npc_lookup[target_id].get("mood", "neutral"))
+        influence_log.append({
+            "speaker_id": speaker_id,
+            "target_id": target_id,
+            "influence": round(i_ij, 4),
+            "behavior": behavior,
+            "political_delta": round(new_political - old_political, 4),
+            "mood_delta": round(new_mood - old_mood, 4),
+        })
+
     # --- Baumann global controversy drift (Eq. 6) for all NPCs ---
     # Even without interaction, high-controversy policies push opinions outward.
     # dx_i/dt = -x_i + Σ A_ij · tanh(α · x_j)  →  simplified self-reinforcement term.
@@ -473,11 +564,19 @@ def _apply_opinion_dynamics(
             drift = 0.02 * math.tanh(alpha * x)
             npc["political_leaning"] = round(clamp(x + drift, -1.0, 1.0), 4)
 
-    return list(npc_lookup.values())
+    return list(npc_lookup.values()), influence_log
 
 
 async def run_round(state: SimState) -> dict[str, Any]:
-    """Run one simulation round for all 25 NPCs in parallel."""
+    """Run one simulation round for all 25 NPCs in parallel.
+
+    Each NPC runs its own cognitive loop (Park et al. 2023):
+      Retrieve → Reflect → Plan → Perceive/React/Act → Store memories
+
+    Results are streamed to the frontend as each NPC finishes via the
+    npc_stream_callback.  Global opinion dynamics (Peralta et al. 2022)
+    run after all NPCs have acted.
+    """
 
     llm = get_llm(max_tokens=2048)
 
@@ -485,54 +584,92 @@ async def run_round(state: SimState) -> dict[str, Any]:
     events = state.get("events", [])
     current_round = state["current_round"]
     max_rounds = state["max_rounds"]
+    memory_streams: dict[str, list[dict[str, Any]]] = {
+        k: list(v) for k, v in state.get("memory_streams", {}).items()
+    }
+    callback = state.get("npc_stream_callback")
 
     logger.info("run_round: starting round %d/%d  (%d NPCs) …", current_round + 1, max_rounds, len(npcs))
 
     policy_text = _policy_summary(state.get("entities", []))
     round_context = _build_round_context(current_round, max_rounds, events)
     rel_map = _build_relationship_map(state.get("relationships", []))
-
-    # Build name→id lookup so LLM references like "Citizen 2" can be resolved.
     name_to_id = {npc.get("name", ""): npc.get("id", "") for npc in npcs}
 
-    # Build per-NPC tasks.
-    tasks: list[Coroutine[Any, Any, list[dict[str, Any]]]] = []
+    # Pre-compute per-NPC spatial and relationship data.
+    npc_neighbor_ids: dict[str, list[str]] = {}
+    npc_rels_map: dict[str, list[tuple[str, str, float]]] = {}
     for npc in npcs:
         npc_id = npc.get("id", "")
-        npc_rels = rel_map.get(npc_id, [])
-        neighbor_ids = _build_neighbor_ids(npc, npcs)
-        neighbor_events_str = _format_neighbor_events(neighbor_ids, events, current_round)
-        nearby_npcs_str = _format_nearby_npcs(neighbor_ids, npcs, npc_rels)
-        social_targets_str = _format_social_targets(npc, npc_rels, neighbor_ids, npcs)
+        npc_neighbor_ids[npc_id] = _build_neighbor_ids(npc, npcs)
+        npc_rels_map[npc_id] = rel_map.get(npc_id, [])
 
-        tasks.append(
-            _simulate_single_npc(
-                npc=npc,
-                state=state,
-                llm=llm,
-                policy_text=policy_text,
-                neighbor_events_str=neighbor_events_str,
-                round_context=round_context,
-                nearby_npcs=nearby_npcs_str,
-                social_targets=social_targets_str,
-                name_to_id=name_to_id,
-            )
+    # ---- Launch per-agent cognitive loops in parallel ----
+    tasks: list[asyncio.Task[NPCRoundResult]] = []
+    for npc in npcs:
+        npc_id = npc.get("id", "")
+        coro = _simulate_single_npc(
+            npc=npc,
+            npc_memories=memory_streams.setdefault(npc_id, []),
+            llm=llm,
+            current_round=current_round,
+            max_rounds=max_rounds,
+            policy_text=policy_text,
+            round_context=round_context,
+            neighbor_ids=npc_neighbor_ids[npc_id],
+            npc_rels=npc_rels_map[npc_id],
+            all_npcs=npcs,
+            name_to_id=name_to_id,
+            objective=state.get("objective", ""),
+        )
+        tasks.append(asyncio.create_task(coro))
+
+    logger.info("run_round: %d NPC cognitive loops launched …", len(tasks))
+
+    # Wait for all tasks, then stream + process in order.
+    # (as_completed yields wrapper coroutines, not original Tasks, so we
+    #  use gather and stream post-hoc instead.)
+    results: list[NPCRoundResult] = await asyncio.gather(*tasks)
+
+    for npc, npc_result in zip(npcs, results):
+        npc_id = npc.get("id", "")
+        npc["perception"] = npc_result.perception
+        npc["emotional_reaction"] = npc_result.emotional_reaction
+        npc["current_plan"] = (
+            npc_result.plan_update
+            or get_current_plan(memory_streams.get(npc_id, []))
+            or ""
         )
 
-    # Fire all 25 NPC calls concurrently.
-    logger.info("run_round: invoking LLM for %d NPCs in parallel …", len(tasks))
-    results: list[list[dict[str, Any]]] = await asyncio.gather(*tasks)
+        # Stream this NPC's events to the frontend.
+        if callback and npc_result.events:
+            try:
+                await callback(npc_result.events)
+            except Exception:
+                logger.debug("Stream callback failed for %s", npc.get("name"))
 
-    # Flatten.
+    # Flatten all events.
     all_events: list[dict[str, Any]] = []
-    for npc_events in results:
-        all_events.extend(npc_events)
+    for r in results:
+        all_events.extend(r.events)
     logger.info("run_round: round %d produced %d events", current_round + 1, len(all_events))
 
-    # --- Phase 1: Apply LLM mood_shift events BEFORE opinion dynamics ---
-    # Individual reactions are the starting point; Deffuant then refines
-    # based on social influence (matching the paper's model).
-    npc_positions = {npc.get("id", ""): (npc.get("x", 0), npc.get("y", 0)) for npc in npcs}
+    # Create memories for targeted events (someone chatted WITH this NPC).
+    for ev in all_events:
+        target_id = ev.get("data", {}).get("target_npc_id")
+        if target_id and target_id in memory_streams:
+            memory_streams[target_id].append(create_memory(
+                target_id,
+                f'{ev.get("npc_id", "someone")} said to me: {ev.get("data", {}).get("dialogue", ev.get("message", ""))}',
+                current_round,
+                importance=heuristic_importance(ev.get("event_type", "chat")),
+                mem_type="observation",
+            ))
+
+    total_mems = sum(len(v) for v in memory_streams.values())
+    logger.info("run_round: total memories across all NPCs: %d", total_mems)
+
+    # ---- Global post-processing: mood shifts + opinion dynamics + movement ----
     mood_updates: dict[str, str] = {}
     move_updates: dict[str, tuple[int, int]] = {}
 
@@ -545,17 +682,13 @@ async def run_round(state: SimState) -> dict[str, Any]:
             to_x = ev.get("data", {}).get("to_x")
             to_y = ev.get("data", {}).get("to_y")
             if to_x is not None and to_y is not None:
-                cur_x, cur_y = npc_positions.get(ev["npc_id"], (0, 0))
-                stepped_x = max(cur_x - 1, min(cur_x + 1, int(to_x)))
-                stepped_y = max(cur_y - 1, min(cur_y + 1, int(to_y)))
                 move_updates[ev["npc_id"]] = (
-                    int(clamp(stepped_x, 0, MAX_X)),
-                    int(clamp(stepped_y, 0, MAX_Y)),
+                    int(clamp(int(to_x), 0, MAX_X)),
+                    int(clamp(int(to_y), 0, MAX_Y)),
                 )
 
-    # --- Deduplicate moves: prevent two NPCs occupying the same tile ---
+    # Deduplicate moves: prevent two NPCs occupying the same tile.
     occupied_targets: set[tuple[int, int]] = set()
-    # Pre-populate with positions of NPCs that are NOT moving
     for npc in npcs:
         npc_id = npc.get("id", "")
         if npc_id not in move_updates:
@@ -568,18 +701,15 @@ async def run_round(state: SimState) -> dict[str, Any]:
             deduplicated_moves[npc_id] = pos
     move_updates = deduplicated_moves
 
-    # Apply mood shifts before opinion dynamics.
     for npc in npcs:
         npc_id = npc.get("id", "")
         if npc_id in mood_updates:
             npc["mood"] = mood_updates[npc_id]
 
-    # --- Phase 2: Apply opinion dynamics (Peralta et al. 2022) ---
     entities = state.get("entities", [])
     controversy = entities[0].get("controversy_level", "medium") if entities else "medium"
-    npcs = _apply_opinion_dynamics(npcs, all_events, current_round, rel_map, controversy)
+    npcs, influence_log = _apply_opinion_dynamics(npcs, all_events, current_round, rel_map, controversy)
 
-    # --- Phase 3: Apply movement updates ---
     updated_npcs = []
     for npc in npcs:
         npc_copy = dict(npc)
@@ -592,4 +722,6 @@ async def run_round(state: SimState) -> dict[str, Any]:
         "events": all_events,
         "current_round": current_round + 1,
         "npcs": updated_npcs,
+        "memory_streams": memory_streams,
+        "influence_events": influence_log,
     }

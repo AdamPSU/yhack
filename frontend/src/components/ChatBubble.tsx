@@ -2,12 +2,13 @@
 
 interface ChatBubbleProps {
   agentName: string;
+  agentCategory?: string;
   message: string;
   x: number;
   y: number;
 }
 
-export function ChatBubble({ agentName, message, x, y }: ChatBubbleProps) {
+export function ChatBubble({ agentName, agentCategory, message, x, y }: ChatBubbleProps) {
   return (
     <div
       className="pointer-events-none absolute z-30 max-w-[180px] -translate-x-1/2 -translate-y-full animate-[fadeInUp_0.3s_ease-out] transition-[left,top] duration-100 ease-linear"
@@ -15,8 +16,15 @@ export function ChatBubble({ agentName, message, x, y }: ChatBubbleProps) {
       data-testid="chat-bubble"
     >
       <div className="rpg-panel px-2.5 py-1.5 bg-black/80 border-white/10 backdrop-blur-md">
-        <div className="text-[8px] font-pixel text-purple-400 neon-text-purple">
-          {agentName}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[8px] font-pixel text-purple-400 neon-text-purple">
+            {agentName}
+          </span>
+          {agentCategory && (
+            <span className="text-[7px] font-mono text-white/30">
+              {agentCategory}
+            </span>
+          )}
         </div>
         <p className="mt-1 text-[10px] font-mono leading-snug text-white/80">
           {message.length > 80 ? `${message.slice(0, 80)}...` : message}

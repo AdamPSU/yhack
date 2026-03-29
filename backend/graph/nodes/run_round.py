@@ -22,7 +22,7 @@ from typing import Any
 
 from langchain_openai import ChatOpenAI
 
-from config import MAX_X, MAX_Y
+from config import MAX_X, MAX_Y, settings
 from graph.llm import get_llm, invoke_llm_structured
 from graph.memory import (
     create_memory,
@@ -584,7 +584,7 @@ async def run_round(state: SimState) -> dict[str, Any]:
     run after all NPCs have acted.
     """
 
-    llm = get_llm(max_tokens=2048)
+    llm = get_llm(max_tokens=2048, model=settings.fast_model_name)
 
     npcs = state["npcs"]
     events = state.get("events", [])

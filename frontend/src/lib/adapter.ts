@@ -118,6 +118,7 @@ export function adaptEvent(
     type: eventType,
     agentId: backendEvent.npc_id,
     agentName: npc.name,
+    agentCategory: npc.category,
     message: backendEvent.message,
     phase,
     month,

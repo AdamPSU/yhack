@@ -16,6 +16,7 @@ export interface SimEvent {
   type: SimEventType;
   agentId: string;
   agentName: string;
+  agentCategory?: string;
   message: string;
   phase: number; // 1-3
   month: number; // 1-9
@@ -35,6 +36,7 @@ export interface SimMetrics {
 export interface NPCState {
   id: string;
   name: string;
+  category?: string;
   x: number;
   y: number;
   direction: "up" | "down" | "left" | "right";

@@ -11,6 +11,7 @@ MoodLiteral = Literal["angry", "anxious", "worried", "neutral", "hopeful", "exci
 class NPC(BaseModel):
     id: str
     name: str
+    category: str = ""
     gender: str
     bio: str
     persona: str

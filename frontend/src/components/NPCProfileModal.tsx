@@ -146,7 +146,7 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               </h2>
             </div>
             <div className="mt-1 ml-5 text-[9px] font-mono text-white/40 uppercase tracking-widest">
-              {npc.role?.replace(/_/g, " ")} · {npc.industry || "Millfield"}
+              {npc.profession || "Resident"} · {npc.mbti || "MBTI"}
             </div>
           </div>
           <button
@@ -174,6 +174,12 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               glowClass={moodGlow}
             />
             <StatRow
+              label="Reputation"
+              value={`${(npc.reputation * 100).toFixed(0)}%`}
+              valueColor="#2dd4bf"
+              glowClass="neon-text-teal"
+            />
+            <StatRow
               label="Income"
               value={income.text}
               valueColor={income.color}
@@ -185,9 +191,6 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               valueColor={polColor}
               glowClass={polGlow}
             />
-            {npc.personality && (
-              <StatRow label="Type" value={npc.personality} />
-            )}
             <StatRow label="Position" value={`(${npc.x}, ${npc.y})`} />
           </div>
         </div>
@@ -198,6 +201,24 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
           symbol="?"
           content={npc.perception}
           fallback="No thoughts yet..."
+        />
+        <SectionBlock
+          label="Strategy"
+          symbol="#"
+          content={npc.social_strategy}
+          fallback="No strategy formed yet..."
+        />
+        <SectionBlock
+          label="Beliefs"
+          symbol="!"
+          content={npc.beliefs?.join(" · ")}
+          fallback="No defined beliefs..."
+        />
+        <SectionBlock
+          label="Controversial Ideas"
+          symbol="*"
+          content={npc.controversial_ideas?.join(" · ")}
+          fallback="No controversial ideas..."
         />
         <SectionBlock
           label="Feeling"

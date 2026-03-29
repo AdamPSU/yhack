@@ -36,8 +36,9 @@ export interface SimMetrics {
 export interface NPCState {
   id: string;
   name: string;
-  role?: string;
+  profession?: string;
   category?: string;
+  reputation?: number;
   x: number;
   y: number;
   direction: "up" | "down" | "left" | "right";
@@ -48,7 +49,8 @@ export interface NPCState {
 export interface NPCHoverInfo {
   id: string;
   name: string;
-  role: string;
+  profession: string;
+  reputation: number;
   x: number;
   y: number;
   sentiment: "happy" | "neutral" | "worried" | "angry";

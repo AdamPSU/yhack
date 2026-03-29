@@ -10,8 +10,9 @@ export class NPC extends Phaser.GameObjects.Sprite {
   readonly npcId: string;
   readonly npcName: string;
   readonly charIndex: number;
-  role = "";
+  profession = "";
   category = "";
+  reputation = 0.5;
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
 
   /** Grid position (in tile coordinates) */
@@ -144,7 +145,8 @@ export class NPC extends Phaser.GameObjects.Sprite {
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
-      role: this.role,
+      profession: this.profession,
+      reputation: this.reputation,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,
@@ -174,7 +176,8 @@ export class NPC extends Phaser.GameObjects.Sprite {
     return {
       id: this.npcId,
       name: this.npcName,
-      role: this.role,
+      profession: this.profession,
+      reputation: this.reputation,
       category: this.category,
       x: (this.x - cam.scrollX) * cam.zoom,
       // Anchor slightly above the 1x1 sprite center; a full half-tile offset

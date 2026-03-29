@@ -37,16 +37,24 @@ export interface BackendNPC {
   id: string;
   name: string;
   category?: string;
-  role: BackendRole;
+  gender: string;
+  bio: string;
+  persona: string;
+  mbti: string;
+  country: string;
+  profession: string;
+  interested_topics: string[];
   income_level: "low" | "medium" | "high";
   political_leaning: number; // -1 to 1
-  industry: string;
-  personality: string;
+  reputation: number; // 0-1
+  beliefs: string[];
+  controversial_ideas: string[];
   x: number; // 0..19
   y: number; // 0..14
   mood: BackendMood;
   // Internal state from generative agents architecture (populated after round 1+)
   perception?: string;
+  social_strategy?: string;
   emotional_reaction?: string;
   current_plan?: string;
 }
@@ -64,6 +72,8 @@ export interface BackendRelationship {
   target_id: string;
   rel_type: BackendRelType;
   strength: number; // 0-1
+  affinity: number; // -1 to 1
+  trust: number; // 0-1
 }
 
 export interface StakeholderInfo {

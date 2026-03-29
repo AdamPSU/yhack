@@ -144,11 +144,11 @@ const LAST_NAMES = [
 
 /** Fixed road positions for driver NPCs (on citypack road columns/rows) */
 const DRIVER_POSITIONS: { x: number; y: number }[] = [
-  { x: 12, y: 5 },
-  { x: 26, y: 5 },
-  { x: 12, y: 18 },
-  { x: 40, y: 5 },
-  { x: 54, y: 18 },
+  { x: 6, y: 5 },   // tileX=12 (road col), tileY=10 (road row)
+  { x: 13, y: 5 },  // tileX=26 (road col), tileY=10 (road row)
+  { x: 6, y: 12 },  // tileX=12 (road col), tileY=24 (road row)
+  { x: 20, y: 5 },  // tileX=40 (road col), tileY=10 (road row)
+  { x: 13, y: 19 }, // tileX=26 (road col), tileY=38 (road row)
 ];
 
 function generateNPCs(): BackendNPC[] {

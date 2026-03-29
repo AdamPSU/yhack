@@ -31,7 +31,7 @@ const SocialGraph = dynamic(
 // game/config.ts imports Phaser at top level which requires `window`.
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 960;
-const SCALE_FACTOR = 1; // game runs natively at 1280×960
+const SCALE_FACTOR = 1; // game runs natively at 1280×960 — no upscale factor
 const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only

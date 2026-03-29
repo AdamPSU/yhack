@@ -74,6 +74,11 @@ export class Car extends Phaser.GameObjects.Container {
   }
 
   /** Apply flip based on movement direction */
+  /** NPC-compatible alias so NPCManager can call face() on cars and NPCs uniformly */
+  face(dir: NPCState["direction"]) {
+    this.updateDirection(dir);
+  }
+
   updateDirection(dir: NPCState["direction"]) {
     this.direction = dir;
     if (this.template.orientation === "portrait") {

@@ -307,13 +307,18 @@ export class NPCManager {
     this.movement.override(npcIdA);
     this.movement.override(npcIdB);
 
-    // Find a walkable tile adjacent to npcB (not B's tile itself)
-    const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
-    const goalX = adj ? adj.x : npcB.tileX;
-    const goalY = adj ? adj.y : npcB.tileY;
+    // Drivers stay in their lane — skip walk-toward to avoid leaving road tiles
+    const eitherIsDriver = npcA.role === "driver" || npcB.role === "driver";
+    const walkPromise = eitherIsDriver
+      ? Promise.resolve()
+      : (() => {
+          const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
+          const goalX = adj ? adj.x : npcB.tileX;
+          const goalY = adj ? adj.y : npcB.tileY;
+          return this.stepToward(npcA, goalX, goalY, 5);
+        })();
 
-    // Step-walk npcA toward npcB (max 5 steps to avoid long paths)
-    this.stepToward(npcA, goalX, goalY, 5).then(() => {
+    walkPromise.then(() => {
       // Face each other
       if (npcA.tileX < npcB.tileX) {
         npcA.face("right");

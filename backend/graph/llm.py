@@ -16,13 +16,15 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-def get_llm(max_tokens: int = 4096) -> ChatOpenAI:
+def get_llm(max_tokens: int = 4096, model: str | None = None, reasoning_effort: str | None = None) -> ChatOpenAI:
     """Create a ChatOpenAI instance for the currently configured model."""
+    extra_body = {"reasoning_effort": reasoning_effort} if reasoning_effort else None
     return ChatOpenAI(
-        model=settings.model_name,
+        model=model or settings.model_name,
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
         max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
+        extra_body=extra_body,  # pyright: ignore[reportCallIssue]
     )
 
 

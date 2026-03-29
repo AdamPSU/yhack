@@ -1,4 +1,4 @@
-"""Node: orchestrate NPC generation — extract from source, fill gaps with GenerateRandom."""
+"""Node: orchestrate NPC generation — extract from source, fill gaps with RNG + LLM personality."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ import random
 
 from langchain_openai import ChatOpenAI
 
-from config import GRID_HEIGHT, GRID_WIDTH, MAX_NPCS, MAX_X, MAX_Y
+from config import GRID_HEIGHT, GRID_WIDTH, MAX_NPCS, MAX_X, MAX_Y, settings
 from graph.llm import get_llm
+from graph.names import FIRST_NAMES_F, FIRST_NAMES_M, LAST_NAMES
 from graph.prompts import (
     EXTRACT_CHARACTERS_PROMPT,
-    GENERATE_RANDOM_NPC_PROMPT,
+    GENERATE_NPC_PERSONALITY_PROMPT,
     GENERATE_RELATIONSHIPS_PROMPT,
 )
 from graph.utils import parse_llm_json
@@ -31,23 +32,33 @@ _MOODS = ["hopeful", "anxious", "angry", "neutral", "excited", "worried", "skept
 _INCOME_LEVELS = ["low", "medium", "high"]
 
 
-def _apply_defaults(npc: dict, index: int) -> dict:
-    """Fill any missing fields with lightweight deterministic defaults."""
-    npc.setdefault("id", f"npc_{index + 1:02d}")
-    npc.setdefault("gender", random.choice(["male", "female", "nonbinary"]))
-    npc.setdefault("bio", "A longtime Millfield resident with deep roots in the community.")
-    npc.setdefault("persona", "Quiet but observant; speaks plainly when they have something to say.")
-    npc.setdefault("mbti", random.choice(_MBTI_TYPES))
-    npc.setdefault("country", "USA")
-    npc.setdefault("profession", npc.pop("role", "local resident"))
-    npc.setdefault("interested_topics", ["local economy"])
-    npc.setdefault("income_level", random.choice(_INCOME_LEVELS))
-    npc.setdefault("political_leaning", round(random.uniform(-0.5, 0.5), 2))
-    npc.setdefault("x", index % GRID_WIDTH)
-    npc.setdefault("y", index // GRID_WIDTH)
-    # mood is internal to opinion dynamics, not exposed in schema
-    npc.setdefault("mood", random.choice(_MOODS))
-    return npc
+def _random_name(gender: str) -> str:
+    pool = FIRST_NAMES_F if gender == "female" else FIRST_NAMES_M
+    return f"{random.choice(pool)} {random.choice(LAST_NAMES)}"
+
+
+def _random_base(index: int, used_names: set[str]) -> dict:
+    """Generate all non-personality attributes via RNG."""
+    gender = random.choice(["male", "female", "nonbinary"])
+    name = _random_name("female" if gender == "female" else "male")
+    # Ensure uniqueness without LLM involvement
+    attempts = 0
+    while name in used_names and attempts < 20:
+        name = _random_name("female" if gender == "female" else "male")
+        attempts += 1
+    used_names.add(name)
+
+    return {
+        "name": name,
+        "gender": gender,
+        "mbti": random.choice(_MBTI_TYPES),
+        "country": "USA",
+        "income_level": random.choice(_INCOME_LEVELS),
+        "political_leaning": round(random.uniform(-1.0, 1.0), 2),
+        "x": random.randint(0, MAX_X),
+        "y": random.randint(0, MAX_Y),
+        "mood": random.choice(_MOODS),
+    }
 
 
 def _clamp_positions(npcs: list[dict]) -> list[dict]:
@@ -67,9 +78,9 @@ def _clamp_positions(npcs: list[dict]) -> list[dict]:
 
 
 async def _extract_characters(source_text: str, entities_json: str, llm: ChatOpenAI) -> list[dict]:
-    """Try to extract named characters or archetypes from the source text."""
+    """Try to extract named characters from the source text."""
     prompt = EXTRACT_CHARACTERS_PROMPT.format(
-        source_text=source_text[:4000],  # Guard against very long inputs.
+        source_text=source_text[:4000],
         entities_json=entities_json,
     )
     response = await llm.ainvoke(prompt)
@@ -77,15 +88,19 @@ async def _extract_characters(source_text: str, entities_json: str, llm: ChatOpe
     return data.get("characters", [])
 
 
-async def generate_random_npc(entities_json: str, existing_names: list[str], llm: ChatOpenAI) -> dict:
-    """GenerateRandom — create one fully-specified NPC grounded in the policy world."""
-    prompt = GENERATE_RANDOM_NPC_PROMPT.format(
+async def _generate_personality(base: dict, entities_json: str, llm: ChatOpenAI) -> dict:
+    """Ask LLM only for personality fields; all other attrs are pre-generated."""
+    prompt = GENERATE_NPC_PERSONALITY_PROMPT.format(
+        name=base["name"],
+        gender=base["gender"],
+        income_level=base["income_level"],
+        political_leaning=base["political_leaning"],
+        mbti=base["mbti"],
         entities_json=entities_json,
-        existing_names=", ".join(existing_names) if existing_names else "none",
     )
     response = await llm.ainvoke(prompt)
     data = parse_llm_json(response.content, fallback={})  # type: ignore[arg-type]
-    return data
+    return {**base, **data}
 
 
 async def _generate_relationships(npcs: list[dict], entities_json: str, llm: ChatOpenAI) -> list[dict]:
@@ -94,13 +109,10 @@ async def _generate_relationships(npcs: list[dict], entities_json: str, llm: Cha
         f'{n["id"]}: {n.get("name", "?")} — {n.get("profession", "?")} x={n.get("x")}, y={n.get("y")}'
         for n in npcs
     ]
-    num_npcs = len(npcs)
-    # Target roughly 1.5 relationships per NPC, minimum 15.
-    target_rels = max(15, int(num_npcs * 1.5))
-    
+    target_rels = max(15, int(len(npcs) * 1.5))
     prompt = GENERATE_RELATIONSHIPS_PROMPT.format(
         npcs_summary="\n".join(summary_lines),
-        num_relationships=f"{target_rels}-{target_rels + 10}"
+        num_relationships=f"{target_rels}-{target_rels + 10}",
     )
     response = await llm.ainvoke(prompt)
     data = parse_llm_json(response.content, fallback={"relationships": []})  # type: ignore[arg-type]
@@ -109,39 +121,50 @@ async def _generate_relationships(npcs: list[dict], entities_json: str, llm: Cha
 
 async def generate_npcs(state: SimState) -> dict:
     num_npcs = state.get("num_npcs", MAX_NPCS)
-    logger.info("generate_npcs: starting — extracting characters for %d NPCs …", num_npcs)
-    llm = get_llm(max_tokens=4096)
+    logger.info("generate_npcs: starting for %d NPCs …", num_npcs)
+    llm = get_llm(max_tokens=1024, model=settings.fast_model_name)
     entities_json = json.dumps(state["entities"])
 
     extracted = await _extract_characters(state["policy_text"], entities_json, llm)
     extracted = extracted[:num_npcs]
     logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
 
+    used_names: set[str] = {c.get("name", "") for c in extracted if c.get("name")}
     npcs: list[dict] = []
     for i, char in enumerate(extracted):
-        char["id"] = f"npc_{i + 1:02d}"
-        npcs.append(_apply_defaults(char, i))
+        char.setdefault("id", f"npc_{i + 1:02d}")
+        char.setdefault("gender", random.choice(["male", "female", "nonbinary"]))
+        char.setdefault("mbti", random.choice(_MBTI_TYPES))
+        char.setdefault("country", "USA")
+        char.setdefault("income_level", random.choice(_INCOME_LEVELS))
+        char.setdefault("political_leaning", round(random.uniform(-1.0, 1.0), 2))
+        char.setdefault("x", random.randint(0, MAX_X))
+        char.setdefault("y", random.randint(0, MAX_Y))
+        char.setdefault("mood", random.choice(_MOODS))
+        char.setdefault("bio", "A longtime Millfield resident.")
+        char.setdefault("persona", "Speaks plainly when they have something to say.")
+        char.setdefault("profession", char.pop("role", "local resident"))
+        char.setdefault("interested_topics", ["local economy"])
+        char.setdefault("category", "resident")
+        npcs.append(char)
 
     needed = num_npcs - len(npcs)
     if needed > 0:
-        logger.info("generate_npcs: generating %d random NPCs to fill roster …", needed)
-        existing_names = [n["name"] for n in npcs]
-        tasks = [generate_random_npc(entities_json, existing_names, llm) for _ in range(needed)]
-        random_results = await asyncio.gather(*tasks)
-
-        # Deduplicate names that collided across parallel calls.
-        seen_names = set(existing_names)
-        for npc in random_results:
-            name = npc.get("name", "")
-            if name in seen_names:
-                npc["name"] = f"{name} Jr."
-            seen_names.add(npc.get("name", ""))
+        logger.info("generate_npcs: generating %d random NPCs …", needed)
+        bases = [_random_base(len(npcs) + i, used_names) for i in range(needed)]
+        tasks = [_generate_personality(b, entities_json, llm) for b in bases]
+        results = await asyncio.gather(*tasks)
+        for i, npc in enumerate(results):
             slot = len(npcs)
             npc["id"] = f"npc_{slot + 1:02d}"
-            npcs.append(_apply_defaults(npc, slot))
+            npc.setdefault("profession", "local resident")
+            npc.setdefault("interested_topics", ["local economy"])
+            npc.setdefault("category", "resident")
+            npcs.append(npc)
 
-    logger.info("generate_npcs: generating relationships for %d NPCs …", len(npcs))
-    relationships = await _generate_relationships(npcs, entities_json, llm)
+    logger.info("generate_npcs: generating relationships …")
+    rel_llm = get_llm(max_tokens=2048, model=settings.fast_model_name)
+    relationships = await _generate_relationships(npcs, entities_json, rel_llm)
     logger.info("generate_npcs: created %d relationships", len(relationships))
 
     npcs = _clamp_positions(npcs)

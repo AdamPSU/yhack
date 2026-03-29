@@ -117,6 +117,7 @@ function NPCTooltip({
 interface BubbleState {
   npcId: string;
   agentName: string;
+  agentCategory?: string;
   message: string;
   role: string;
   x: number;
@@ -211,6 +212,7 @@ function SimulateContent() {
             next.set(npc.id, {
               npcId: npc.id,
               agentName: npc.name,
+              agentCategory: npc.category,
               message: npc.message,
               role: npc.role ?? "",
               x: npc.x,
@@ -604,6 +606,7 @@ function SimulateContent() {
                   <ChatBubble
                     key={b.npcId}
                     agentName={b.agentName}
+                    agentCategory={b.agentCategory}
                     message={b.message}
                     x={cx}
                     y={cy}

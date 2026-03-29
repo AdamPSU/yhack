@@ -234,6 +234,7 @@ export class NPCManager {
         const charIndex = i % 16;
         const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
         npc.role = bn.role;
+        npc.category = bn.category ?? "";
         npc.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, npc);
         this.occupancy.occupy(bn.id, tileX, tileY);

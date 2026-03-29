@@ -11,6 +11,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
   readonly npcName: string;
   readonly charIndex: number;
   role = "";
+  category = "";
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
 
   /** Grid position (in tile coordinates) */
@@ -174,6 +175,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
       id: this.npcId,
       name: this.npcName,
       role: this.role,
+      category: this.category,
       x: (this.x - cam.scrollX) * cam.zoom,
       // Anchor slightly above the 1x1 sprite center; a full half-tile offset
       // pushes the DOM bubble too far toward the top-left visually.

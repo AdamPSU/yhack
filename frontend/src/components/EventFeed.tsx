@@ -100,6 +100,11 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
                 <span className="text-[10px] font-mono font-bold text-white/90 neon-text-white">
                   {event.agentName}
                 </span>
+                {event.agentCategory && (
+                  <span className="text-[9px] font-mono text-white/30">
+                    {event.agentCategory}
+                  </span>
+                )}
                 <span className="ml-auto text-[9px] font-mono tabular-nums text-white/20">
                   M{event.month}
                 </span>

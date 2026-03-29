@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from graph.llm import invoke_llm_structured
+from config import settings
+from graph.llm import get_llm, invoke_llm_structured
 from graph.prompts import PARSE_POLICY_PROMPT
 from models.schemas import PolicyAnalysis
 from models.state import SimState
@@ -31,7 +32,8 @@ async def parse_policy(state: SimState) -> dict[str, Any]:
         objective=state.get("objective", "") or "general economic and social impact",
     )
     try:
-        result = await invoke_llm_structured(prompt, PolicyAnalysis, max_tokens=4096)
+        llm = get_llm(max_tokens=4096, model=settings.reasoning_model_name, reasoning_effort="low")
+        result = await invoke_llm_structured(prompt, PolicyAnalysis, llm=llm)
         entities = result.model_dump()
         logger.info(
             "parse_policy: sectors=%d  stakeholders=%d  impacts=%d  controversy=%s",

@@ -345,7 +345,7 @@ export function NPCInteractionModal({
             <SectionBlock
               label="Strategy"
               symbol="#"
-              content={npc.social_strategy}
+              content={npc.current_plan}
               fallback="No strategy formed yet..."
             />
             <SectionBlock

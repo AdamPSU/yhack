@@ -14,6 +14,7 @@ import { ChunkManager } from "../map/ChunkManager";
 import { CitypackChunkManager } from "../map/CitypackChunkManager";
 import { isRoad as citypackIsRoad } from "../map/CitypackProceduralCity";
 import { isRoad as ccityIsRoad } from "../map/ProceduralCity";
+import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -283,7 +284,14 @@ export class WorldScene extends Phaser.Scene {
       // ProceduralCity.isRoad takes (worldRow, worldCol) — swap
       return (col, row) => ccityIsRoad(row, col);
     }
-    // Static/pico8 fallback: treat all walkable tiles as roads
+    // Static citypack: check ground tile GID against known road GIDs
+    if (selectedMap === "citypack" && this.staticGroundLayer) {
+      return (col, row) => {
+        const tile = this.staticGroundLayer!.getTileAt(col, row);
+        return tile !== null && CITYPACK_ROAD_TILES.has(tile.index);
+      };
+    }
+    // pico8 / ccity static fallback: any non-building tile is walkable-as-road
     return (col, row) => this.isWalkable(col, row);
   }
 

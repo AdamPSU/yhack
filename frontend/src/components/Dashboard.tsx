@@ -31,6 +31,12 @@ function zeroOneSeverity(v: number, invert = false) {
   return "bad" as const;
 }
 
+function eggSeverity(v: number) {
+  if (v < 1.5) return "good" as const;
+  if (v < 3.0) return "warn" as const;
+  return "bad" as const;
+}
+
 export function Dashboard({
   metrics,
   metricsHistory,
@@ -64,6 +70,15 @@ export function Dashboard({
       {/* Charts */}
       <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin px-1 py-1">
         {/* Sparkline time-series metrics */}
+        <SparklineCard
+          label="Egg Index"
+          values={metricsHistory.map((m) => m.eggIndex)}
+          currentValue={metrics.eggIndex}
+          formatValue={(v) => `$${v.toFixed(2)}`}
+          severity={eggSeverity(metrics.eggIndex)}
+          baseline={1.0}
+          domain={[0.5, 5.0]}
+        />
         <SparklineCard
           label="Prices"
           values={metricsHistory.map((m) => m.priceIndex)}

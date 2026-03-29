@@ -25,6 +25,7 @@ export interface SimEvent {
 }
 
 export interface SimMetrics {
+  eggIndex: number; // Joke metric: price of eggs (multiplier)
   priceIndex: number; // % change from baseline
   unemploymentRate: number; // %
   socialUnrest: number; // 0-1

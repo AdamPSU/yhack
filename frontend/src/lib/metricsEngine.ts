@@ -15,13 +15,14 @@ const MOOD_SCORES: Record<string, number> = {
 
 /** Running accumulators — updated incrementally per round, not rescanned. */
 export interface MetricsAccumulator {
+  eggIndex: number;
   priceIndex: number;
   closureCount: number;
   layoffCount: number;
 }
 
 export function createAccumulator(): MetricsAccumulator {
-  return { priceIndex: 0, closureCount: 0, layoffCount: 0 };
+  return { eggIndex: 1.0, priceIndex: 0, closureCount: 0, layoffCount: 0 };
 }
 
 /**
@@ -66,6 +67,7 @@ export function updateMetrics(
   }
 
   return {
+    eggIndex: acc.eggIndex + (acc.priceIndex / 1000) + (Math.random() * 0.05 - 0.02),
     priceIndex: Math.max(-50, Math.min(50, acc.priceIndex)),
     unemploymentRate: Math.min(15, 4.2 + acc.layoffCount * 0.4),
     socialUnrest: unrestCount / total,

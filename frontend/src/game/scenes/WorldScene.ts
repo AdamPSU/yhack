@@ -499,17 +499,19 @@ export class WorldScene extends Phaser.Scene {
     this.npcManager?.refreshActiveBubblePositions();
   }
 
-  private onPhaseChange(data: { phase: number; round: number }) {
+  private onPhaseChange(data: { phase: number; round: number; sentiment?: number }) {
     const overlay = this.phaseOverlay;
     if (!this.sceneReady || this.cleanedUp || !overlay) return;
 
-    const overlays: Record<number, { color: number; alpha: number }> = {
-      1: { color: 0x000000, alpha: 0 },
-      2: { color: 0xff8800, alpha: 0.08 },
-      3: { color: 0xff2200, alpha: 0.15 },
-    };
-    const { color, alpha } = overlays[data.phase] ?? overlays[1];
-    overlay.setFillStyle(color, alpha);
+    const sentiment = data.sentiment ?? 0.5;
+    if (data.phase <= 1) {
+      overlay.setFillStyle(0x000000, 0);
+    } else {
+      const color =
+        sentiment >= 0.6 ? 0x00ff44 : sentiment <= 0.35 ? 0xff2200 : 0xff8800;
+      const alpha = 0.08 + (1 - sentiment) * 0.1;
+      overlay.setFillStyle(color, alpha);
+    }
   }
 
   private getMainCamera(): Phaser.Cameras.Scene2D.Camera | null {

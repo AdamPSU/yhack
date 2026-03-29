@@ -39,11 +39,43 @@ const INITIAL_METRICS: SimMetrics = {
   interestRate: 5.25,
 };
 
-const PHASE_LABELS: Record<number, string> = {
-  1: "Phase 1: Policy Announcement & Initial Assessment",
-  2: "Phase 2: Economic Ripple Effects",
-  3: "Phase 3: Social Crisis & Reckoning",
+const MOOD_SCORE: Record<string, number> = {
+  excited: 1,
+  hopeful: 0.7,
+  neutral: 0.5,
+  worried: 0.3,
+  anxious: 0.2,
+  angry: 0,
 };
+
+function computePhaseLabel(phase: number, npcs: BackendNPC[]): { label: string; sentiment: number } {
+  if (npcs.length === 0) return { label: `Phase ${phase}`, sentiment: 0.5 };
+
+  const avgScore =
+    npcs.reduce((s, n) => s + (MOOD_SCORE[n.mood] ?? 0.5), 0) / npcs.length;
+
+  const outcomes: Record<number, [string, string, string]> = {
+    1: [
+      "Policy Announced — Initial Optimism",
+      "Policy Announced — Mixed Reactions",
+      "Policy Announced — Public Concern",
+    ],
+    2: [
+      "Economic Growth Emerging",
+      "Economic Ripple Effects",
+      "Economic Strain Deepening",
+    ],
+    3: ["Social Prosperity", "Social Reckoning", "Social Crisis"],
+  };
+
+  const [pos, mid, neg] = outcomes[phase] ?? [
+    `Phase ${phase}`,
+    `Phase ${phase}`,
+    `Phase ${phase}`,
+  ];
+  const label = avgScore >= 0.6 ? pos : avgScore <= 0.35 ? neg : mid;
+  return { label, sentiment: avgScore };
+}
 
 /** Cap EventFeed to last N events to avoid unbounded React state growth */
 const MAX_FEED_EVENTS = 200;
@@ -56,6 +88,7 @@ interface SimulationState {
   metrics: SimMetrics;
   metricsHistory: SimMetrics[];
   phase: number;
+  phaseLabel: string;
   round: number;
   maxRounds: number;
   isRunning: boolean;
@@ -94,6 +127,7 @@ export function useSimulation(simulationId?: string, record = false) {
     metrics: { ...INITIAL_METRICS },
     metricsHistory: [{ ...INITIAL_METRICS }],
     phase: 0,
+    phaseLabel: "",
     round: 0,
     maxRounds: 1,
     isRunning: false,
@@ -136,7 +170,8 @@ export function useSimulation(simulationId?: string, record = false) {
 
     getBridge().then(({ eventBridge }) => {
       if (event.type === "phase_change") {
-        eventBridge.emitPhaseChange(event.phase, event.round);
+        const sentiment = typeof event.data?.sentiment === "number" ? event.data.sentiment : undefined;
+        eventBridge.emitPhaseChange(event.phase, event.round, sentiment);
       }
       eventBridge.emitSimEvent(event);
     });
@@ -151,6 +186,7 @@ export function useSimulation(simulationId?: string, record = false) {
         events,
         latestEvent: event,
         phase: event.phase > prev.phase ? event.phase : prev.phase,
+        phaseLabel: event.type === "phase_change" ? event.message : prev.phaseLabel,
         round: event.round > prev.round ? event.round : prev.round,
         maxRounds: event.maxRounds,
       };
@@ -202,16 +238,19 @@ export function useSimulation(simulationId?: string, record = false) {
       const { phase } = roundToPhase(round, maxRoundsRef.current);
       if (phase > lastPhaseRef.current) {
         lastPhaseRef.current = phase;
+        const npcValues = Array.from(lookup.values());
+        const { label, sentiment } = computePhaseLabel(phase, npcValues);
         eventQueueRef.current.push({
           id: `phase-${phase}`,
           type: "phase_change",
           agentId: "system",
           agentName: "System",
-          message: PHASE_LABELS[phase] || `Phase ${phase}`,
+          message: label,
           phase,
           round,
           maxRounds: maxRoundsRef.current,
           timestamp: Date.now(),
+          data: { sentiment },
         });
       }
 
@@ -282,6 +321,7 @@ export function useSimulation(simulationId?: string, record = false) {
       metrics: { ...INITIAL_METRICS },
       metricsHistory: [{ ...INITIAL_METRICS }],
       phase: 0,
+      phaseLabel: "",
       round: 0,
       maxRounds: 1,
       isRunning: true,
@@ -470,6 +510,7 @@ export function useSimulation(simulationId?: string, record = false) {
         metrics: { ...INITIAL_METRICS },
         metricsHistory: [{ ...INITIAL_METRICS }],
         phase: 0,
+        phaseLabel: "",
         round: 0,
         maxRounds: 1,
         isRunning: true,

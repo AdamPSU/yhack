@@ -87,30 +87,41 @@ export function spawnMoneyGain(
   floatText(scene, worldX, worldY, "+$", "#44ff88", 14);
 }
 
-/** Phase change → full screen flash */
+/** Phase change → full screen flash with sentiment-driven color */
 export function spawnPhaseFlash(
   scene: Phaser.Scene,
   phase: number,
   gameW: number,
   gameH: number,
+  sentiment?: number,
 ) {
-  const colors: Record<number, number> = {
-    1: 0x00ff88,
-    2: 0xff8800,
-    3: 0xff2200,
+  const s = sentiment ?? 0.5;
+  const color = s >= 0.6 ? 0x00ff44 : s <= 0.35 ? 0xff2200 : 0xff8800;
+
+  const posLabels: Record<number, string> = {
+    1: "POLICY WELCOMED",
+    2: "GROWTH EMERGING",
+    3: "PROSPERITY",
   };
-  const labels: Record<number, string> = {
+  const midLabels: Record<number, string> = {
     1: "POLICY ANNOUNCED",
+    2: "ECONOMIC SHIFT",
+    3: "SOCIAL RECKONING",
+  };
+  const negLabels: Record<number, string> = {
+    1: "PUBLIC CONCERN",
     2: "ECONOMIC PRESSURE",
     3: "SOCIAL CRISIS",
   };
-  const color = colors[phase] ?? 0xffffff;
+  const labelMap = s >= 0.6 ? posLabels : s <= 0.35 ? negLabels : midLabels;
+  const labelText = labelMap[phase] ?? `PHASE ${phase}`;
+
   const rect = scene.add
     .rectangle(gameW / 2, gameH / 2, gameW * 4, gameH * 4, color, 0.3)
     .setDepth(6)
     .setScrollFactor(0);
   const label = scene.add
-    .text(gameW / 2, gameH / 2, labels[phase] ?? `PHASE ${phase}`, {
+    .text(gameW / 2, gameH / 2, labelText, {
       fontSize: "22px",
       color: "#ffffff",
       fontFamily: "monospace",

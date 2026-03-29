@@ -66,8 +66,8 @@ class EventBridge {
     this.emit("sim:event", event);
   }
 
-  emitPhaseChange(phase: number, round: number) {
-    this.emit("sim:phase-change", { phase, round });
+  emitPhaseChange(phase: number, round: number, sentiment?: number) {
+    this.emit("sim:phase-change", { phase, round, sentiment });
   }
 
   // React → Phaser

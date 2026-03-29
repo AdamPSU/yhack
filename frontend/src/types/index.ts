@@ -25,6 +25,8 @@ export interface SimEvent {
   timestamp: number;
   /** Target NPC ID for chat events (who the speaker is addressing) */
   targetNpcId?: string;
+  /** Arbitrary event-specific data (e.g. sentiment score for phase_change) */
+  data?: Record<string, unknown>;
 }
 
 export interface SimMetrics {

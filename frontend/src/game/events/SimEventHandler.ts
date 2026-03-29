@@ -34,8 +34,8 @@ export class SimEventHandler {
     eventBridge.on("sim:phase-change", this.onPhaseChange, this);
   }
 
-  private onPhaseChange(data: { phase: number; round: number }) {
-    spawnPhaseFlash(this.scene, data.phase, GAME_WIDTH, GAME_HEIGHT);
+  private onPhaseChange(data: { phase: number; round: number; sentiment?: number }) {
+    spawnPhaseFlash(this.scene, data.phase, GAME_WIDTH, GAME_HEIGHT, data.sentiment);
   }
 
   private onSimEvent(event: SimEvent) {

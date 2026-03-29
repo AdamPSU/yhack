@@ -64,12 +64,6 @@ function GameCanvasPlaceholder() {
   );
 }
 
-const PHASE_LABELS: Record<number, string> = {
-  1: "Announcement & Assessment",
-  2: "Economic Ripple Effects",
-  3: "Social Crisis & Reckoning",
-};
-
 const SENTIMENT_LABEL: Record<
   NPCHoverInfo["sentiment"],
   { symbol: string; color: string }
@@ -523,7 +517,7 @@ function SimulateContent() {
               className="text-[9px] font-mono uppercase tracking-widest ml-2"
               style={{ color: "#6B4C2A" }}
             >
-              {PHASE_LABELS[sim.phase]}
+              {sim.phaseLabel}
             </span>
           )}
         </div>

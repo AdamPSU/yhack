@@ -6,6 +6,7 @@ import type {
   StartSimulationRequest,
   UploadedContextSource,
   WSInitMsg,
+  WSNPCAddedMsg,
   WSNPCEventsMsg,
   WSPolicyAnalysisMsg,
   WSRoundMsg,
@@ -15,6 +16,7 @@ const API_BASE = "http://localhost:8000";
 
 export interface WSCallbacks {
   onPolicyAnalysis: (msg: WSPolicyAnalysisMsg) => void;
+  onNPCAdded?: (msg: WSNPCAddedMsg) => void;
   onInit: (msg: WSInitMsg) => void;
   onRound: (msg: WSRoundMsg) => void;
   onNPCEvents?: (msg: WSNPCEventsMsg) => void;
@@ -113,6 +115,10 @@ export function connectSimulation(
 
   socket.on("policy_analysis", (data: WSPolicyAnalysisMsg) => {
     callbacks.onPolicyAnalysis(data);
+  });
+
+  socket.on("npc_added", (data: WSNPCAddedMsg) => {
+    callbacks.onNPCAdded?.(data);
   });
 
   socket.on("init", (data: WSInitMsg) => {

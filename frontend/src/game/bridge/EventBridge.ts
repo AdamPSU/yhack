@@ -1,4 +1,5 @@
 import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
+import type { BackendNPC } from "@/types/backend";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Listener = (...args: any[]) => void;
@@ -83,6 +84,17 @@ class EventBridge {
   emitInitNPCs(npcs: unknown[]) {
     this.sticky.set("sim:init-npcs", [npcs]);
     this.emit("sim:init-npcs", npcs);
+  }
+
+  // React → Phaser: clear all NPC sprites before a new simulation
+  emitResetNPCs() {
+    this.sticky.delete("sim:init-npcs");
+    this.emit("sim:reset-npcs");
+  }
+
+  // React → Phaser: add a single NPC sprite as soon as it's generated
+  emitAddNPC(npc: BackendNPC) {
+    this.emit("sim:add-npc", npc);
   }
 
   // React → Phaser: move an NPC to new position

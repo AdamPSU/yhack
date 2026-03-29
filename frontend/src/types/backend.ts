@@ -154,6 +154,11 @@ export interface WSRoundMsg {
   influence_events?: BackendInfluenceEvent[];
 }
 
+export interface WSNPCAddedMsg {
+  type: "npc_added";
+  npc: BackendNPC;
+}
+
 export interface WSNPCEventsMsg {
   type: "npc_events";
   events: BackendSimEvent[];

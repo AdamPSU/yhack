@@ -106,6 +106,7 @@ export function useSimulation(simulationId?: string, record = false) {
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const recordingRef = useRef<SavedSimulation | null>(null);
+  const npcsStreamedRef = useRef(false);
   const npcLookupRef = useRef<Map<string, BackendNPC>>(new Map());
   const relationshipsRef = useRef<BackendRelationship[]>([]);
   const influenceLogRef = useRef<BackendInfluenceEvent[]>([]);
@@ -354,6 +355,9 @@ export function useSimulation(simulationId?: string, record = false) {
       };
     }
 
+    npcsStreamedRef.current = false;
+    getBridge().then(({ eventBridge }) => eventBridge.emitResetNPCs());
+
     console.log("[sim] start() called — connecting WS for sim=%s", simId);
 
     try {
@@ -363,6 +367,13 @@ export function useSimulation(simulationId?: string, record = false) {
             "[sim] policy_analysis received — %d entities",
             msg.entities?.length ?? 0,
           );
+        },
+
+        onNPCAdded: (msg) => {
+          const npc = msg.npc;
+          npcLookupRef.current.set(npc.id, npc);
+          npcsStreamedRef.current = true;
+          getBridge().then(({ eventBridge }) => eventBridge.emitAddNPC(npc));
         },
 
         onInit: (msg) => {
@@ -386,9 +397,11 @@ export function useSimulation(simulationId?: string, record = false) {
             version: prev.version + 1,
           }));
 
-          getBridge().then(({ eventBridge }) => {
-            eventBridge.emitInitNPCs(msg.npcs);
-          });
+          if (!npcsStreamedRef.current) {
+            getBridge().then(({ eventBridge }) => {
+              eventBridge.emitInitNPCs(msg.npcs);
+            });
+          }
         },
 
         onRound: (msg: WSRoundMsg) => {

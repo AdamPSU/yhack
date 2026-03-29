@@ -40,6 +40,9 @@ export class NPCManager {
   private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
+  /** Cached shuffled road tiles for incremental NPC spawning */
+  private roadTilesCache: { x: number; y: number }[] = [];
+  private spawnAreaReady = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -62,12 +65,84 @@ export class NPCManager {
     );
 
     // Listen for dynamic NPC init from backend via EventBridge
+    eventBridge.on("sim:reset-npcs", this.onResetNPCs, this);
+    eventBridge.on("sim:add-npc", this.onAddNPC, this);
     eventBridge.on("sim:init-npcs", this.onInitNPCs, this);
     eventBridge.on("sim:npc-move", this.onNPCMove, this);
     eventBridge.on("sim:npc-mood", this.onNPCMood, this);
   }
 
+  private ensureSpawnArea() {
+    if (this.spawnAreaReady) return;
+    for (let row = CENTER_BOUNDS.minRow; row <= CENTER_BOUNDS.maxRow; row++) {
+      for (let col = CENTER_BOUNDS.minCol; col <= CENTER_BOUNDS.maxCol; col++) {
+        if (this.isRoad(col, row) && this.isWalkable(col, row)) {
+          this.roadTilesCache.push({ x: col, y: row });
+        }
+      }
+    }
+    for (let i = this.roadTilesCache.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.roadTilesCache[i], this.roadTilesCache[j]] = [this.roadTilesCache[j], this.roadTilesCache[i]];
+    }
+    this.spawnAreaReady = true;
+  }
+
+  private onResetNPCs() {
+    this.movement.destroy();
+    for (const npc of this.npcs.values()) npc.destroy();
+    this.npcs.clear();
+    this.npcZones.clear();
+    this.occupancy.clear();
+    this.roadTilesCache = [];
+    this.spawnAreaReady = false;
+    this.movement = new MovementSystem(this.scene, this.isWalkable, this.isRoad, this.occupancy);
+  }
+
+  private onAddNPC(bn: BackendNPC) {
+    this.ensureSpawnArea();
+    let tileX = -1;
+    let tileY = -1;
+
+    for (const candidate of this.roadTilesCache) {
+      if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+      if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
+        tileX = candidate.x;
+        tileY = candidate.y;
+        break;
+      }
+    }
+    if (tileX === -1) {
+      for (const candidate of this.roadTilesCache) {
+        if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
+          tileX = candidate.x;
+          tileY = candidate.y;
+          break;
+        }
+      }
+    }
+    if (tileX === -1) {
+      tileX = Math.max(CENTER_BOUNDS.minCol, Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()));
+      tileY = Math.max(CENTER_BOUNDS.minRow, Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()));
+    }
+
+    const charIndex = this.npcs.size % 16;
+    const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+    npc.role = bn.role;
+    npc.category = bn.category ?? "";
+    npc.sentiment = moodToSentiment(bn.mood);
+    this.npcs.set(bn.id, npc);
+    this.occupancy.occupy(bn.id, tileX, tileY);
+    const zone = roleToZone(bn.role);
+    this.npcZones.set(bn.id, zone);
+    this.movement.startRoaming(npc, zone);
+    this.centerCameraOnNPCs();
+  }
+
   private onInitNPCs(backendNPCs: unknown[]) {
+    // If NPCs were already streamed individually, skip batch creation
+    if (this.npcs.size > 0) return;
+
     // Clear any existing NPCs (sprites + movement timers)
     this.movement.destroy();
     for (const npc of this.npcs.values()) {
@@ -481,6 +556,8 @@ export class NPCManager {
   }
 
   destroy() {
+    eventBridge.off("sim:reset-npcs", this.onResetNPCs, this);
+    eventBridge.off("sim:add-npc", this.onAddNPC, this);
     eventBridge.off("sim:init-npcs", this.onInitNPCs, this);
     eventBridge.off("sim:npc-move", this.onNPCMove, this);
     eventBridge.off("sim:npc-mood", this.onNPCMood, this);

@@ -109,7 +109,9 @@ function NPCTooltip({
             [{sent.symbol}]
           </span>
         </div>
-        <div className="text-[8px] font-mono tracking-widest uppercase text-white/40">{info.role}</div>
+        <div className="text-[8px] font-mono tracking-widest uppercase text-white/40">
+          {info.role}
+        </div>
       </div>
     </div>
   );
@@ -120,7 +122,6 @@ interface BubbleState {
   agentName: string;
   agentCategory?: string;
   message: string;
-  role: string;
   x: number;
   y: number;
 }
@@ -133,20 +134,6 @@ const DEFAULT_OVERLAY_METRICS: OverlayMetrics = {
   scaleX: SCALE_FACTOR,
   scaleY: SCALE_FACTOR,
 };
-
-function roleToBubbleColor(role: string): "orange" | "blue" | "yellow" {
-  switch (role) {
-    case "politician":
-    case "business_owner":
-    case "shopkeeper":
-      return "blue";
-    case "retiree":
-    case "farmer":
-      return "yellow";
-    default:
-      return "orange";
-  }
-}
 
 export default function SimulatePage() {
   return (
@@ -178,7 +165,9 @@ function SimulateContent() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
-  const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(DEFAULT_OVERLAY_METRICS);
+  const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
+    DEFAULT_OVERLAY_METRICS,
+  );
   const [showReport, setShowReport] = useState(false);
   const reportShownRef = useRef(false);
 
@@ -215,7 +204,6 @@ function SimulateContent() {
               agentName: npc.name,
               agentCategory: npc.category,
               message: npc.message,
-              role: npc.role ?? "",
               x: npc.x,
               y: npc.y,
             });
@@ -227,6 +215,20 @@ function SimulateContent() {
       };
       eventBridge.on("sim:npc-position", handler);
       cleanup = () => eventBridge.off("sim:npc-position", handler);
+    });
+    return () => cleanup?.();
+  }, []);
+
+  // Reset transient overlay UI when Phaser re-initializes the NPC set.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+      const handler = () => {
+        setBubbles(new Map());
+        setHoverInfo(null);
+      };
+      eventBridge.on("sim:init-npcs", handler);
+      cleanup = () => eventBridge.off("sim:init-npcs", handler);
     });
     return () => cleanup?.();
   }, []);

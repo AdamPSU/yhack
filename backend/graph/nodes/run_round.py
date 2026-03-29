@@ -22,7 +22,7 @@ from typing import Any
 
 from langchain_openai import ChatOpenAI
 
-from config import MAX_X, MAX_Y, settings
+from config import MAX_X, MAX_Y
 from graph.llm import get_llm, invoke_llm_structured
 from graph.memory import (
     create_memory,
@@ -775,7 +775,7 @@ def _apply_opinion_dynamics(
 async def run_round(state: SimState) -> dict[str, Any]:
     """Run one simulation round for all 25 NPCs in parallel."""
 
-    llm = get_llm(max_tokens=2048, model=settings.fast_model_name)
+    llm = get_llm(max_tokens=2048, tier="fast")
 
     npcs = state["npcs"]
     events = state.get("events", [])

@@ -30,20 +30,42 @@ export function floatText(
   });
 }
 
-/** Protest → red bankruptcy sign floating up */
+/** Protest / closure → persistent bankruptcy marker */
 export function spawnBankruptcy(
   scene: Phaser.Scene,
   worldX: number,
   worldY: number,
 ) {
-  floatText(scene, worldX, worldY, "BANKRUPT", "#ff4444", 13);
+  const txt = scene.add
+    .text(worldX, worldY - 8, "!! BANKRUPT", {
+      fontSize: "11px",
+      color: "#ff4444",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 2,
+      backgroundColor: "#00000066",
+      padding: { x: 3, y: 2 },
+    })
+    .setDepth(20)
+    .setOrigin(0.5, 1)
+    .setScale(0);
+
+  // Pop in animation — then stays forever
+  scene.tweens.add({
+    targets: txt,
+    scaleX: 1,
+    scaleY: 1,
+    duration: 400,
+    ease: "Back.easeOut",
+  });
+
   floatText(
     scene,
-    worldX + Phaser.Math.Between(-20, 20),
-    worldY - 10,
-    "---",
+    worldX + Phaser.Math.Between(-15, 15),
+    worldY - 20,
+    "CRASH",
     "#ff6666",
-    18,
+    12,
   );
 }
 

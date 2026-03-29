@@ -86,7 +86,7 @@ export async function startSimulation(
 ): Promise<string> {
   if (typeof requestOrText === "string") {
     throw new Error(
-      "Text-only simulations are no longer supported. Upload a policy PDF first.",
+      "Pass a StartSimulationRequest object (upload files and/or use notes_text).",
     );
   }
 
@@ -94,7 +94,9 @@ export async function startSimulation(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      primary_policy_source_id: requestOrText.primary_policy_source_id,
+      primary_policy_source_id:
+        requestOrText.primary_policy_source_id ?? null,
+      policy_source_ids: requestOrText.policy_source_ids ?? [],
       notes_text: requestOrText.notes_text ?? "",
       trend_source_ids: requestOrText.trend_source_ids ?? [],
       num_rounds: requestOrText.num_rounds ?? numRounds ?? 75,

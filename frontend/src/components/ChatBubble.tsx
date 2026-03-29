@@ -26,7 +26,7 @@ export function ChatBubble({
         style={{ background: "#FDF5E6", border: "2px solid #A0824A" }}
       >
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[8px] font-pixel" style={{ color: "#5B3A1E" }}>
+          <span className="text-[8px] font-mono" style={{ color: "#5B3A1E" }}>
             {agentName}
           </span>
           {agentCategory && (

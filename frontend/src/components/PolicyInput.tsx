@@ -6,6 +6,7 @@ import { setReplayData } from "@/lib/replayStore";
 import { POLICY_PRESETS } from "@/mocks/mockData";
 import { startSimulation } from "@/services/wsClient";
 import type { SavedSimulation } from "@/types/backend";
+import { MIN_NOTES_CHARS_FOR_TEXT_ONLY } from "@/types/backend";
 
 function isSavedSimulation(data: unknown): data is SavedSimulation {
   if (!data || typeof data !== "object") return false;
@@ -69,7 +70,7 @@ export function PolicyInput() {
   }
 
   async function handleSimulate() {
-    if (text.trim().length < 20 || loading) return;
+    if (text.trim().length < MIN_NOTES_CHARS_FOR_TEXT_ONLY || loading) return;
     const recordParam = record ? "&record=true" : "";
     if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
       router.push(`/simulate?map=citypack${recordParam}`);
@@ -77,7 +78,13 @@ export function PolicyInput() {
     }
     setLoading(true);
     try {
-      const simId = await startSimulation(text);
+      const simId = await startSimulation({
+        notes_text: text,
+        policy_source_ids: [],
+        primary_policy_source_id: null,
+        trend_source_ids: [],
+        map_id: "citypack",
+      });
       router.push(`/simulate?id=${simId}&map=citypack${recordParam}`);
     } catch (err) {
       console.error("Failed to start simulation:", err);
@@ -165,7 +172,9 @@ export function PolicyInput() {
         <button
           type="button"
           onClick={handleSimulate}
-          disabled={text.trim().length < 20 || loading}
+          disabled={
+            text.trim().length < MIN_NOTES_CHARS_FOR_TEXT_ONLY || loading
+          }
           suppressHydrationWarning
           data-testid="simulate-button"
           className="rpg-panel flex-1 px-6 py-3 text-sm font-mono font-bold uppercase tracking-wider transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px hover:opacity-85"

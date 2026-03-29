@@ -567,6 +567,7 @@ export function generateMockSimulation(maxRounds = 15): MockSimulation {
     type: "init",
     npcs: [...npcs],
     relationships,
+    max_rounds: maxRounds,
   };
 
   const rounds: WSRoundMsg[] = [];
@@ -584,6 +585,7 @@ export function generateMockSimulation(maxRounds = 15): MockSimulation {
       events,
       npcs: npcs.map((n) => ({ ...n })),
       influence_events: influenceEvents,
+      max_rounds: maxRounds,
     });
   }
 

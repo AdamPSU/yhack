@@ -1,113 +1,136 @@
 "use client";
 
 import { useRef } from "react";
+import { MIN_NOTES_CHARS_FOR_TEXT_ONLY } from "@/types/backend";
 import { useForm } from "./FormContext";
 import NodeWrapper from "./NodeWrapper";
 
-const PDF_ACCEPTED = ".pdf";
-const CSV_ACCEPTED = ".csv";
+const NARRATIVE_ACCEPT =
+  ".pdf,.md,.markdown,.txt,.text,.epub,.mp4,.webm,.mov,.mkv,.m4v,.avi";
+
+function kindLabel(kind: string): string {
+  switch (kind) {
+    case "pdf":
+      return "PDF";
+    case "text":
+      return "TEXT";
+    case "book":
+      return "BOOK";
+    case "video":
+      return "VIDEO";
+    default:
+      return kind.toUpperCase();
+  }
+}
 
 export default function PolicyNode() {
   const {
     notesText,
     setNotesText,
-    primaryPolicy,
-    trendSources,
-    uploadingPrimary,
-    uploadingTrends,
-    handlePrimaryPolicyFile,
-    handleTrendFiles,
-    removeTrendSource,
+    policySources,
+    uploadingPolicySources,
+    handlePolicyNarrativeFiles,
+    removePolicySource,
   } = useForm();
-  const pdfRef = useRef<HTMLInputElement>(null);
-  const csvRef = useRef<HTMLInputElement>(null);
+  const narrativeRef = useRef<HTMLInputElement>(null);
+
+  const notesOk = notesText.trim().length >= MIN_NOTES_CHARS_FOR_TEXT_ONLY;
+  const readyHint =
+    policySources.length > 0 || notesOk
+      ? "\u2605 READY TO RUN"
+      : `ADD FILE(S) OR ${MIN_NOTES_CHARS_FOR_TEXT_ONLY}+ CHARS BELOW`;
 
   return (
     <NodeWrapper
       badge="01"
       title="POLICY"
-      description="Upload one primary policy PDF, then add optional notes and trend CSVs."
+      description="Multimodal: PDF, Markdown, plain text, EPUB, video, and/or raw text — mix freely. CSV trends are separate."
       hasTarget={false}
     >
-      <div className="nodrag nopan space-y-3" style={{ width: 480 }}>
+      <div
+        className="nodrag nopan cursor-default space-y-3"
+        style={{ width: 704 }}
+      >
         <div className="space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <input
-              ref={pdfRef}
+              ref={narrativeRef}
               type="file"
-              accept={PDF_ACCEPTED}
-              onChange={handlePrimaryPolicyFile}
+              accept={NARRATIVE_ACCEPT}
+              onChange={handlePolicyNarrativeFiles}
               className="hidden"
-              id="policy-pdf-node"
-              data-testid="policy-pdf-input"
-            />
-            <label
-              htmlFor="policy-pdf-node"
-              data-testid="upload-pdf-button"
-              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
-              style={{
-                color: uploadingPrimary ? "#A0824A" : "#3D2510",
-                background: "#E8D5A3",
-                opacity: uploadingPrimary ? 0.6 : 1,
-              }}
-            >
-              {uploadingPrimary
-                ? "Uploading PDF..."
-                : "\u2191 Primary Policy PDF"}
-            </label>
-            <span
-              className="text-[9px] font-mono"
-              style={{ color: primaryPolicy ? "#3E7C34" : "#B83A52" }}
-            >
-              {primaryPolicy ? "\u2605 READY" : "REQUIRED"}
-            </span>
-
-            <span className="text-[9px] font-mono" style={{ color: "#C4A46C" }}>
-              |
-            </span>
-
-            <input
-              ref={csvRef}
-              type="file"
-              accept={CSV_ACCEPTED}
-              onChange={handleTrendFiles}
-              className="hidden"
-              id="policy-csv-node"
-              data-testid="trend-csv-input"
+              id="policy-narrative-node"
+              data-testid="policy-narrative-input"
               multiple
             />
             <label
-              htmlFor="policy-csv-node"
-              data-testid="upload-csv-button"
-              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
+              htmlFor="policy-narrative-node"
+              data-testid="upload-narrative-button"
+              className="rpg-panel px-3 py-1.5 text-[13px] font-mono cursor-pointer transition-opacity hover:opacity-80"
               style={{
-                color: uploadingTrends ? "#A0824A" : "#3D2510",
+                color: uploadingPolicySources ? "#A0824A" : "#3D2510",
                 background: "#E8D5A3",
-                opacity: uploadingTrends ? 0.6 : 1,
+                opacity: uploadingPolicySources ? 0.6 : 1,
               }}
             >
-              {uploadingTrends ? "Uploading CSV..." : "+ Trend CSV"}
+              {uploadingPolicySources
+                ? "Uploading…"
+                : "\u2191 Policy & documents"}
             </label>
-            <span className="text-[9px] font-mono" style={{ color: "#8B7355" }}>
-              {trendSources.length} attached
+            <span
+              className="text-[12px] font-mono"
+              style={{
+                color:
+                  policySources.length > 0 || notesOk ? "#3E7C34" : "#B83A52",
+              }}
+            >
+              {readyHint}
             </span>
           </div>
-          {primaryPolicy && (
-            <div
-              className="rounded p-2 text-[9px] font-mono"
-              style={{
-                background: "#FFF8DC",
-                border: "1px solid #C4A46C",
-                color: "#6B4C2A",
-              }}
-            >
-              <div style={{ color: "#3D2510" }}>{primaryPolicy.filename}</div>
-              <div
-                className="mt-1 line-clamp-4 whitespace-pre-wrap"
-                style={{ color: "#8B7355" }}
-              >
-                {primaryPolicy.preview_text}
-              </div>
+
+          {policySources.length > 0 && (
+            <div className="space-y-1">
+              {policySources.map((source) => (
+                <div
+                  key={source.id}
+                  className="flex items-start gap-2 rounded p-2 text-[12px] font-mono"
+                  style={{
+                    background: "#FFF8DC",
+                    border: "1px solid #C4A46C",
+                    color: "#6B4C2A",
+                  }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span style={{ color: "#3D2510" }}>{source.filename}</span>
+                      <span
+                        className="rounded px-1 text-[11px]"
+                        style={{
+                          background: "#E8D5A3",
+                          color: "#5B3A1E",
+                        }}
+                      >
+                        {kindLabel(source.kind)}
+                      </span>
+                    </div>
+                    <div
+                      className="mt-1 line-clamp-3 whitespace-pre-wrap"
+                      style={{ color: "#8B7355" }}
+                    >
+                      {source.preview_text}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removePolicySource(source.id)}
+                    className="transition-opacity hover:opacity-60"
+                    style={{ color: "#B83A52" }}
+                    data-testid={`remove-policy-${source.id}`}
+                  >
+                    {"\u00D7"}
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -117,9 +140,9 @@ export default function PolicyNode() {
             value={notesText}
             onChange={(e) => setNotesText(e.target.value)}
             data-testid="policy-textarea"
-            placeholder="Optional supporting notes. Use this for analysis focus, caveats, scenario framing, or what you want the simulation to pay attention to."
-            rows={6}
-            className="rpg-panel w-full resize-none p-3 text-xs leading-relaxed font-mono outline-none transition-colors"
+            placeholder={`Raw text, instructions, or your full scenario (no upload required if you write at least ${MIN_NOTES_CHARS_FOR_TEXT_ONLY} characters). Combine with any files above.`}
+            rows={10}
+            className="rpg-panel w-full resize-none p-3 text-[15px] leading-relaxed font-mono outline-none transition-colors"
             style={{
               color: "#3D2510",
               background: "#FFF8DC",
@@ -127,48 +150,19 @@ export default function PolicyNode() {
             }}
           />
           <span
-            className="absolute right-2 bottom-2 text-[9px] font-mono"
+            className="absolute right-2 bottom-2 text-[12px] font-mono"
             style={{ color: "#A0824A" }}
           >
             {notesText.length} chars
+            {!notesOk && policySources.length === 0 ? (
+              <span style={{ color: "#B83A52" }}>
+                {" "}
+                ({MIN_NOTES_CHARS_FOR_TEXT_ONLY}+ for text-only)
+              </span>
+            ) : null}
           </span>
         </div>
 
-        {/* CSV previews */}
-        {trendSources.length > 0 && (
-          <div className="space-y-1">
-            {trendSources.map((source) => (
-              <div
-                key={source.id}
-                className="flex items-start gap-2 rounded p-2 text-[9px] font-mono"
-                style={{
-                  background: "#FFF8DC",
-                  border: "1px solid #C4A46C",
-                  color: "#6B4C2A",
-                }}
-              >
-                <div className="min-w-0 flex-1">
-                  <div style={{ color: "#3D2510" }}>{source.filename}</div>
-                  <div
-                    className="mt-1 line-clamp-3 whitespace-pre-wrap"
-                    style={{ color: "#8B7355" }}
-                  >
-                    {source.summary}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeTrendSource(source.id)}
-                  className="transition-opacity hover:opacity-60"
-                  style={{ color: "#B83A52" }}
-                  data-testid={`remove-trend-${source.id}`}
-                >
-                  {"\u00D7"}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </NodeWrapper>
   );

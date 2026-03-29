@@ -5,9 +5,14 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
+import { AuroraLayer } from "@/components/ui/aurora-background";
+import FuzzyText from "@/components/FuzzyText/FuzzyText";
 import IntroAnimation from "@/components/IntroAnimation";
+import LogoLoop from "@/components/LogoLoop/LogoLoop";
+import { Particles } from "@/components/Particles/Particles";
 import { SimLoadingScreen } from "@/components/SimLoadingScreen";
 import { setReplayData } from "@/lib/replayStore";
+import { simulacraTechLogos } from "@/lib/simulacraTechLogos";
 import type { SavedSimulation } from "@/types/backend";
 
 const NodeCanvasClient = dynamic(
@@ -221,6 +226,8 @@ export default function Home() {
   const [showIntro, setShowIntro] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showCurtain, setShowCurtain] = useState(false);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,8 +236,14 @@ export default function Home() {
   }, []);
 
   const handlePlay = useCallback(() => {
-    setShowEditor(true);
-  }, []);
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    // After fuzzy plays (500ms), drop the curtain and reveal the editor behind it
+    setTimeout(() => {
+      setShowCurtain(true);
+      setShowEditor(true);
+    }, 500);
+  }, [isTransitioning]);
 
   const handleLoadFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -266,20 +279,53 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 2, ease: "easeOut" }}
-          className="relative flex h-screen flex-col items-center justify-center overflow-hidden"
+          className="relative isolate flex h-screen flex-col items-center justify-center overflow-hidden"
         >
-          {/* ── Background ──────────────────────────────────────── */}
-          <Image
-            src="/background.png"
-            alt=""
-            fill
-            priority
-            className="object-cover object-bottom pixel-crisp"
-            style={{ zIndex: 0 }}
-          />
+          {/* ── Background image (bottom layer) ─────────────────── */}
+          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+            <Image
+              src="/background.png"
+              alt=""
+              fill
+              priority
+              className="object-cover object-bottom pixel-crisp"
+            />
+          </div>
+
+          {/* ── Subtle aurora layer ─────────────────────────── */}
+          <AuroraLayer className="z-[3]" showRadialGradient={false} />
+
+          {/* ── Subtle dust (drifting dots) ─────────────────────────── */}
+          <div className="pointer-events-none absolute inset-0 z-[4]">
+            <Particles
+              variant="dust"
+              className="h-full w-full min-h-0"
+              quantity={80}
+              color="#FDF5E6"
+              alphaMin={0.05}
+              alphaMax={0.15}
+              size={0.6}
+              vx={0.05}
+              vy={0.02}
+            />
+          </div>
+
+          {/* ── Subtle rain (grey streaks) ─ */}
+          <div className="pointer-events-none absolute inset-0 z-[5]">
+            <Particles
+              variant="rain"
+              className="h-full w-full min-h-0"
+              quantity={96}
+              color="#3D3E45"
+              alphaMin={0.08}
+              alphaMax={0.22}
+              vx={0.22}
+              vy={0.28}
+            />
+          </div>
 
           {/* ── Twinkling stars ──────────────────────────────────── */}
-          <div className="absolute inset-0 z-[1] pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 z-[6]">
             <Star x="12%" y="6%" delay={0} size={3} />
             <Star x="28%" y="4%" delay={0.8} size={2} />
             <Star x="50%" y="2%" delay={1.5} size={4} />
@@ -293,7 +339,7 @@ export default function Home() {
           </div>
 
           {/* ── Drifting pixel clouds ───────────────────────────── */}
-          <div className="absolute inset-0 z-[2] pointer-events-none overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 z-[7] overflow-hidden">
             <PixelCloud y="22%" delay={0} duration={80} scale={1.4} />
             <PixelCloud y="32%" delay={15} duration={100} scale={1.0} />
             <PixelCloud y="18%" delay={35} duration={90} scale={1.2} />
@@ -302,7 +348,7 @@ export default function Home() {
           </div>
 
           {/* ── Flying birds ──────────────────────────────────────── */}
-          <div className="absolute inset-0 z-[3] pointer-events-none overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 z-[8] overflow-hidden">
             <Bird y="15%" delay={2} duration={18} size={1.0} />
             <Bird y="12%" delay={5} duration={20} size={0.8} />
             <Bird y="18%" delay={9} duration={16} size={1.2} />
@@ -325,7 +371,9 @@ export default function Home() {
           >
             {/* Sign board — pixelated */}
             <div
-              className="relative px-14 py-8 text-center pixel-crisp"
+              role="button"
+              onClick={handlePlay}
+              className="relative px-14 py-8 text-center pixel-crisp cursor-pointer"
               style={{
                 background: "#D4A044",
                 border: "6px solid #5B3010",
@@ -393,18 +441,30 @@ export default function Home() {
               />
 
               {/* Title text */}
-              <motion.h1
+              <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.8, duration: 0.6, type: "spring" }}
-                className="relative z-10 text-[36px] font-pixel uppercase leading-tight tracking-wider"
-                style={{
-                  color: "#5B3010",
-                  textShadow: "3px 3px 0 #C89038, -1px -1px 0 #7A4E1E",
-                }}
+                className="relative z-10"
               >
-                Simulacra
-              </motion.h1>
+                <FuzzyText
+                  fontSize={36}
+                  fontFamily="'Press Start 2P', monospace"
+                  fontWeight={900}
+                  color="#5B3010"
+                  baseIntensity={isTransitioning ? 0.85 : 0}
+                  hoverIntensity={0}
+                  enableHover={false}
+                  glitchMode={isTransitioning}
+                  glitchInterval={90}
+                  glitchDuration={220}
+                  fuzzRange={28}
+                  direction="both"
+                  clickEffect={false}
+                >
+                  SIMULACRA
+                </FuzzyText>
+              </motion.div>
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -471,15 +531,23 @@ export default function Home() {
                 minWidth: "120px",
               }}
             >
-              <span
-                className="text-[14px] font-pixel uppercase tracking-wide"
-                style={{
-                  color: "#5B3010",
-                  textShadow: "2px 2px 0 #C89038",
-                }}
+              <FuzzyText
+                fontSize={14}
+                fontFamily="'Press Start 2P', monospace"
+                fontWeight={900}
+                color="#5B3010"
+                baseIntensity={isTransitioning ? 0.85 : 0}
+                hoverIntensity={0}
+                enableHover={false}
+                glitchMode={isTransitioning}
+                glitchInterval={90}
+                glitchDuration={220}
+                fuzzRange={14}
+                direction="both"
+                clickEffect={false}
               >
-                Play
-              </span>
+                PLAY
+              </FuzzyText>
             </motion.button>
 
             {/* LOAD button */}
@@ -513,6 +581,23 @@ export default function Home() {
             </motion.button>
           </motion.div>
 
+          {/* Foreground rain over sign + Play/Load */}
+          <div
+            className="pointer-events-none absolute inset-0 z-[11]"
+            aria-hidden
+          >
+            <Particles
+              variant="rain"
+              className="h-full w-full min-h-0"
+              quantity={64}
+              color="#3D3E45"
+              alphaMin={0.06}
+              alphaMax={0.18}
+              vx={0.18}
+              vy={0.22}
+            />
+          </div>
+
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -522,20 +607,51 @@ export default function Home() {
             className="hidden"
           />
 
-          {/* ── Version badge ────────────────────────────────────── */}
-          <motion.div
+          {/* ── Footer: centered tech strip; version in corner (frosted glass) ─ */}
+          <motion.footer
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 2.0, duration: 1.0 }}
-            className="absolute bottom-4 right-4 z-[10]"
+            className="absolute bottom-0 left-0 right-0 z-[12] flex flex-col items-center px-4 pb-7 pt-10 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(18, 52, 42, 0.72) 0%, rgba(18, 45, 38, 0.28) 38%, rgba(18, 40, 34, 0.06) 68%, transparent 92%)",
+              WebkitMaskImage:
+                "linear-gradient(to top, black 0%, black 55%, rgba(0,0,0,0.45) 78%, transparent 100%)",
+              maskImage:
+                "linear-gradient(to top, black 0%, black 55%, rgba(0,0,0,0.45) 78%, transparent 100%)",
+            }}
           >
+            <div className="pointer-events-auto w-full max-w-5xl">
+              <div
+                className="rounded-2xl border border-white/20 px-5 py-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.18)] [&_a]:flex [&_a]:items-center [&_svg]:text-white"
+                style={{
+                  background: "rgba(12, 38, 32, 0.28)",
+                  color: "rgba(255,255,255,0.92)",
+                  WebkitBackdropFilter: "blur(18px) saturate(140%)",
+                  backdropFilter: "blur(18px) saturate(140%)",
+                }}
+              >
+                <LogoLoop
+                  logos={simulacraTechLogos}
+                  speed={52}
+                  direction="left"
+                  logoHeight={34}
+                  gap={48}
+                  hoverSpeed={0}
+                  fadeOut
+                  fadeOutColor="rgba(14, 42, 36, 0.55)"
+                  ariaLabel="Built with"
+                />
+              </div>
+            </div>
             <span
-              className="text-[8px] font-pixel uppercase tracking-widest"
-              style={{ color: "rgba(255,255,255,0.5)" }}
+              className="pointer-events-auto absolute bottom-3 right-4 text-right text-[9px] font-pixel uppercase tracking-widest drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] sm:bottom-4 sm:right-6"
+              style={{ color: "rgba(255,255,255,0.58)" }}
             >
               v1.0 {"\u2014"} The Boys Inc.
             </span>
-          </motion.div>
+          </motion.footer>
 
           {/* ── Node editor overlay ─────────────────────────────── */}
           <AnimatePresence>
@@ -544,16 +660,17 @@ export default function Home() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.15 }}
                 className="fixed inset-0 z-[50] flex flex-col"
               >
-                <Image
-                  src="/background.png"
-                  alt=""
-                  fill
-                  className="object-cover object-bottom"
-                  style={{ zIndex: 0 }}
-                />
+                <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                  <Image
+                    src="/background.png"
+                    alt=""
+                    fill
+                    className="object-cover object-bottom"
+                  />
+                </div>
                 <div
                   className="absolute inset-0 z-[1]"
                   style={{
@@ -561,8 +678,9 @@ export default function Home() {
                       "linear-gradient(180deg, rgba(10,30,15,0.6) 0%, rgba(10,30,15,0.4) 40%, rgba(10,30,15,0.55) 100%)",
                   }}
                 />
+                <AuroraLayer className="z-[2]" showRadialGradient={false} />
                 <div
-                  className="relative z-[10] flex h-10 shrink-0 items-center justify-between px-5"
+                  className="relative z-[20] flex h-10 shrink-0 items-center justify-between px-5"
                   style={{
                     background: "rgba(232,213,163,0.92)",
                     borderBottom: "3px solid #6B4226",
@@ -589,7 +707,7 @@ export default function Home() {
                     {"\u2605"} Ready
                   </span>
                 </div>
-                <div className="relative z-[10] flex-1">
+                <div className="relative z-[10] min-h-0 flex-1 flex items-center justify-center pt-20">
                   <NodeCanvasClient
                     onSimulateStart={() => setShowLoading(true)}
                   />
@@ -602,6 +720,28 @@ export default function Home() {
           <SimLoadingScreen isVisible={showLoading} />
         </motion.div>
       )}
+
+      {/* ── Slide curtain transition ─────────────────────────── */}
+      <AnimatePresence>
+        {showCurtain && (
+          <motion.div
+            key="slide-curtain"
+            className="fixed inset-0 z-[300]"
+            style={{ background: "#1a1208" }}
+            initial={{ x: "100%" }}
+            animate={{ x: ["100%", "0%", "0%", "-100%"] }}
+            transition={{
+              duration: 1.1,
+              times: [0, 0.28, 0.52, 1],
+              ease: "easeInOut",
+            }}
+            onAnimationComplete={() => {
+              setShowCurtain(false);
+              setIsTransitioning(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }

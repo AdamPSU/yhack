@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import { Particles } from "./Particles/Particles";
 
 interface SimLoadingScreenProps {
   isVisible: boolean;
@@ -18,7 +19,20 @@ export function SimLoadingScreen({ isVisible }: SimLoadingScreenProps) {
           className="fixed inset-0 z-[200] flex items-center justify-center font-pixel"
           style={{ background: "#1a1208" }}
         >
-          <div className="flex flex-col items-center text-center space-y-8">
+          <div className="pointer-events-none absolute inset-0 z-[1]">
+            <Particles
+              variant="dust"
+              className="h-full w-full min-h-0"
+              quantity={40}
+              color="#FDF5E6"
+              alphaMin={0.03}
+              alphaMax={0.1}
+              size={0.4}
+              vx={0.02}
+              vy={0.01}
+            />
+          </div>
+          <div className="relative z-10 flex flex-col items-center text-center space-y-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

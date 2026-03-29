@@ -14,6 +14,7 @@ import { type MapType, setSelectedMap } from "@/game/constants";
 import { setReplayData } from "@/lib/replayStore";
 import { startSimulation, uploadContextSource } from "@/services/wsClient";
 import type { SavedSimulation, UploadedContextSource } from "@/types/backend";
+import { MIN_NOTES_CHARS_FOR_TEXT_ONLY } from "@/types/backend";
 import ConfigNode from "./ConfigNode";
 import { FormContext } from "./FormContext";
 import PolicyNode from "./PolicyNode";
@@ -35,33 +36,52 @@ const nodeTypes = {
   runNode: RunNode,
 };
 
+/**
+ * Horizontal layout: `width` / `height` match real DOM so the first `fitView` centers
+ * correctly before ResizeObserver runs. `NODE_GAP` keeps edge paths in clear space.
+ */
+const NODE_GAP = 88;
+/** 704 content + p-3 (24) + border (6) + shadow (~12) */
+const POLICY_NODE_W = 750;
+const POLICY_NODE_H = 792;
+const CONFIG_NODE_W = 574;
+const CONFIG_NODE_H = 616;
+const RUN_NODE_W = 486;
+const RUN_NODE_H = 550;
+
 const initialNodes: Node[] = [
   {
     id: "policy",
     type: "policyNode",
-    position: { x: 50, y: 200 },
+    position: { x: 0, y: 0 },
+    width: POLICY_NODE_W,
+    height: POLICY_NODE_H,
     data: {},
-    draggable: false,
   },
   {
     id: "config",
     type: "configNode",
-    position: { x: 600, y: 140 },
+    position: { x: POLICY_NODE_W + NODE_GAP, y: 0 },
+    width: CONFIG_NODE_W,
+    height: CONFIG_NODE_H,
     data: {},
-    draggable: false,
   },
   {
     id: "run",
     type: "runNode",
-    position: { x: 1050, y: 220 },
+    position: {
+      x: POLICY_NODE_W + NODE_GAP + CONFIG_NODE_W + NODE_GAP,
+      y: 0,
+    },
+    width: RUN_NODE_W,
+    height: RUN_NODE_H,
     data: {},
-    draggable: false,
   },
 ];
 
 const edgeStyle = {
-  stroke: "#D4A520",
-  strokeWidth: 2.5,
+  stroke: "#C97D1A",
+  strokeWidth: 3.5,
 };
 
 const initialEdges: Edge[] = [
@@ -87,6 +107,9 @@ interface NodeCanvasProps {
   onSimulateStart?: () => void;
 }
 
+const FIT_MIN_ZOOM = 0.35;
+const FIT_MAX_ZOOM = 1;
+
 export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const router = useRouter();
   const [notesText, setNotesText] = useState("");
@@ -95,11 +118,12 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const [objective, setObjective] = useState("");
   const mapId: MapType = "citypack";
   const setMapId = useCallback((_: MapType) => {}, []);
-  const [uploadingPrimary, setUploadingPrimary] = useState(false);
+  const [uploadingPolicySources, setUploadingPolicySources] = useState(false);
   const [uploadingTrends, setUploadingTrends] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [primaryPolicy, setPrimaryPolicy] =
-    useState<UploadedContextSource | null>(null);
+  const [policySources, setPolicySources] = useState<UploadedContextSource[]>(
+    [],
+  );
   const [trendSources, setTrendSources] = useState<UploadedContextSource[]>([]);
   const [record, setRecord] = useState(false);
   const [loadingCustomRun, setLoadingCustomRun] = useState(false);
@@ -107,23 +131,37 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  const handlePrimaryPolicyFile = useCallback(
+  const handlePolicyNarrativeFiles = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploadingPrimary(true);
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length) return;
+      setUploadingPolicySources(true);
       try {
-        const uploaded = await uploadContextSource(file, "Primary Policy PDF");
-        setPrimaryPolicy(uploaded);
+        const uploaded = await Promise.all(
+          files.map((file) => uploadContextSource(file, file.name)),
+        );
+        const narratives = uploaded.filter((u) => u.kind !== "csv");
+        if (narratives.length < uploaded.length) {
+          alert(
+            "CSV files belong in Trend data — they were skipped here. Use the + Trend CSV control.",
+          );
+        }
+        if (narratives.length) {
+          setPolicySources((prev) => [...prev, ...narratives]);
+        }
       } catch {
-        alert("Could not upload the policy PDF.");
+        alert("Could not upload one or more policy files.");
       } finally {
-        setUploadingPrimary(false);
+        setUploadingPolicySources(false);
         e.target.value = "";
       }
     },
     [],
   );
+
+  const removePolicySource = useCallback((sourceId: string) => {
+    setPolicySources((prev) => prev.filter((s) => s.id !== sourceId));
+  }, []);
 
   const handleTrendFiles = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,7 +189,14 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   }, []);
 
   const handleSimulate = useCallback(async () => {
-    if (!primaryPolicy || isSimulating || uploadingPrimary || uploadingTrends)
+    const notesOk = notesText.trim().length >= MIN_NOTES_CHARS_FOR_TEXT_ONLY;
+    const hasNarrativeFiles = policySources.length > 0;
+    if (
+      (!hasNarrativeFiles && !notesOk) ||
+      isSimulating ||
+      uploadingPolicySources ||
+      uploadingTrends
+    )
       return;
 
     onSimulateStart?.();
@@ -162,7 +207,8 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
 
     try {
       const simId = await startSimulation({
-        primary_policy_source_id: primaryPolicy.id,
+        policy_source_ids: policySources.map((s) => s.id),
+        primary_policy_source_id: null,
         notes_text: notesText,
         trend_source_ids: trendSources.map((source) => source.id),
         num_rounds: numRounds,
@@ -178,7 +224,7 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       setIsSimulating(false);
     }
   }, [
-    primaryPolicy,
+    policySources,
     notesText,
     trendSources,
     numNpcs,
@@ -187,7 +233,7 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
     record,
     router,
     isSimulating,
-    uploadingPrimary,
+    uploadingPolicySources,
     uploadingTrends,
     onSimulateStart,
   ]);
@@ -247,14 +293,15 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       setObjective,
       mapId,
       setMapId,
-      primaryPolicy,
+      policySources,
       trendSources,
-      uploadingPrimary,
+      uploadingPolicySources,
       uploadingTrends,
       isSimulating,
       record,
       setRecord,
-      handlePrimaryPolicyFile,
+      handlePolicyNarrativeFiles,
+      removePolicySource,
       handleTrendFiles,
       removeTrendSource,
       handleSimulate,
@@ -267,13 +314,14 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       numNpcs,
       numRounds,
       objective,
-      primaryPolicy,
+      policySources,
       trendSources,
-      uploadingPrimary,
+      uploadingPolicySources,
       uploadingTrends,
       isSimulating,
       record,
-      handlePrimaryPolicyFile,
+      handlePolicyNarrativeFiles,
+      removePolicySource,
       handleTrendFiles,
       removeTrendSource,
       handleSimulate,
@@ -287,27 +335,41 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   return (
     <FormContext.Provider value={formValue}>
       <style>{`
-        .react-flow, .react-flow__pane, .react-flow__renderer, .react-flow__background { background: transparent !important; }
-        .react-flow__edge-path { stroke-linecap: round; }
-        .react-flow__edge.animated path { animation-duration: 1.5s; }
+        .node-canvas-flow, .node-canvas-flow .react-flow__pane, .node-canvas-flow .react-flow__renderer, .node-canvas-flow .react-flow__background { background: transparent !important; }
+        .node-canvas-flow .react-flow__edge-path {
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          filter: drop-shadow(0 1px 2px rgba(45, 28, 12, 0.45));
+        }
+        .node-canvas-flow .react-flow__edge.animated path { animation-duration: 1.35s; }
+        .node-canvas-flow .react-flow__edges { z-index: 2; }
+        .node-canvas-flow .react-flow__nodes { z-index: 3; }
       `}</style>
       <ReactFlow
+        className="node-canvas-flow"
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         proOptions={{ hideAttribution: true }}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        nodesDraggable={false}
+        fitView
+        fitViewOptions={{
+          padding: 0.1,
+          maxZoom: FIT_MAX_ZOOM,
+          minZoom: FIT_MIN_ZOOM,
+        }}
+        nodesDraggable
         nodesConnectable={false}
         panOnDrag={false}
         zoomOnScroll={false}
         zoomOnPinch={false}
         zoomOnDoubleClick={false}
-        minZoom={1}
+        minZoom={FIT_MIN_ZOOM}
         maxZoom={1}
+        selectNodesOnDrag={false}
       />
+
     </FormContext.Provider>
   );
 }

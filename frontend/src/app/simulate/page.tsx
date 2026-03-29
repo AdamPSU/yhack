@@ -176,6 +176,7 @@ function SimulateContent() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [focusScale, setFocusScale] = useState(1);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
@@ -183,6 +184,14 @@ function SimulateContent() {
   );
   const [showReport, setShowReport] = useState(false);
   const reportShownRef = useRef(false);
+
+  useEffect(() => {
+    if (focusMode) {
+      setFocusScale(Math.max(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT));
+    } else {
+      setFocusScale(1);
+    }
+  }, [focusMode]);
 
   // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
@@ -635,7 +644,8 @@ function SimulateContent() {
               border: "3px solid #6B4226",
               borderRadius: 4,
               ...(focusMode ? {
-                zoom: Math.max(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1),
+                transform: `scale(${focusScale})`,
+                transformOrigin: 'center center',
                 border: 'none',
                 padding: 0,
                 boxShadow: 'none',

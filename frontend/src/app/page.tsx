@@ -5,12 +5,12 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
-import { AuroraLayer } from "@/components/ui/aurora-background";
 import FuzzyText from "@/components/FuzzyText/FuzzyText";
 import IntroAnimation from "@/components/IntroAnimation";
 import LogoLoop from "@/components/LogoLoop/LogoLoop";
 import { Particles } from "@/components/Particles/Particles";
 import { SimLoadingScreen } from "@/components/SimLoadingScreen";
+import { AuroraLayer } from "@/components/ui/aurora-background";
 import { setReplayData } from "@/lib/replayStore";
 import { simulacraTechLogos } from "@/lib/simulacraTechLogos";
 import type { SavedSimulation } from "@/types/backend";
@@ -510,7 +510,7 @@ export default function Home() {
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 1.0, duration: 0.8 }}
-            className="relative z-[10] flex gap-5"
+            className="relative z-[10] flex w-full max-w-[280px] justify-center gap-3 px-4 max-[500px]:max-w-[160px] max-[500px]:flex-col"
           >
             {/* PLAY button */}
             <motion.button
@@ -521,18 +521,17 @@ export default function Home() {
               transition={{ delay: 1.2, duration: 0.5 }}
               whileHover={{ y: -3 }}
               whileTap={{ y: 2 }}
-              className="flex items-center justify-center px-14 py-5 cursor-pointer pixel-crisp"
+              className="flex min-h-[32px] flex-1 basis-0 items-center justify-center px-4 py-1.5 cursor-pointer pixel-crisp max-[500px]:w-full"
               style={{
                 background: "#D4A044",
-                border: "4px solid #5B3010",
+                border: "2px solid #5B3010",
                 borderRadius: "2px",
                 boxShadow:
-                  "inset 3px 3px 0 #E8C874, inset -3px -3px 0 #A07028, 4px 4px 0 #3D1E08",
-                minWidth: "120px",
+                  "inset 1px 1px 0 #E8C874, inset -1px -1px 0 #A07028, 2px 2px 0 #3D1E08",
               }}
             >
               <FuzzyText
-                fontSize={14}
+                fontSize={12}
                 fontFamily="'Press Start 2P', monospace"
                 fontWeight={900}
                 color="#5B3010"
@@ -542,7 +541,7 @@ export default function Home() {
                 glitchMode={isTransitioning}
                 glitchInterval={90}
                 glitchDuration={220}
-                fuzzRange={14}
+                fuzzRange={8}
                 direction="both"
                 clickEffect={false}
               >
@@ -557,27 +556,34 @@ export default function Home() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 1.35, duration: 0.5 }}
-              whileHover={{ y: -3 }}
-              whileTap={{ y: 2 }}
-              className="flex items-center justify-center px-14 py-5 cursor-pointer pixel-crisp"
+              whileHover={{ y: -2 }}
+              whileTap={{ y: 1 }}
+              className="flex min-h-[32px] flex-1 basis-0 items-center justify-center px-4 py-1.5 cursor-pointer pixel-crisp max-[500px]:w-full"
               style={{
                 background: "#D4A044",
-                border: "4px solid #5B3010",
+                border: "2px solid #5B3010",
                 borderRadius: "2px",
                 boxShadow:
-                  "inset 3px 3px 0 #E8C874, inset -3px -3px 0 #A07028, 4px 4px 0 #3D1E08",
-                minWidth: "120px",
+                  "inset 1px 1px 0 #E8C874, inset -1px -1px 0 #A07028, 2px 2px 0 #3D1E08",
               }}
             >
-              <span
-                className="text-[14px] font-pixel uppercase tracking-wide"
-                style={{
-                  color: "#5B3010",
-                  textShadow: "2px 2px 0 #C89038",
-                }}
+              <FuzzyText
+                fontSize={12}
+                fontFamily="'Press Start 2P', monospace"
+                fontWeight={900}
+                color="#5B3010"
+                baseIntensity={isTransitioning ? 0.85 : 0}
+                hoverIntensity={0}
+                enableHover={false}
+                glitchMode={isTransitioning}
+                glitchInterval={90}
+                glitchDuration={220}
+                fuzzRange={8}
+                direction="both"
+                clickEffect={false}
               >
-                Load
-              </span>
+                LOAD
+              </FuzzyText>
             </motion.button>
           </motion.div>
 

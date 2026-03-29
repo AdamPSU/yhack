@@ -8,7 +8,6 @@ import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCInteractionModal } from "@/components/NPCInteractionModal";
-import { StatsLegend } from "@/components/StatsLegend";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, SimEvent } from "@/types";

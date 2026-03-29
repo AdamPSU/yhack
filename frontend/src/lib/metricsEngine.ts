@@ -39,9 +39,20 @@ export function updateMetrics(
   // Incrementally update accumulators with this round's events only
   for (const e of newEvents) {
     if (e.event_type === "price_change") {
-      const oldPrice = Number(e.data.old_price) || 1;
-      const newPrice = Number(e.data.new_price) || oldPrice;
-      acc.priceIndex += ((newPrice - oldPrice) / oldPrice) * 100;
+      const pctChange = Number(e.data.pct_change);
+      if (Number.isFinite(pctChange)) {
+        acc.priceIndex += pctChange;
+      } else {
+        const oldPrice = Number(e.data.old_price);
+        const newPrice = Number(e.data.new_price);
+        if (
+          Number.isFinite(oldPrice) &&
+          oldPrice !== 0 &&
+          Number.isFinite(newPrice)
+        ) {
+          acc.priceIndex += ((newPrice - oldPrice) / oldPrice) * 100;
+        }
+      }
     }
     if (e.event_type === "chat") {
       const npc = npcs.find((n) => n.id === e.npc_id);

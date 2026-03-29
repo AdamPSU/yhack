@@ -138,34 +138,30 @@ def _fuzzy_mood_to_ladder(mood: str) -> str:
 
 def _build_relationship_map(
     relationships: list[dict[str, Any]],
-) -> dict[str, list[tuple[str, str, float, float, float]]]:
-    """Pre-index relationships as {npc_id: [(other_id, rel_type, strength, affinity, trust), ...]}.
+) -> dict[str, list[tuple[str, float, float]]]:
+    """Pre-index relationships as {npc_id: [(other_id, affinity, trust), ...]}.
 
-    Deduplicates: if the same pair appears multiple times (e.g. as both
-    colleague and neighbor), only the entry with the highest effective
-    influence (strength × type_weight) is kept.
+    Deduplicates: if the same pair appears multiple times, only the entry with
+    the highest total (affinity + trust) is kept (though they should be unique).
     """
     # First pass: pick the strongest relationship per directed pair.
     best: dict[
-        tuple[str, str], tuple[str, float, float, float, float]
-    ] = {}  # (src,tgt) → (rtype, strength, eff, affinity, trust)
+        tuple[str, str], tuple[float, float]
+    ] = {}  # (src,tgt) → (affinity, trust)
     for rel in relationships:
         src: str = rel.get("source_id", "")
         tgt: str = rel.get("target_id", "")
-        rtype: str = rel.get("rel_type", "neighbor")
-        strength = float(rel.get("strength", 0.5))
         affinity = float(rel.get("affinity", 0.0))
         trust = float(rel.get("trust", 0.5))
-        eff = strength * _TYPE_WEIGHTS.get(rtype, 0.5)
         for pair in [(src, tgt), (tgt, src)]:
             prev = best.get(pair)
-            if prev is None or eff > prev[2]:
-                best[pair] = (rtype, strength, eff, affinity, trust)
+            if prev is None or (affinity + trust) > (prev[0] + prev[1]):
+                best[pair] = (affinity, trust)
 
     # Second pass: build the map from deduplicated entries.
-    rel_map: dict[str, list[tuple[str, str, float, float, float]]] = {}
-    for (src, tgt), (rtype, strength, _, affinity, trust) in best.items():
-        rel_map.setdefault(src, []).append((tgt, rtype, strength, affinity, trust))
+    rel_map: dict[str, list[tuple[str, float, float]]] = {}
+    for (src, tgt), (affinity, trust) in best.items():
+        rel_map.setdefault(src, []).append((tgt, affinity, trust))
     return rel_map
 
 
@@ -191,15 +187,15 @@ def _build_neighbor_ids(
 def _format_nearby_npcs(
     neighbor_ids: list[str],
     all_npcs: list[dict[str, Any]],
-    npc_rels: list[tuple[str, str, float, float, float]],
+    npc_rels: list[tuple[str, float, float]],
 ) -> str:
     """List nearby NPCs with name, role, mood, and relationship annotation."""
     if not neighbor_ids:
         return "Nobody is nearby right now."
     id_set = set(neighbor_ids)
     rel_lookup = {
-        other_id: (rtype, strength, affinity, trust)
-        for other_id, rtype, strength, affinity, trust in npc_rels
+        other_id: (affinity, trust)
+        for other_id, affinity, trust in npc_rels
     }
     lines: list[str] = []
     for other in all_npcs:
@@ -207,8 +203,8 @@ def _format_nearby_npcs(
         if oid in id_set:
             line = f"- {other.get('name', '?')} ({other.get('profession', '?')}) [Rep: {other.get('reputation', 0.5):.2f}]"
             if oid in rel_lookup:
-                rtype, strength, affinity, trust = rel_lookup[oid]
-                line += f" [your {rtype}, Closeness: {strength:.1f}, Like: {affinity:.1f}, Trust: {trust:.1f}]"
+                affinity, trust = rel_lookup[oid]
+                line += f" [Known, Like: {affinity:.1f}, Trust: {trust:.1f}]"
             else:
                 line += " [stranger]"
             lines.append(line)
@@ -217,7 +213,7 @@ def _format_nearby_npcs(
 
 def _format_social_targets(
     npc: dict[str, Any],
-    npc_rels: list[tuple[str, str, float, float, float]],
+    npc_rels: list[tuple[str, float, float]],
     neighbor_ids: list[str],
     all_npcs: list[dict[str, Any]],
 ) -> str:
@@ -229,8 +225,8 @@ def _format_social_targets(
     neighbor_set = set(neighbor_ids)
     npc_lookup: dict[str | None, dict[str, Any]] = {n.get("id"): n for n in all_npcs}
 
-    candidates: list[tuple[float, str, str, str, float, float, float, str, int]] = []
-    for other_id, rtype, strength, affinity, trust in npc_rels:
+    candidates: list[tuple[float, str, str, float, float, str, int]] = []
+    for other_id, affinity, trust in npc_rels:
         if other_id in neighbor_set:
             continue
         other = npc_lookup.get(other_id)
@@ -238,7 +234,8 @@ def _format_social_targets(
             continue
         ox, oy = other.get("x", 0), other.get("y", 0)
         dist = max(abs(ox - npc_x), abs(oy - npc_y))
-        pull = strength * _TYPE_WEIGHTS.get(rtype, 0.5)
+        # Influence based on trust and absolute affinity (strong feeling either way)
+        pull = trust * (abs(affinity) + 0.5)
         dx, dy = ox - npc_x, oy - npc_y
         dirs: list[str] = []
         if dy < 0:
@@ -255,8 +252,6 @@ def _format_social_targets(
                 pull,
                 other.get("name", "?"),
                 other_id,
-                rtype,
-                strength,
                 affinity,
                 trust,
                 direction,
@@ -269,11 +264,11 @@ def _format_social_targets(
 
     candidates.sort(key=lambda c: c[0], reverse=True)
     lines: list[str] = []
-    for _, name, oid, rtype, strength, affinity, trust, direction, dist in candidates[
+    for _, name, oid, affinity, trust, direction, dist in candidates[
         :3
     ]:
         lines.append(
-            f"- {name} [{oid}] (your {rtype}, Closeness: {strength:.1f}, Like: {affinity:.1f}) — {dist} tiles {direction}"
+            f"- {name} [{oid}] (Like: {affinity:.1f}, Trust: {trust:.1f}) — {dist} tiles {direction}"
         )
     return "\n".join(lines)
 
@@ -335,8 +330,6 @@ class NPCRoundResult:
 
     events: list[dict[str, Any]] = field(default_factory=list)
     perception: str = ""
-    emotional_reaction: str = ""
-    social_strategy: str = ""
     plan_update: str | None = None
 
 
@@ -349,7 +342,7 @@ async def _simulate_single_npc(
     policy_text: str,
     round_context: str,
     neighbor_ids: list[str],
-    npc_rels: list[tuple[str, str, float, float, float]],
+    npc_rels: list[tuple[str, float, float]],
     all_npcs: list[dict[str, Any]],
     name_to_id: dict[str, str],
     objective: str = "",
@@ -415,8 +408,6 @@ async def _simulate_single_npc(
     )
 
     perception = ""
-    emotional_reaction = ""
-    social_strategy = ""
     plan_update = None
 
     try:
@@ -427,8 +418,6 @@ async def _simulate_single_npc(
         )
         raw_events = [ev.model_dump() for ev in result.events]
         perception = result.perception
-        emotional_reaction = result.emotional_reaction
-        social_strategy = result.social_strategy
         plan_update = result.plan_update
     except Exception:
         logger.warning("NPC %s structured output failed, using fallback", npc_name)
@@ -473,26 +462,6 @@ async def _simulate_single_npc(
                 mem_type="observation",
             )
         )
-    if social_strategy:
-        npc_memories.append(
-            create_memory(
-                npc_id,
-                f"My social strategy: {social_strategy}",
-                current_round,
-                importance=4,
-                mem_type="observation",
-            )
-        )
-    if emotional_reaction:
-        npc_memories.append(
-            create_memory(
-                npc_id,
-                emotional_reaction,
-                current_round,
-                importance=6,
-                mem_type="observation",
-            )
-        )
     for ev in sim_events:
         npc_memories.append(
             create_memory(
@@ -520,7 +489,6 @@ async def _simulate_single_npc(
     return NPCRoundResult(
         events=sim_events,
         perception=perception,
-        emotional_reaction=emotional_reaction,
         plan_update=plan_update,
     )
 
@@ -547,21 +515,20 @@ def _continuous_to_mood(value: float) -> str:
 def _compute_influence_factor(
     speaker_id: str,
     target_id: str,
-    rel_map: dict[str, list[tuple[str, str, float, float, float]]],
+    rel_map: dict[str, list[tuple[str, float, float]]],
     speaker_reputation: float,
 ) -> float:
     """Compute I_ij influence factor from relationship and reputation data."""
     rels = rel_map.get(speaker_id, [])
     rel_match = next(
-        ((rt, s, a, t) for oid, rt, s, a, t in rels if oid == target_id), None
+        ((a, t) for oid, a, t in rels if oid == target_id), None
     )
 
     if rel_match:
-        rtype, strength, affinity, trust = rel_match
-        base = strength * _TYPE_WEIGHTS.get(rtype, 0.5)
+        affinity, trust = rel_match
         # Reputation and trust amplify influence; affinity makes them more receptive.
         social_mod = (speaker_reputation + trust + (affinity + 1) / 2) / 3
-        return min(1.0, base * (0.4 + 1.2 * social_mod))
+        return min(1.0, 0.4 * (0.4 + 1.2 * social_mod))
 
     # Stranger influence is primarily driven by reputation.
     return min(1.0, 0.1 * (0.5 + speaker_reputation))
@@ -571,7 +538,7 @@ def _apply_opinion_dynamics(
     npcs: list[dict[str, Any]],
     events: list[dict[str, Any]],
     current_round: int,
-    rel_map: dict[str, list[tuple[str, str, float, float, float]]],
+    rel_map: dict[str, list[tuple[str, float, float]]],
     controversy: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Apply opinion dynamics from Peralta et al. (2022) to NPC interactions.
@@ -657,17 +624,33 @@ def _apply_opinion_dynamics(
 
         # Affinity increases if opinions are similar or converged
         # Multiplier if it's a controversial idea: they really like or hate you for it.
-        impact_mult = 2.5 if is_controversial else 1.0
+        impact_mult = 3.0 if is_controversial else 1.0
         
-        aff_delta = (0.05 if pol_diff < 0.4 else -0.02) * impact_mult
-        # Trust increases if the target was influenced by the speaker
-        trust_delta = (0.03 if behavior != "keep" else 0.0) * impact_mult
-        # Reputation increases slightly for active speakers with positive affinity from others
-        # but controversial ideas can significantly tank or boost reputation based on target's affinity
-        rep_delta = (0.01 if aff_delta > 0 else -0.015) * impact_mult
+        # If pol_diff is low, they like the speaker more.
+        # If behavior is "adopt" or "compromise", they have bonded over the idea.
+        if behavior != "keep":
+            aff_delta = (0.08 if pol_diff < 0.4 else 0.02) * impact_mult
+            trust_delta = 0.05 * impact_mult
+        else:
+            # They didn't listen. If it was controversial, they might like the speaker LESS.
+            aff_delta = (-0.05 if is_controversial else -0.01)
+            trust_delta = -0.02 if is_controversial else 0.0
+
+        # Reputation changes based on how the target reacted.
+        # If the target likes the speaker (affinity up), the speaker's reputation grows.
+        # If it was a controversial idea and the target HATED it (affinity down), reputation tanks.
+        rep_delta = (0.02 if aff_delta > 0 else -0.03) * impact_mult
+        
+        # High reputation characters have "social armor": they lose less reputation from single bad interactions
+        # but also gain it slower (diminishing returns).
+        current_rep = float(speaker.get("reputation", 0.5))
+        if rep_delta < 0:
+            rep_delta *= (1.2 - current_rep) # Armor: high rep = less loss
+        else:
+            rep_delta *= (1.1 - current_rep) # Diminishing returns: high rep = less gain
 
         npc_lookup[speaker_id]["reputation"] = round(
-            clamp(float(speaker.get("reputation", 0.5)) + rep_delta, 0.05, 1.0), 3
+            clamp(current_rep + rep_delta, 0.05, 1.0), 3
         )
 
         pair = (target_id, speaker_id)  # Update target's view of speaker
@@ -727,7 +710,7 @@ async def run_round(state: SimState) -> dict[str, Any]:
     name_to_id = {npc.get("name", ""): npc.get("id", "") for npc in npcs}
 
     npc_neighbor_ids: dict[str, list[str]] = {}
-    npc_rels_map: dict[str, list[tuple[str, str, float, float, float]]] = {}
+    npc_rels_map: dict[str, list[tuple[str, float, float]]] = {}
     for npc in npcs:
         npc_id = npc.get("id", "")
         npc_neighbor_ids[npc_id] = _build_neighbor_ids(npc, npcs)
@@ -757,8 +740,6 @@ async def run_round(state: SimState) -> dict[str, Any]:
     for npc, npc_result in zip(npcs, results):
         npc_id = npc.get("id", "")
         npc["perception"] = npc_result.perception
-        npc["emotional_reaction"] = npc_result.emotional_reaction
-        npc["social_strategy"] = npc_result.social_strategy
         npc["current_plan"] = (
             npc_result.plan_update
             or get_current_plan(memory_streams.get(npc_id, []))

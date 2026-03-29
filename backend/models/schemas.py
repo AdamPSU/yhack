@@ -31,8 +31,6 @@ class NPC(BaseModel):
 class Relationship(BaseModel):
     source_id: str
     target_id: str
-    rel_type: Literal["friend", "family", "employer", "neighbor", "colleague"]
-    strength: float = Field(default=0.5, ge=0, le=1)
     affinity: float = Field(default=0.0, ge=-1, le=1)
     trust: float = Field(default=0.5, ge=0, le=1)
 
@@ -143,10 +141,8 @@ class NPCRoundResponseV2(BaseModel):
     Based on the generative agents architecture (Park et al., 2023).
     """
 
-    perception: str
-    emotional_reaction: str
-    social_strategy: str = Field(
-        description="Internal reasoning for choosing words or actions, including whether to lie or build reputation."
+    perception: str = Field(
+        description="What you notice about the situation, your emotional reaction to it, and your social strategy for how you will interact with others this round."
     )
     plan_update: str | None = None
     events: list[RawNPCEvent]

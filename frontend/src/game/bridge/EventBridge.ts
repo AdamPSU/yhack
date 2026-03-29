@@ -12,7 +12,7 @@ type Listener = (...args: any[]) => void;
  *
  * React side emits:
  *   sim:event        (SimEvent)       → Phaser receives and triggers game effects
- *   sim:phase-change ({phase, month}) → Phaser updates world state
+ *   sim:phase-change ({phase, round}) → Phaser updates world state
  *
  * Phaser side emits:
  *   sim:npc-position (NPCState)       → React renders DOM chat bubbles
@@ -66,8 +66,8 @@ class EventBridge {
     this.emit("sim:event", event);
   }
 
-  emitPhaseChange(phase: number, month: number) {
-    this.emit("sim:phase-change", { phase, month });
+  emitPhaseChange(phase: number, round: number) {
+    this.emit("sim:phase-change", { phase, round });
   }
 
   // React → Phaser

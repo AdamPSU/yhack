@@ -171,6 +171,7 @@ function SimulateContent() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [focusScale, setFocusScale] = useState(1);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
@@ -178,6 +179,19 @@ function SimulateContent() {
   );
   const [showReport, setShowReport] = useState(false);
   const reportShownRef = useRef(false);
+
+  useEffect(() => {
+    if (focusMode) {
+      setFocusScale(
+        Math.max(
+          window.innerWidth / GAME_WIDTH,
+          window.innerHeight / GAME_HEIGHT,
+        ),
+      );
+    } else {
+      setFocusScale(1);
+    }
+  }, [focusMode]);
 
   // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
@@ -465,8 +479,8 @@ function SimulateContent() {
 
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden"
-      style={{ background: "transparent" }}
+      className="relative flex h-screen flex-col overflow-clip"
+      style={{ background: "#4a7a3b" }}
       data-testid="simulate-page"
     >
       {/* Phase indicator bar */}
@@ -634,10 +648,19 @@ function SimulateContent() {
         >
           <div
             ref={canvasContainerRef}
-            className="relative w-full h-full"
+            className="relative shrink-0 canvas-glow canvas-expand"
             style={{
               border: "3px solid #6B4226",
               borderRadius: 4,
+              ...(focusMode
+                ? {
+                    transform: `scale(${focusScale})`,
+                    transformOrigin: "center center",
+                    border: "none",
+                    padding: 0,
+                    boxShadow: "none",
+                  }
+                : {}),
             }}
           >
             <GameCanvas />
@@ -685,16 +708,6 @@ function SimulateContent() {
               </button>
             </div>
 
-            {/* Dashboard overlay - positioned on bottom right */}
-            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
-              <Dashboard
-                metrics={sim.metrics}
-                metricsHistory={sim.metricsHistory}
-                phase={sim.phase}
-                month={sim.month}
-              />
-            </div>
-
             {/* NPC hover tooltip */}
             {hoverInfo && (
               <div
@@ -715,6 +728,19 @@ function SimulateContent() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Viewport-fixed dashboard so it stays fully visible instead of being clipped by the canvas area */}
+      <div
+        className={`fixed bottom-3 right-3 z-40 pointer-events-auto ${focusMode ? "opacity-0 pointer-events-none" : ""}`}
+      >
+        <Dashboard
+          metrics={sim.metrics}
+          metricsHistory={sim.metricsHistory}
+          phase={sim.phase}
+          round={sim.round}
+          maxRounds={sim.maxRounds}
+        />
       </div>
 
       {/* Focus mode exit overlay */}

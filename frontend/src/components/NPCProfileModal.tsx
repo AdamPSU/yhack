@@ -219,16 +219,10 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
 
         {/* Internal state sections */}
         <SectionBlock
-          label="Thinking"
+          label="Perception"
           symbol="?"
           content={npc.perception}
           fallback="No thoughts yet..."
-        />
-        <SectionBlock
-          label="Strategy"
-          symbol="#"
-          content={npc.social_strategy}
-          fallback="No strategy formed yet..."
         />
         <SectionBlock
           label="Beliefs"
@@ -241,12 +235,6 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
           symbol="*"
           content={npc.controversial_ideas?.join(" · ")}
           fallback="No controversial ideas..."
-        />
-        <SectionBlock
-          label="Feeling"
-          symbol="~"
-          content={npc.emotional_reaction}
-          fallback="No feelings recorded yet..."
         />
         <SectionBlock
           label="Plan"

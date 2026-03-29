@@ -29,21 +29,26 @@ class Settings(BaseSettings):
 
     model_config: dict[str, tuple[str, str]] = {"env_file": (".env", ".env.local")}  # pyright: ignore[reportIncompatibleVariableOverride]
 
-    @property
-    def _is_k2_model(self) -> bool:
-        return self.model_name.startswith("k2")
+    def is_k2_model(self, model_name: str | None = None) -> bool:
+        return (model_name or self.model_name).startswith("k2")
+
+    def llm_api_key_for(self, model_name: str | None = None) -> str:
+        """Return the API key for the currently selected model."""
+        return self.k2_api_key if self.is_k2_model(model_name) else self.xai_api_key
+
+    def llm_base_url_for(self, model_name: str | None = None) -> str:
+        """Return the base URL for the currently selected model."""
+        if self.is_k2_model(model_name):
+            return "https://api.k2think.ai/v1"
+        return "https://api.x.ai/v1"
 
     @property
     def llm_api_key(self) -> str:
-        """Return the API key for the currently selected model."""
-        return self.k2_api_key if self._is_k2_model else self.xai_api_key
+        return self.llm_api_key_for()
 
     @property
     def llm_base_url(self) -> str:
-        """Return the base URL for the currently selected model."""
-        if self._is_k2_model:
-            return "https://api.k2think.ai/v1"
-        return "https://api.x.ai/v1"
+        return self.llm_base_url_for()
 
 
 settings = Settings()

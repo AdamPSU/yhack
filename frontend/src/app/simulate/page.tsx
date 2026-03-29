@@ -447,7 +447,7 @@ function SimulateContent() {
 
         {/* Center: Game canvas with chat bubble overlays */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
-          <div ref={canvasContainerRef} className="relative shrink-0 overflow-hidden">
+          <div ref={canvasContainerRef} className="relative shrink-0">
             <GameCanvas />
 
             {/* Fullscreen toggle + Zoom controls */}

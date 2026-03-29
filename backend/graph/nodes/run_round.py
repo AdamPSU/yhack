@@ -530,9 +530,10 @@ async def _simulate_single_npc(
     sim_events: list[dict[str, Any]] = []
     for ev in raw_events:
         ev_data = dict(ev.get("data", {}))
-        if "target_npc_id" in ev_data:
+        raw_target = ev_data.get("target_npc_id")
+        if raw_target:
             ev_data["target_npc_id"] = normalize_npc_id(
-                ev_data["target_npc_id"], name_to_id
+                raw_target, name_to_id
             )
         sim_event = {
             "round": current_round,

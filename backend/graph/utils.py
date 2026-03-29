@@ -65,7 +65,7 @@ _NPC_ID_RE = re.compile(r"npc_(\d+)")
 def normalize_npc_id(
     raw_id: str,
     name_to_id: dict[str, str] | None = None,
-) -> str:
+) -> str | None:
     """Normalize an NPC reference to the canonical ``npc_XX`` format.
 
     Handles:
@@ -73,6 +73,8 @@ def normalize_npc_id(
     - ``Citizen 2`` → ``npc_02`` (via name lookup)
     - ``marcus_rivera`` → ``npc_03`` (via snake_case / partial name lookup)
     """
+    if not raw_id:
+        return None
     # Try direct regex match for npc_N or npc_NN format.
     m = _NPC_ID_RE.search(raw_id)
     if m:

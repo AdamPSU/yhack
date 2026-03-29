@@ -53,9 +53,9 @@ export function GameCanvas() {
               super({ key: "PlaceholderScene" });
             }
             create() {
-              // Warm grid background
+              // Dark grid background
               const g = this.add.graphics();
-              g.lineStyle(1, 0x3a2e1e, 0.4);
+              g.lineStyle(1, 0xffffff, 0.05);
               for (let x = 0; x <= GAME_WIDTH; x += 16) {
                 g.moveTo(x, 0);
                 g.lineTo(x, GAME_HEIGHT);
@@ -67,19 +67,22 @@ export function GameCanvas() {
               g.strokePath();
 
               // Title
-              this.add
+              const title = this.add
                 .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "SIMULACRA", {
                   fontSize: "28px",
-                  color: "#e8a43a",
+                  color: "#a855f7",
                   fontFamily: "monospace",
                   fontStyle: "bold",
                 })
                 .setOrigin(0.5);
+              
+              // Add glow to title
+              title.setShadow(0, 0, "#a855f7", 10, true, true);
 
               this.add
                 .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 16, "Loading city...", {
                   fontSize: "12px",
-                  color: "#8a7a62",
+                  color: "rgba(255,255,255,0.4)",
                   fontFamily: "monospace",
                 })
                 .setOrigin(0.5);
@@ -89,7 +92,7 @@ export function GameCanvas() {
                 GAME_WIDTH / 2,
                 GAME_HEIGHT / 2 + 40,
                 3,
-                0xe8a43a,
+                0xa855f7,
               );
               this.tweens.add({
                 targets: dot,

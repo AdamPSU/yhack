@@ -69,6 +69,7 @@ export class Car extends Phaser.GameObjects.Container {
     );
     this.on("pointerover", this.onHover, this);
     this.on("pointerout", this.onHoverOut, this);
+    this.on("pointerdown", this.onClick, this);
 
     scene.add.existing(this);
   }
@@ -158,5 +159,9 @@ export class Car extends Phaser.GameObjects.Container {
   private onHoverOut() {
     this.isHovered = false;
     eventBridge.emitNPCHoverOut();
+  }
+
+  private onClick() {
+    eventBridge.emitNPCClick(this.npcId);
   }
 }

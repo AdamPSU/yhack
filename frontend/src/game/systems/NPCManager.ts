@@ -6,7 +6,7 @@ import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS, TILE_SIZE } from "../config";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
-import { CAR_TEMPLATES } from "../map/CarRegistry";
+import { type CarTemplate, CAR_TEMPLATES } from "../map/CarRegistry";
 import { MovementSystem } from "./MovementSystem";
 import { OccupancyGrid } from "./OccupancyGrid";
 import { findPath } from "./Pathfinder";
@@ -36,6 +36,7 @@ export class NPCManager {
   private buildingPositions: BuildingPositions;
   private isWalkable: (col: number, row: number) => boolean;
   private isRoad: (col: number, row: number) => boolean;
+  private getRoadType: (col: number, row: number) => "v" | "h" | "none";
   private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
@@ -45,11 +46,13 @@ export class NPCManager {
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
     isRoad: (col: number, row: number) => boolean,
+    getRoadType: (col: number, row: number) => "v" | "h" | "none" = () => "none",
   ) {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
     this.isWalkable = isWalkable;
     this.isRoad = isRoad;
+    this.getRoadType = getRoadType;
     this.occupancy = new OccupancyGrid();
     this.movement = new MovementSystem(
       scene,
@@ -100,69 +103,132 @@ export class NPCManager {
       [roadTiles[i], roadTiles[j]] = [roadTiles[j], roadTiles[i]];
     }
 
+    const canFitCar = (col: number, row: number, template: CarTemplate): boolean => {
+      if (template.orientation === "portrait") {
+        // 2 wide × 3 tall — check left and right column of vertical road pair
+        return this.getRoadType(col, row) === "v"
+          && this.getRoadType(col + 1, row) === "v"
+          && this.isWalkable(col, row)
+          && this.isWalkable(col + 1, row)
+          && !this.occupancy.isOccupied(col, row)
+          && !this.occupancy.isOccupied(col + 1, row);
+      }
+      // 3 wide × 2 tall — ALL 6 tiles must be horizontal road and walkable
+      for (let dc = 0; dc < template.cols; dc++) {
+        for (let dr = 0; dr < template.rows; dr++) {
+          if (this.getRoadType(col + dc, row + dr) !== "h") return false;
+          if (!this.isWalkable(col + dc, row + dr)) return false;
+          if (this.occupancy.isOccupied(col + dc, row + dr)) return false;
+        }
+      }
+      return true;
+    };
+
     for (let i = 0; i < npcs.length; i++) {
       const bn = npcs[i];
 
-      // Find a road tile with adequate spacing from other NPCs
-      let tileX = -1;
-      let tileY = -1;
+      if (bn.role === "driver") {
+        // Spawn a Car entity aligned to its road pair
+        const template = CAR_TEMPLATES[i % CAR_TEMPLATES.length];
 
-      // Try with spacing constraint first
-      for (const candidate of roadTiles) {
-        if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
-        if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
-          tileX = candidate.x;
-          tileY = candidate.y;
-          break;
-        }
-      }
-
-      // Fallback: relax spacing, just find any unoccupied road tile
-      if (tileX === -1) {
+        let tileX = -1;
+        let tileY = -1;
         for (const candidate of roadTiles) {
-          if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
+          if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+          if (canFitCar(candidate.x, candidate.y, template)) {
             tileX = candidate.x;
             tileY = candidate.y;
             break;
           }
         }
-      }
 
-      // Last resort: use backend coords + snap to nearest road
-      if (tileX === -1) {
-        tileX = Math.max(
-          CENTER_BOUNDS.minCol,
-          Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
-        );
-        tileY = Math.max(
-          CENTER_BOUNDS.minRow,
-          Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
-        );
-        const snapped = this.findNearestTile(
-          tileX,
-          tileY,
-          (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
-          10,
-        );
-        if (snapped) {
-          tileX = snapped.x;
-          tileY = snapped.y;
+        // Last resort: use backend coords + snap to nearest road
+        if (tileX === -1) {
+          tileX = Math.max(
+            CENTER_BOUNDS.minCol,
+            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
+          );
+          tileY = Math.max(
+            CENTER_BOUNDS.minRow,
+            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
+          );
+          const snapped = this.findNearestTile(
+            tileX,
+            tileY,
+            (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+            10,
+          );
+          if (snapped) {
+            tileX = snapped.x;
+            tileY = snapped.y;
+          }
         }
-      }
 
-      if (bn.role === "driver") {
-        // Spawn a Car entity for driver NPCs
-        const template = CAR_TEMPLATES[i % CAR_TEMPLATES.length];
+        if (tileX === -1) continue; // skip if no valid spawn found
+
         const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
         car.role = bn.role;
         car.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, car as unknown as NPC);
-        this.occupancy.occupy(bn.id, tileX, tileY);
+
+        // Mark all tiles of the car footprint as occupied
+        for (let dc = 0; dc < template.cols; dc++) {
+          for (let dr = 0; dr < template.rows; dr++) {
+            this.occupancy.occupy(`${bn.id}_${dc}_${dr}`, tileX + dc, tileY + dr);
+          }
+        }
 
         const zone = roleToZone(bn.role);
         this.npcZones.set(bn.id, zone);
         this.movement.startRoaming(car as unknown as NPC, zone);
       } else {
+        // Find a road tile with adequate spacing from other NPCs
+        let tileX = -1;
+        let tileY = -1;
+
+        // Try with spacing constraint first
+        for (const candidate of roadTiles) {
+          if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+          if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
+            tileX = candidate.x;
+            tileY = candidate.y;
+            break;
+          }
+        }
+
+        // Fallback: relax spacing, just find any unoccupied road tile
+        if (tileX === -1) {
+          for (const candidate of roadTiles) {
+            if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
+              tileX = candidate.x;
+              tileY = candidate.y;
+              break;
+            }
+          }
+        }
+
+        // Last resort: use backend coords + snap to nearest road
+        if (tileX === -1) {
+          tileX = Math.max(
+            CENTER_BOUNDS.minCol,
+            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
+          );
+          tileY = Math.max(
+            CENTER_BOUNDS.minRow,
+            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
+          );
+          const snapped = this.findNearestTile(
+            tileX,
+            tileY,
+            (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+            10,
+          );
+          if (snapped) {
+            tileX = snapped.x;
+            tileY = snapped.y;
+          }
+        }
+
         const charIndex = i % 16;
         const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
         npc.role = bn.role;

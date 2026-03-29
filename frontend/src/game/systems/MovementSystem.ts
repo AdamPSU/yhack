@@ -129,6 +129,7 @@ export class MovementSystem {
     const zone = this.npcZone.get(npc.npcId);
     const bounds = zone ? ZONE_BOUNDS[zone] : undefined;
     const isDriver = npc.role === "driver";
+    const carOrientation: string | undefined = (npc as { template?: { orientation?: string } }).template?.orientation;
 
     // Score each direction — road tiles only; non-road as last resort
     const roadScored: { idx: number; score: number }[] = [];
@@ -142,8 +143,23 @@ export class MovementSystem {
       if (!this.isWalkable(nx, ny)) continue;
       if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
 
+      // Portrait cars: vertical road lane — up/down only
+      if (isDriver && carOrientation === "portrait" && (i === 2 || i === 3)) continue;
+      // Landscape cars: horizontal road lane — left/right only
+      if (isDriver && carOrientation === "landscape" && (i === 0 || i === 1)) continue;
+
       // Drivers can only move to road tiles
       if (isDriver && !this.isRoad(nx, ny)) continue;
+
+      // Check full car footprint is on road at the new position
+      if (isDriver && carOrientation === "portrait") {
+        // Check both columns for the new row
+        if (!this.isRoad(nx, ny) || !this.isRoad(nx + 1, ny)) continue;
+      }
+      if (isDriver && carOrientation === "landscape") {
+        // Check both rows for the new column
+        if (!this.isRoad(nx, ny) || !this.isRoad(nx, ny + 1)) continue;
+      }
 
       // Reject tiles outside center bounds
       if (

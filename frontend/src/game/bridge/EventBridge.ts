@@ -19,8 +19,8 @@ type Listener = (...args: any[]) => void;
 class EventBridge {
   private static instance: EventBridge;
   private listeners = new Map<string, Set<{ fn: Listener; ctx: unknown }>>();
-  /** Buffered init-npcs payload — replayed to late subscribers (e.g. NPCManager not yet ready) */
-  private bufferedInitNPCs: unknown[] | null = null;
+  /** Sticky events: new listeners immediately receive the last emitted value. */
+  private sticky = new Map<string, unknown[]>();
 
   private constructor() {}
 
@@ -36,10 +36,9 @@ class EventBridge {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add({ fn, ctx: context });
-    // Replay buffered init-npcs so NPCManager gets it even if Phaser booted after React emitted
-    if (event === "sim:init-npcs" && this.bufferedInitNPCs !== null) {
-      fn.apply(context, [this.bufferedInitNPCs]);
-    }
+    // Replay sticky event for late subscribers
+    const last = this.sticky.get(event);
+    if (last) fn.apply(context, last);
   }
 
   off(event: string, fn: Listener, context?: unknown) {
@@ -80,9 +79,9 @@ class EventBridge {
     this.emit("sim:camera-zoom", { delta });
   }
 
-  // React → Phaser: initialize NPCs from backend
+  // React → Phaser: initialize NPCs from backend (sticky — replays for late listeners)
   emitInitNPCs(npcs: unknown[]) {
-    this.bufferedInitNPCs = npcs;
+    this.sticky.set("sim:init-npcs", [npcs]);
     this.emit("sim:init-npcs", npcs);
   }
 

@@ -41,7 +41,7 @@ class SimEvent(BaseModel):
 
 class PolicyInput(BaseModel):
     text: str = Field(max_length=3000)
-    num_rounds: int = 75
+    num_rounds: int = 15  # NUM_PHASES(3) × ROUNDS_PER_PHASE(5)
 
 
 # --- Structured output response models for LLM calls ---
@@ -81,6 +81,20 @@ class RawNPCEvent(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
-class NPCRoundResponse(BaseModel):
-    """Structured response from a single NPC's round simulation."""
+MemType = Literal["observation", "reflection", "plan"]
+
+
+class NPCRoundResponseV2(BaseModel):
+    """Extended response capturing internal reasoning for memory creation.
+
+    Based on the generative agents architecture (Park et al., 2023).
+    """
+    perception: str
+    emotional_reaction: str
+    plan_update: str | None = None
     events: list[RawNPCEvent]
+
+
+class ReflectionResponse(BaseModel):
+    """Structured response from an NPC's reflection phase."""
+    insights: list[str]

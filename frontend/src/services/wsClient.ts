@@ -28,7 +28,7 @@ export async function startSimulation(
   const res = await fetch(`${API_BASE}/simulate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: policyText, num_rounds: numRounds ?? 75 }),
+    body: JSON.stringify({ text: policyText, num_rounds: numRounds ?? 15 }),
   });
 
   if (!res.ok) {

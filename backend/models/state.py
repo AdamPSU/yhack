@@ -6,9 +6,11 @@ from typing import Annotated, Any, TypedDict
 
 class SimState(TypedDict):
     policy_text: str
+    objective: str
     entities: list[dict[str, Any]]
     npcs: list[dict[str, Any]]
     relationships: list[dict[str, Any]]
     events: Annotated[list[dict[str, Any]], operator.add]
     current_round: int
     max_rounds: int
+    num_npcs: int

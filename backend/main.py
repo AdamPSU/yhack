@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
+from routers.extract import router as extract_router
 from routers.simulate import router
 
 # ── Logging ──────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(extract_router)
 
 logger.info("PolicySim ready — model=%s, base_url=%s", settings.model_name, settings.llm_base_url)
 

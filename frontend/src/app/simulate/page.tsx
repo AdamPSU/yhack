@@ -86,18 +86,34 @@ interface BubbleState {
 
 export default function SimulatePage() {
   const [policyText, setPolicyText] = useState<string>("");
-  const sim = useSimulation(policyText);
+  const [numNpcs, setNumNpcs] = useState<number>(25);
+  const [numRounds, setNumRounds] = useState<number>(5);
+  const [objective, setObjective] = useState<string>("");
+  const sim = useSimulation(policyText, numNpcs, numRounds, objective);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   // Auto-start on mount
   useEffect(() => {
-    const stored = sessionStorage.getItem("agora-policy");
-    if (stored) {
-      setPolicyText(stored);
+    const storedPolicy = sessionStorage.getItem("agora-policy");
+    const storedNumNpcs = sessionStorage.getItem("agora-num-npcs");
+    if (storedPolicy) {
+      setPolicyText(storedPolicy);
     }
+    if (storedNumNpcs) setNumNpcs(Number.parseInt(storedNumNpcs, 10));
+    const storedNumRounds = sessionStorage.getItem("agora-num-rounds");
+    if (storedNumRounds) setNumRounds(Number.parseInt(storedNumRounds, 10));
+    const storedObjective = sessionStorage.getItem("agora-objective");
+    if (storedObjective) setObjective(storedObjective);
   }, []);
+
+  // Trigger simulation start once policy text is loaded
+  useEffect(() => {
+    if (policyText && !sim.isRunning && !sim.isComplete) {
+      sim.start();
+    }
+  }, [policyText, sim.start, sim.isRunning, sim.isComplete]);
 
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
@@ -222,7 +238,7 @@ export default function SimulatePage() {
       >
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
-            AGORA
+            SIMULACRA
           </span>
           <span className="text-[10px] font-mono text-[#4a3c2a]">|</span>
           <div className="flex gap-1">

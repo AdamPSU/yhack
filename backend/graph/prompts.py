@@ -18,6 +18,11 @@ Given the policy text below, perform a thorough analysis and extract structured 
 {policy_text}
 </policy_text>
 
+<user_objective>
+The user is specifically curious about: {objective}
+Tailor your analysis to surface insights most relevant to this objective. If no objective is given, perform a general analysis.
+</user_objective>
+
 <output_format>
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
@@ -117,7 +122,7 @@ GENERATE_RELATIONSHIPS_PROMPT = """\
 You are a social network designer for a small-town simulation.
 
 <task>
-Given the list of NPCs below, generate 30-40 realistic relationships that form a believable social fabric — family clusters, coworker bonds, neighborhood ties, and a few unlikely friendships.
+Given the list of NPCs below, generate a realistic set of relationships (approximately {num_relationships} in total) that form a believable social fabric — family clusters, coworker bonds, neighborhood ties, and a few unlikely friendships.
 </task>
 
 <npcs>
@@ -165,6 +170,11 @@ You are simulating the behavior of a single person in a small town reacting to a
 <policy>
 {policy_summary}
 </policy>
+
+<simulation_focus>
+The simulation is examining: {objective}
+Let this shape what you pay attention to and what you talk about, if relevant to your character.
+</simulation_focus>
 
 <simulation_state>
 <round current="{current_round}" max="{max_rounds}"/>

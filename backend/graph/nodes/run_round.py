@@ -307,6 +307,7 @@ async def _simulate_single_npc(
         npc_x=npc.get("x", 0),
         npc_y=npc.get("y", 0),
         policy_summary=policy_text,
+        objective=state.get("objective", "") or "general economic and social impact",
         current_round=current_round + 1,
         max_rounds=max_rounds,
         round_context=round_context,

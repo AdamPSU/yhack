@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AGORA - Economic Policy Simulator",
+  title: "SIMULACRA - Economic Policy Simulator",
   description:
     "Watch 20 AI agents react to your economic policies in a simulated city.",
 };

@@ -43,7 +43,9 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
 
     initial_state: SimState = {
         "policy_text": policy.text,
+        "objective": policy.objective,
         "max_rounds": policy.num_rounds,
+        "num_npcs": policy.num_npcs,
         "entities": [],
         "npcs": [],
         "relationships": [],

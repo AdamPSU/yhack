@@ -55,7 +55,7 @@ export function GameCanvas() {
 
               // Title
               this.add
-                .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "AGORA", {
+                .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "SIMULACRA", {
                   fontSize: "28px",
                   color: "#e8a43a",
                   fontFamily: "monospace",

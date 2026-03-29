@@ -67,7 +67,7 @@ function waitForQueueDrain(
   tick();
 }
 
-export function useSimulation(policyText?: string) {
+export function useSimulation(policyText?: string, numNpcs?: number, numRounds?: number, objective?: string) {
   const [state, setState] = useState<SimulationState>({
     events: [],
     metrics: { ...INITIAL_METRICS },
@@ -83,8 +83,17 @@ export function useSimulation(policyText?: string) {
   const metricsAccRef = useRef<MetricsAccumulator>(createAccumulator());
   const eventQueueRef = useRef<SimEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxRoundsRef = useRef(75);
+  const maxRoundsRef = useRef(numRounds ?? 5);
   const lastPhaseRef = useRef(0);
+  const numNpcsRef = useRef(numNpcs ?? 25);
+
+  useEffect(() => {
+    if (numNpcs !== undefined) numNpcsRef.current = numNpcs;
+  }, [numNpcs]);
+
+  useEffect(() => {
+    if (numRounds !== undefined) maxRoundsRef.current = numRounds;
+  }, [numRounds]);
 
   const drainQueue = useCallback(() => {
     const queue = eventQueueRef.current;
@@ -239,7 +248,12 @@ export function useSimulation(policyText?: string) {
     if (!text) return;
 
     try {
-      const simId = await startSimulation(text);
+      const simId = await startSimulation(
+        text,
+        maxRoundsRef.current,
+        numNpcsRef.current,
+        objective,
+      );
 
       const cleanup = connectWebSocket(simId, {
         onPolicyAnalysis: () => {},

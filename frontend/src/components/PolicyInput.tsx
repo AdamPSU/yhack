@@ -2,15 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import type { MapType } from "@/game/config";
 import { setReplayData } from "@/lib/replayStore";
 import { POLICY_PRESETS } from "@/mocks/mockData";
 import { startSimulation } from "@/services/wsClient";
 import type { SavedSimulation } from "@/types/backend";
-
-const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
-  { id: "citypack", label: "Citypack", desc: "Infinite procedural city" },
-];
 
 function isSavedSimulation(data: unknown): data is SavedSimulation {
   if (!data || typeof data !== "object") return false;
@@ -24,23 +19,15 @@ function isSavedSimulation(data: unknown): data is SavedSimulation {
 
 export function PolicyInput() {
   const [text, setText] = useState("");
-  const [mapId, setMapId] = useState<MapType>("citypack");
-  const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCustomRun, setLoadingCustomRun] = useState(false);
   const [record, setRecord] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  function loadReplay(
-    data: SavedSimulation,
-    replayMapId: MapType,
-    replayProcedural = false,
-  ) {
-    const proceduralParam =
-      replayMapId === "citypack" && replayProcedural ? "&procedural=true" : "";
+  function loadReplay(data: SavedSimulation) {
     setReplayData(data);
-    router.push(`/simulate?mode=replay&map=${replayMapId}${proceduralParam}`);
+    router.push("/simulate?mode=replay&map=citypack");
   }
 
   function handleLoadFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -54,7 +41,7 @@ export function PolicyInput() {
           console.error("Invalid simulation file: missing initMsg or rounds");
           return;
         }
-        loadReplay(parsed, mapId, procedural);
+        loadReplay(parsed);
       } catch (err) {
         console.error("Failed to parse simulation file:", err);
       }
@@ -74,7 +61,7 @@ export function PolicyInput() {
         setLoadingCustomRun(false);
         return;
       }
-      loadReplay(bundledReplay, "citypack");
+      loadReplay(bundledReplay);
     } catch (err) {
       console.error("Failed to load bundled custom run:", err);
       setLoadingCustomRun(false);
@@ -83,19 +70,15 @@ export function PolicyInput() {
 
   async function handleSimulate() {
     if (text.trim().length < 20 || loading) return;
-    const proceduralParam =
-      mapId === "citypack" && procedural ? "&procedural=true" : "";
     const recordParam = record ? "&record=true" : "";
     if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
-      router.push(`/simulate?map=${mapId}${proceduralParam}${recordParam}`);
+      router.push(`/simulate?map=citypack${recordParam}`);
       return;
     }
     setLoading(true);
     try {
       const simId = await startSimulation(text);
-      router.push(
-        `/simulate?id=${simId}&map=${mapId}${proceduralParam}${recordParam}`,
-      );
+      router.push(`/simulate?id=${simId}&map=citypack${recordParam}`);
     } catch (err) {
       console.error("Failed to start simulation:", err);
       setLoading(false);

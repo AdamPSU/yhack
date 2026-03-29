@@ -190,9 +190,12 @@ function SimulateContent() {
 
   const handleEventClick = useCallback((event: SimEvent) => {
     setSelectedNpcId(event.agentId);
+    // Removed automatic camera snap to allow manual control
+    /*
     import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
       eventBridge.emitCameraSnapToNPC(event.agentId);
     });
+    */
   }, []);
 
   const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
@@ -277,7 +280,8 @@ function SimulateContent() {
     import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
       const handler = (data: { npcId: string }) => {
         setSelectedNpcId(data.npcId);
-        eventBridge.emitCameraSnapToNPC(data.npcId);
+        // Removed automatic camera snap to allow manual control
+        // eventBridge.emitCameraSnapToNPC(data.npcId);
       };
       eventBridge.on("sim:npc-click", handler);
       cleanup = () => eventBridge.off("sim:npc-click", handler);
@@ -402,10 +406,27 @@ function SimulateContent() {
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
 
+    // Camera zooming via mouse wheel
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1 : -1;
+      
+      // Get relative mouse position within the container
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+        eventBridge.emitCameraZoom(delta, mouseX, mouseY);
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+
     return () => {
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("wheel", onWheel);
     };
   }, []);
 
@@ -434,22 +455,6 @@ function SimulateContent() {
     }
   }, [sim.isComplete, sim.reportLoading, sim.report]);
 
-  // Camera zoom via scroll wheel
-  useEffect(() => {
-    const el = canvasContainerRef.current;
-    if (!el) return;
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -1 : 1;
-      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-        eventBridge.emitCameraZoom(delta);
-      });
-    };
-
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
 
   const bubbleList = Array.from(bubbles.values());
 

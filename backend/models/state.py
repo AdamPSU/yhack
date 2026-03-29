@@ -25,3 +25,4 @@ class SimState(TypedDict):
     map_id: NotRequired[str]
     memory_streams: dict[str, list[dict[str, Any]]]
     npc_stream_callback: NotRequired[Callable[[list[dict[str, Any]]], Awaitable[None]] | None]
+    npc_added_callback: NotRequired[Callable[[dict[str, Any]], Awaitable[None]] | None]

@@ -124,6 +124,7 @@ async def generate_npcs(state: SimState) -> dict:
     logger.info("generate_npcs: starting for %d NPCs …", num_npcs)
     llm = get_llm(max_tokens=1024, model=settings.fast_model_name)
     entities_json = json.dumps(state["entities"])
+    callback = state.get("npc_added_callback")
 
     extracted = await _extract_characters(state["policy_text"], entities_json, llm)
     extracted = extracted[:num_npcs]
@@ -132,7 +133,7 @@ async def generate_npcs(state: SimState) -> dict:
     used_names: set[str] = {c.get("name", "") for c in extracted if c.get("name")}
     npcs: list[dict] = []
     for i, char in enumerate(extracted):
-        char.setdefault("id", f"npc_{i + 1:02d}")
+        char["id"] = f"npc_{i + 1:02d}"
         char.setdefault("gender", random.choice(["male", "female", "nonbinary"]))
         char.setdefault("mbti", random.choice(_MBTI_TYPES))
         char.setdefault("country", "USA")
@@ -147,20 +148,24 @@ async def generate_npcs(state: SimState) -> dict:
         char.setdefault("interested_topics", ["local economy"])
         char.setdefault("category", "resident")
         npcs.append(char)
+        if callback:
+            await callback(char)
 
     needed = num_npcs - len(npcs)
     if needed > 0:
         logger.info("generate_npcs: generating %d random NPCs …", needed)
         bases = [_random_base(len(npcs) + i, used_names) for i in range(needed)]
-        tasks = [_generate_personality(b, entities_json, llm) for b in bases]
-        results = await asyncio.gather(*tasks)
-        for i, npc in enumerate(results):
-            slot = len(npcs)
-            npc["id"] = f"npc_{slot + 1:02d}"
+        tasks = [asyncio.ensure_future(_generate_personality(b, entities_json, llm)) for b in bases]
+        slot_offset = len(npcs)
+        for i, future in enumerate(asyncio.as_completed(tasks)):
+            npc = await future
+            npc["id"] = f"npc_{slot_offset + i + 1:02d}"
             npc.setdefault("profession", "local resident")
             npc.setdefault("interested_topics", ["local economy"])
             npc.setdefault("category", "resident")
             npcs.append(npc)
+            if callback:
+                await callback(npc)
 
     logger.info("generate_npcs: generating relationships …")
     rel_llm = get_llm(max_tokens=2048, model=settings.fast_model_name)

@@ -39,15 +39,24 @@ export function Dashboard({
 }: DashboardProps) {
   return (
     <div
-      className="rpg-panel flex h-full w-56 flex-col bg-black/40 border-white/10 backdrop-blur-md"
+      className="rpg-panel flex h-full w-56 flex-col"
       data-testid="dashboard"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="text-[8px] font-pixel uppercase text-purple-400 neon-text-purple">
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ background: "#E8D5A3", borderBottom: "2px solid #C4A46C" }}
+      >
+        <span
+          className="text-[8px] font-pixel uppercase"
+          style={{ color: "#5B3A1E" }}
+        >
           Phase {phase || "-"}
         </span>
-        <span className="text-[10px] font-mono tabular-nums text-white/40 uppercase tracking-widest">
+        <span
+          className="text-[10px] font-mono tabular-nums uppercase tracking-widest"
+          style={{ color: "#8B7355" }}
+        >
           Month {month || "-"}
         </span>
       </div>

@@ -19,12 +19,18 @@ export function GameCanvas() {
 
     async function initGame() {
       const Phaser = await import("phaser");
-      const { createGameConfig, setSelectedMap } = await import("@/game/config");
+      const { createGameConfig, setSelectedMap } = await import(
+        "@/game/config"
+      );
 
       // Read map param from URL and set before Phaser initializes
       const params = new URLSearchParams(window.location.search);
       const mapParam = params.get("map");
-      if (mapParam === "pico8" || mapParam === "ccity" || mapParam === "citypack") {
+      if (
+        mapParam === "pico8" ||
+        mapParam === "ccity" ||
+        mapParam === "citypack"
+      ) {
         setSelectedMap(mapParam);
       }
 
@@ -46,16 +52,16 @@ export function GameCanvas() {
         );
         scenes = [BootScene, WorldScene];
       } catch {
-        // Fallback placeholder scene with warm theme
+        // Fallback placeholder scene with warm Stardew theme
         scenes = [
           class PlaceholderScene extends Phaser.Scene {
             constructor() {
               super({ key: "PlaceholderScene" });
             }
             create() {
-              // Dark grid background
+              this.cameras.main.setBackgroundColor("#E8D5A3");
               const g = this.add.graphics();
-              g.lineStyle(1, 0xffffff, 0.05);
+              g.lineStyle(1, 0xc4a46c, 0.3);
               for (let x = 0; x <= GAME_WIDTH; x += 16) {
                 g.moveTo(x, 0);
                 g.lineTo(x, GAME_HEIGHT);
@@ -70,29 +76,28 @@ export function GameCanvas() {
               const title = this.add
                 .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "SIMULACRA", {
                   fontSize: "28px",
-                  color: "#a855f7",
+                  color: "#5B3A1E",
                   fontFamily: "monospace",
                   fontStyle: "bold",
                 })
                 .setOrigin(0.5);
-              
-              // Add glow to title
-              title.setShadow(0, 0, "#a855f7", 10, true, true);
+
+              title.setShadow(1, 1, "#A0824A", 4, true, true);
 
               this.add
                 .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 16, "Loading city...", {
                   fontSize: "12px",
-                  color: "rgba(255,255,255,0.4)",
+                  color: "#8B7355",
                   fontFamily: "monospace",
                 })
                 .setOrigin(0.5);
 
-              // Pulsing dot
+              // Pulsing golden dot
               const dot = this.add.circle(
                 GAME_WIDTH / 2,
                 GAME_HEIGHT / 2 + 40,
                 3,
-                0xa855f7,
+                0xd4a520,
               );
               this.tweens.add({
                 targets: dot,

@@ -87,10 +87,141 @@ export function PolicyInput() {
 
   return (
     <div className="w-full max-w-2xl space-y-4" data-testid="policy-input">
+      {/* Map selector */}
+      <div data-testid="map-selector">
+        <p
+          className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase"
+          style={{ color: "#A0824A" }}
+        >
+          {"\u2605"} Select Map
+        </p>
+        <div className="flex gap-3">
+          {MAP_OPTIONS.map((opt) => {
+            const isSelected = mapId === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setMapId(opt.id)}
+                data-testid={`map-${opt.id}`}
+                className="rpg-panel flex-1 px-4 py-3 text-left transition-all duration-150 active:translate-y-px"
+                style={{
+                  background: isSelected ? "#EDE4D3" : "#FDF5E6",
+                  borderColor: isSelected ? "#D4A520" : undefined,
+                  boxShadow: isSelected
+                    ? "inset 2px 2px 0 rgba(196,164,108,.5), 0 0 8px rgba(212,165,32,0.15)"
+                    : undefined,
+                }}
+              >
+                {/* Mini tile swatch preview */}
+                <div className="flex gap-0.5 mb-1.5">
+                  {opt.id === "citypack" && (
+                    <>
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#5B3A1E" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#3E7C34" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#D4A520" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#7B68EE" }}
+                      />
+                    </>
+                  )}
+                  {opt.id === "ccity" && (
+                    <>
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#4a4a4a" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#3E7C34" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#C97D1A" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#5A8DB8" }}
+                      />
+                    </>
+                  )}
+                  {opt.id === "pico8" && (
+                    <>
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#B83A52" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#3E7C34" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#5A8DB8" }}
+                      />
+                      <div
+                        className="h-2 w-2 rounded-sm"
+                        style={{ background: "#D4A520" }}
+                      />
+                    </>
+                  )}
+                </div>
+                <span
+                  className="block text-sm font-mono font-bold"
+                  style={{ color: isSelected ? "#D4A520" : "#5B3A1E" }}
+                >
+                  {opt.label}
+                </span>
+                <span
+                  className="block mt-0.5 text-[10px] font-mono"
+                  style={{ color: "#8B7355" }}
+                >
+                  {opt.desc}
+                </span>
+                {opt.id === "citypack" && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProcedural((p) => !p);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        setProcedural((p) => !p);
+                      }
+                    }}
+                    className="mt-1 block text-[9px] font-mono cursor-pointer transition-opacity hover:opacity-70"
+                    style={{ color: procedural ? "#3E7C34" : "#8B7355" }}
+                  >
+                    [{procedural ? "\u25A0" : "\u25A1"}] Procedural:{" "}
+                    {procedural ? "ON" : "OFF"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Preset buttons */}
       <div>
-        <p className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase text-[#6a5a42]">
-          /// Policy Presets
+        <p
+          className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase"
+          style={{ color: "#A0824A" }}
+        >
+          {"\u2605"} Policy Presets
         </p>
         <div className="flex flex-wrap gap-2" data-testid="preset-buttons">
           {POLICY_PRESETS.map((preset) => (
@@ -99,8 +230,8 @@ export function PolicyInput() {
               type="button"
               onClick={() => setText(preset.text)}
               data-testid={`preset-${preset.id}`}
-              className="terminal-btn"
-              style={{ padding: "6px 16px", fontSize: "11px" }}
+              className="rpg-panel px-4 py-1.5 text-[11px] font-mono transition-all duration-150 active:translate-y-px hover:opacity-80"
+              style={{ color: "#5B3A1E", background: "#FDF5E6" }}
             >
               {preset.label}
             </button>
@@ -110,8 +241,11 @@ export function PolicyInput() {
 
       {/* Policy textarea */}
       <div>
-        <p className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase text-[#6a5a42]">
-          /// Policy Input
+        <p
+          className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase"
+          style={{ color: "#A0824A" }}
+        >
+          {"\u2605"} Policy Input
         </p>
         <div className="relative">
           <textarea
@@ -120,9 +254,17 @@ export function PolicyInput() {
             placeholder="Describe an economic policy in ~500 words..."
             data-testid="policy-textarea"
             rows={8}
-            className="rpg-panel w-full resize-none p-4 text-sm leading-relaxed font-mono text-[#d4c4a0] placeholder-[#3a2e1e] outline-none transition-all duration-150 focus:border-[#e8a43a] focus:shadow-[0_0_12px_rgba(232,164,58,0.1)]"
+            className="rpg-panel w-full resize-none p-4 text-sm leading-relaxed font-mono outline-none transition-all duration-150"
+            style={{
+              color: "#3D2510",
+              background: "#FDF5E6",
+              borderColor: text.length > 0 ? "#D4A520" : undefined,
+            }}
           />
-          <span className="absolute right-3 bottom-3 text-[9px] font-mono uppercase tracking-wider text-[#3a2e1e]">
+          <span
+            className="absolute right-3 bottom-3 text-[9px] font-mono uppercase tracking-wider"
+            style={{ color: "#A0824A" }}
+          >
             {text.length} chars
           </span>
         </div>
@@ -134,14 +276,15 @@ export function PolicyInput() {
           type="button"
           onClick={() => setRecord((r) => !r)}
           data-testid="record-toggle"
-          className={`rpg-panel px-4 py-3 text-xs font-mono transition-all duration-150 active:translate-y-px shrink-0 ${
-            record
-              ? "border-[#d45050] bg-[#2a1515] text-[#d45050] shadow-[0_0_8px_rgba(212,80,80,0.2)]"
-              : "text-[#5a4a32] hover:border-[#6a5a42] hover:text-[#8a7a62]"
-          }`}
+          className="rpg-panel px-4 py-3 text-xs font-mono transition-all duration-150 active:translate-y-px shrink-0"
+          style={{
+            color: record ? "#B83A52" : "#8B7355",
+            background: record ? "#FADED4" : "#FDF5E6",
+            borderColor: record ? "#B83A52" : undefined,
+          }}
           title={
             record
-              ? "Recording enabled — simulation will be saved to JSON"
+              ? "Recording enabled \u2014 simulation will be saved to JSON"
               : "Enable recording to save simulation as JSON"
           }
         >
@@ -153,10 +296,16 @@ export function PolicyInput() {
           disabled={text.trim().length < 20 || loading}
           suppressHydrationWarning
           data-testid="simulate-button"
-          className="rpg-panel flex-1 px-6 py-3 text-sm font-mono font-bold uppercase tracking-wider text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_12px_rgba(232,164,58,0.2)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px"
-          style={{ textShadow: "0 0 8px rgba(232,164,58,0.3)" }}
+          className="rpg-panel flex-1 px-6 py-3 text-sm font-mono font-bold uppercase tracking-wider transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px hover:opacity-85"
+          style={{
+            color: "#3D2510",
+            background: "#E8D5A3",
+            borderColor: "#D4A520",
+          }}
         >
-          {loading ? "[ Starting... ]" : "[ Run Simulation ]"}
+          {loading
+            ? "\u2605 Starting... \u2605"
+            : "\u2605 Run Simulation \u2605"}
         </button>
       </div>
 
@@ -167,12 +316,10 @@ export function PolicyInput() {
           onClick={handleLoadCustomRun}
           disabled={loadingCustomRun}
           data-testid="load-custom-run-button"
-          className="terminal-btn w-full text-center"
-          style={{ padding: "8px 24px", fontSize: "11px" }}
+          className="rpg-panel w-full text-center px-6 py-2 text-[11px] font-mono transition-all duration-150 active:translate-y-px hover:opacity-80 disabled:opacity-40"
+          style={{ color: "#5B3A1E", background: "#FDF5E6" }}
         >
-          {loadingCustomRun
-            ? "Loading Custom Run..."
-            : "Load Custom Run"}
+          {loadingCustomRun ? "Loading Custom Run..." : "Load Custom Run"}
         </button>
 
         <input
@@ -186,8 +333,8 @@ export function PolicyInput() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           data-testid="load-simulation-button"
-          className="terminal-btn w-full text-center"
-          style={{ padding: "8px 24px", fontSize: "11px" }}
+          className="rpg-panel w-full text-center px-6 py-2 text-[11px] font-mono transition-all duration-150 active:translate-y-px hover:opacity-80"
+          style={{ color: "#5B3A1E", background: "#FDF5E6" }}
         >
           Load Saved Simulation
         </button>

@@ -1,9 +1,6 @@
-'use client';
+"use client";
 
-import { Handle, Position } from '@xyflow/react';
-import StarBorder from '@/components/StarBorder';
-import BorderGlow from '@/components/BorderGlow/BorderGlow';
-import DecryptedText from '@/components/DecryptedText';
+import { Handle, Position } from "@xyflow/react";
 
 interface Props {
   badge: string;
@@ -12,70 +9,84 @@ interface Props {
   children: React.ReactNode;
   hasTarget?: boolean;
   hasSource?: boolean;
-  badgeColor?: string;
-  badgeGlow?: string;
 }
 
-const handleStyle = {
-  background: 'rgba(168,85,247,0.9)',
+const handleStyle: React.CSSProperties = {
+  background: "#D4A520",
   width: 10,
   height: 10,
-  border: '2px solid rgba(192,132,252,1)',
+  border: "2px solid #6B4226",
+  boxShadow: "0 0 6px rgba(212,165,32,0.4)",
 };
 
-export default function NodeWrapper({ 
-  badge, 
-  title, 
+export default function NodeWrapper({
+  badge,
+  title,
   description,
-  children, 
-  hasTarget = true, 
+  children,
+  hasTarget = true,
   hasSource = true,
-  badgeColor = 'text-purple-300',
-  badgeGlow = 'rgba(168,85,247,0.7)'
 }: Props) {
   return (
-    <div style={{ 
-      position: 'relative',
-      filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.125))'
-    }}>
-      {hasTarget && <Handle type="target" position={Position.Left} style={handleStyle} />}
-      <BorderGlow
-        borderRadius={12}
-        glowRadius={30}
-        glowIntensity={0.8}
-        backgroundColor="#1a1510"
-        colors={['rgba(168,85,247,0.5)', 'rgba(255,255,255,0.2)', 'rgba(168,85,247,0.3)']}
+    <div style={{ position: "relative" }}>
+      {hasTarget && (
+        <Handle type="target" position={Position.Left} style={handleStyle} />
+      )}
+      <div
+        style={{
+          background: "#FDF5E6",
+          border: "3px solid #6B4226",
+          borderRadius: "6px",
+          boxShadow:
+            "inset 2px 2px 0 rgba(196,164,108,.5), inset -2px -2px 0 rgba(61,37,16,.2), 3px 3px 0 rgba(61,37,16,.35)",
+          overflow: "hidden",
+        }}
       >
-        <StarBorder as="div" color="rgba(255,255,255,0.3)" speed="6s">
-          <div className="space-y-3">
-            <div className="space-y-2 pb-2 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span 
-                  className={`text-[7px] font-pixel ${badgeColor} bg-white/5 px-1.5 py-0.5 rounded leading-none`}
-                  style={{ filter: `drop-shadow(0 0 5px ${badgeGlow})` }}
-                >
-                  {badge}
-                </span>
-                <DecryptedText 
-                  text={title}
-                  speed={80}
-                  maxIterations={20}
-                  animateOn="hover"
-                  className="text-[8px] font-pixel font-bold text-white tracking-tight"
-                  encryptedClassName="text-[8px] font-pixel font-bold text-purple-400 tracking-tight"
-                />
-              </div>
-              {description && (
-                <p className="text-[9px] font-mono text-purple-300/80 leading-tight uppercase tracking-widest border-l border-purple-400/40 pl-2">
-                  {description}
-                </p>
-              )}
-            </div>
-            {children}
+        {/* Header */}
+        <div
+          className="px-3 py-2"
+          style={{
+            background: "#E8D5A3",
+            borderBottom: "2px solid #C4A46C",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[7px] font-pixel px-1.5 py-0.5 rounded leading-none"
+              style={{
+                color: "#6B4C2A",
+                background: "rgba(212,165,32,0.2)",
+                border: "1px solid #C4A46C",
+              }}
+            >
+              {badge}
+            </span>
+            <span
+              className="text-[9px] font-pixel tracking-tight"
+              style={{ color: "#3D2510" }}
+            >
+              {"\u2605"} {title}
+            </span>
           </div>
-        </StarBorder>
-      </BorderGlow>
-      {hasSource && <Handle type="source" position={Position.Right} style={handleStyle} />}
+          {description && (
+            <p
+              className="mt-1 text-[9px] font-mono leading-tight uppercase tracking-widest"
+              style={{
+                color: "#8B7355",
+                borderLeft: "2px solid #C4A46C",
+                paddingLeft: "8px",
+              }}
+            >
+              {description}
+            </p>
+          )}
+        </div>
+        {/* Content */}
+        <div className="p-3">{children}</div>
+      </div>
+      {hasSource && (
+        <Handle type="source" position={Position.Right} style={handleStyle} />
+      )}
     </div>
   );
 }

@@ -8,7 +8,8 @@ export type BackendRole =
   | "retiree"
   | "activist"
   | "farmer"
-  | "shopkeeper";
+  | "shopkeeper"
+  | "driver";
 
 export type BackendMood =
   | "angry"

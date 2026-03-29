@@ -156,6 +156,7 @@ export class MovementSystem {
     const lastDirIdx = this.lastDir.get(npc.npcId);
     const zone = this.npcZone.get(npc.npcId);
     const bounds = zone ? ZONE_BOUNDS[zone] : undefined;
+    const isDriver = npc.role === "driver";
 
     // Score each direction
     const scored: { idx: number; score: number }[] = [];
@@ -167,6 +168,9 @@ export class MovementSystem {
 
       if (!this.isWalkable(nx, ny)) continue;
       if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
+
+      // Drivers can only move to road tiles
+      if (isDriver && !this.isRoadTile(nx, ny)) continue;
 
       // Reject tiles outside center bounds
       if (

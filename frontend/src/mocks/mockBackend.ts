@@ -48,6 +48,7 @@ const ROLES: BackendRole[] = [
   "activist",
   "farmer",
   "shopkeeper",
+  "driver",
 ];
 
 const MOODS: BackendMood[] = [
@@ -141,6 +142,15 @@ const LAST_NAMES = [
   "Popov",
 ];
 
+/** Fixed road positions for driver NPCs (on citypack road columns/rows) */
+const DRIVER_POSITIONS: { x: number; y: number }[] = [
+  { x: 12, y: 5 },
+  { x: 26, y: 5 },
+  { x: 12, y: 18 },
+  { x: 40, y: 5 },
+  { x: 54, y: 18 },
+];
+
 function generateNPCs(): BackendNPC[] {
   // Track occupied cells to avoid stacking NPCs
   const occupied = new Set<string>();
@@ -149,17 +159,33 @@ function generateNPCs(): BackendNPC[] {
   for (let i = 0; i < 25; i++) {
     let x: number;
     let y: number;
-    do {
-      x = randInt(0, 19);
-      y = randInt(0, 14);
-    } while (occupied.has(`${x},${y}`));
+
+    if (i >= 20) {
+      // Driver NPCs (indices 20-24) placed on road tiles
+      const pos = DRIVER_POSITIONS[i - 20];
+      x = pos.x;
+      y = pos.y;
+    } else {
+      do {
+        x = randInt(0, 19);
+        y = randInt(0, 14);
+      } while (occupied.has(`${x},${y}`));
+    }
     occupied.add(`${x},${y}`);
+
+    const role: BackendRole =
+      i >= 20
+        ? "driver"
+        : i < 4
+          ? "worker"
+          : i < 7
+            ? "business_owner"
+            : ROLES[i % ROLES.length];
 
     npcs.push({
       id: uid(),
       name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
-      role:
-        i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
+      role,
       income_level: pick(["low", "medium", "high"]),
       political_leaning: Math.round((Math.random() * 2 - 1) * 100) / 100,
       industry: INDUSTRIES[i % INDUSTRIES.length],

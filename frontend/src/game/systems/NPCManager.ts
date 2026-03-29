@@ -4,7 +4,9 @@ import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS } from "../config";
+import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
+import { CAR_TEMPLATES } from "../map/CarRegistry";
 import { MovementSystem } from "./MovementSystem";
 import { OccupancyGrid } from "./OccupancyGrid";
 import { findPath } from "./Pathfinder";
@@ -115,16 +117,30 @@ export class NPCManager {
         }
       }
 
-      const charIndex = i % 16;
-      const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
-      npc.role = bn.role;
-      npc.sentiment = moodToSentiment(bn.mood);
-      this.npcs.set(bn.id, npc);
-      this.occupancy.occupy(bn.id, tileX, tileY);
+      if (bn.role === "driver") {
+        // Spawn a Car entity for driver NPCs
+        const template = CAR_TEMPLATES[i % CAR_TEMPLATES.length];
+        const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
+        car.role = bn.role;
+        car.sentiment = moodToSentiment(bn.mood);
+        this.npcs.set(bn.id, car as unknown as NPC);
+        this.occupancy.occupy(bn.id, tileX, tileY);
 
-      const zone = roleToZone(bn.role);
-      this.npcZones.set(bn.id, zone);
-      this.movement.startRoaming(npc, zone);
+        const zone = roleToZone(bn.role);
+        this.npcZones.set(bn.id, zone);
+        this.movement.startRoaming(car as unknown as NPC, zone);
+      } else {
+        const charIndex = i % 16;
+        const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+        npc.role = bn.role;
+        npc.sentiment = moodToSentiment(bn.mood);
+        this.npcs.set(bn.id, npc);
+        this.occupancy.occupy(bn.id, tileX, tileY);
+
+        const zone = roleToZone(bn.role);
+        this.npcZones.set(bn.id, zone);
+        this.movement.startRoaming(npc, zone);
+      }
     }
   }
 

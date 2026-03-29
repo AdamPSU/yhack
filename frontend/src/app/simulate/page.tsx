@@ -91,13 +91,20 @@ export default function SimulatePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
-  // Auto-start on mount
+  // Load policy text from sessionStorage
   useEffect(() => {
     const stored = sessionStorage.getItem("agora-policy");
     if (stored) {
       setPolicyText(stored);
     }
   }, []);
+
+  // Auto-start simulation once policy text is available
+  useEffect(() => {
+    if (policyText && !sim.isRunning && !sim.isComplete) {
+      sim.start();
+    }
+  }, [policyText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {

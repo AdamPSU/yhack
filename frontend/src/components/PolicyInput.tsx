@@ -51,6 +51,7 @@ export function PolicyInput() {
         type="button"
         onClick={handleSimulate}
         disabled={text.trim().length < 20}
+        suppressHydrationWarning
         data-testid="simulate-button"
         className="rpg-panel w-full px-6 py-3 text-sm font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px"
       >

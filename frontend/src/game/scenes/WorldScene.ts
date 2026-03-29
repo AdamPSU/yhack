@@ -7,8 +7,8 @@ import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
   private map!: Phaser.Tilemaps.Tilemap;
-  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
-  private buildingLayer!: Phaser.Tilemaps.TilemapLayer;
+  private groundLayer: Phaser.Tilemaps.TilemapLayer | null = null;
+  private buildingLayer: Phaser.Tilemaps.TilemapLayer | null = null;
   private phaseOverlay!: Phaser.GameObjects.Rectangle;
   private npcManager!: NPCManager;
   private simEventHandler!: SimEventHandler;
@@ -104,7 +104,7 @@ export class WorldScene extends Phaser.Scene {
 
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
-        const tile = this.buildingLayer.getTileAt(c, r);
+        const tile = this.buildingLayer?.getTileAt(c, r);
         if (!tile) continue;
         const g = tile.index;
 
@@ -130,7 +130,7 @@ export class WorldScene extends Phaser.Scene {
     for (let r = 0; r < MAP_ROWS; r++) {
       grid[r] = [];
       for (let c = 0; c < MAP_COLS; c++) {
-        const tile = this.groundLayer.getTileAt(c, r);
+        const tile = this.groundLayer?.getTileAt(c, r);
         grid[r][c] = tile ? tile.index : 0;
       }
     }
@@ -139,6 +139,7 @@ export class WorldScene extends Phaser.Scene {
 
   isWalkable(col: number, row: number): boolean {
     if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return false;
+    if (!this.buildingLayer) return true;
     // getTileAt returns null for empty cells (GID 0 in Tiled JSON → index -1 internally → null when nonNull=false)
     // A non-null tile means a building occupies this cell
     return !this.buildingLayer.getTileAt(col, row);

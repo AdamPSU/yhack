@@ -708,17 +708,6 @@ function SimulateContent() {
               </button>
             </div>
 
-            {/* Dashboard overlay - positioned on bottom right */}
-            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
-              <Dashboard
-                metrics={sim.metrics}
-                metricsHistory={sim.metricsHistory}
-                phase={sim.phase}
-                round={sim.round}
-                maxRounds={sim.maxRounds}
-              />
-            </div>
-
             {/* NPC hover tooltip */}
             {hoverInfo && (
               <div
@@ -739,6 +728,19 @@ function SimulateContent() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Viewport-fixed dashboard so it stays fully visible instead of being clipped by the canvas area */}
+      <div
+        className={`fixed bottom-3 right-3 z-40 pointer-events-auto ${focusMode ? "opacity-0 pointer-events-none" : ""}`}
+      >
+        <Dashboard
+          metrics={sim.metrics}
+          metricsHistory={sim.metricsHistory}
+          phase={sim.phase}
+          round={sim.round}
+          maxRounds={sim.maxRounds}
+        />
       </div>
 
       {/* Focus mode exit overlay */}

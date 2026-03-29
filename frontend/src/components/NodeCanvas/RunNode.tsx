@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import NodeWrapper from './NodeWrapper';
-import { useForm } from './FormContext';
+import { useRef } from "react";
+import { useForm } from "./FormContext";
+import NodeWrapper from "./NodeWrapper";
 
 export default function RunNode() {
   const {
@@ -10,30 +11,101 @@ export default function RunNode() {
     uploadingTrends,
     handleSimulate,
     isSimulating,
+    record,
+    setRecord,
+    handleLoadCustomRun,
+    handleLoadFile,
+    loadingCustomRun,
   } = useForm();
-  const canRun = primaryPolicy !== null && !isSimulating && !uploadingPrimary && !uploadingTrends;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canRun =
+    primaryPolicy !== null &&
+    !isSimulating &&
+    !uploadingPrimary &&
+    !uploadingTrends;
 
   return (
-    <NodeWrapper badge="04" title="RUN" description="Go." hasSource={false}>
-      <div className="nodrag nopan flex flex-col items-center gap-3 py-2" style={{ width: 120 }}>
+    <NodeWrapper badge="03" title="OUTPUT" description="Go." hasSource={false}>
+      <div
+        className="nodrag nopan flex flex-col items-center gap-3 py-2"
+        style={{ width: 200 }}
+      >
+        {/* Run button */}
         <button
           type="button"
           onClick={handleSimulate}
           disabled={!canRun}
           data-testid="run-button"
-          className="rpg-panel w-full py-5 text-sm font-mono font-bold text-white hover:bg-[#1a1a1a] hover:border-white hover:shadow-[0_0_12px_rgba(168,85,247,0.4)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px transition-all duration-150"
+          className="rpg-panel w-full py-4 text-[11px] font-pixel uppercase tracking-wide transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px hover:opacity-85"
+          style={{
+            color: "#3D2510",
+            background: "#E8D5A3",
+            borderColor: canRun ? "#D4A520" : undefined,
+          }}
         >
-          {isSimulating ? '...' : '▶'}
+          {isSimulating ? "\u2605 Running... \u2605" : "\u2605 Run Sim \u2605"}
         </button>
-        <span className="text-[9px] font-mono text-white/60 text-center">
-          {isSimulating
-            ? 'SIMULATING...'
-            : canRun
-              ? 'READY'
+
+        {/* Status */}
+        <span
+          className="text-[9px] font-mono text-center"
+          style={{
+            color: canRun
+              ? "#3E7C34"
               : uploadingPrimary
-                ? 'PROCESSING PDF...'
-                : 'UPLOAD PDF'}
+                ? "#C97D1A"
+                : "#B83A52",
+          }}
+        >
+          {isSimulating
+            ? "SIMULATING..."
+            : canRun
+              ? "\u2605 READY"
+              : uploadingPrimary
+                ? "PROCESSING PDF..."
+                : "UPLOAD PDF"}
         </span>
+
+        {/* Record toggle */}
+        <button
+          type="button"
+          onClick={() => setRecord(!record)}
+          className="rpg-panel w-full px-3 py-1.5 text-[9px] font-mono transition-all duration-150 active:translate-y-px"
+          style={{
+            color: record ? "#B83A52" : "#8B7355",
+            background: record ? "#FADED4" : "#FFF8DC",
+            borderColor: record ? "#B83A52" : undefined,
+          }}
+        >
+          [{record ? "REC" : "OFF"}] Record
+        </button>
+
+        {/* Replay loaders */}
+        <button
+          type="button"
+          onClick={handleLoadCustomRun}
+          disabled={loadingCustomRun}
+          className="rpg-panel w-full px-3 py-1.5 text-[9px] font-mono text-center transition-opacity hover:opacity-80 disabled:opacity-40"
+          style={{ color: "#5B3A1E", background: "#FFF8DC" }}
+        >
+          {loadingCustomRun ? "Loading..." : "Load Custom Run"}
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleLoadFile}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="rpg-panel w-full px-3 py-1.5 text-[9px] font-mono text-center transition-opacity hover:opacity-80"
+          style={{ color: "#5B3A1E", background: "#FFF8DC" }}
+        >
+          Load Saved Sim
+        </button>
       </div>
     </NodeWrapper>
   );

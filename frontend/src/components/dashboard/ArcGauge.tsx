@@ -5,10 +5,10 @@ import { useAnimatedValue } from "@/hooks/useAnimatedValue";
 type Severity = "good" | "warn" | "bad" | "neutral";
 
 const SEVERITY_HEX: Record<Severity, string> = {
-  good: "#2dd4bf", // Electric Teal
-  warn: "#facc15", // Neon Yellow
-  bad: "#f472b6",  // Hot Pink
-  neutral: "#818cf8", // Electric Indigo
+  good: "#3E7C34", // Forest Green
+  warn: "#C97D1A", // Autumn Orange
+  bad: "#B83A52", // Berry Red
+  neutral: "#5A8DB8", // Sky Blue
 };
 
 interface ArcGaugeProps {
@@ -38,11 +38,16 @@ export function ArcGauge({
   const color = SEVERITY_HEX[severity];
   const dashOffset = ARC_LEN * (1 - animatedValue);
   const isBad = severity === "bad";
-  const glowClass = severity === "good" ? "neon-text-teal" : severity === "warn" ? "neon-text-yellow" : severity === "bad" ? "neon-text-pink" : "neon-text-indigo";
 
   return (
-    <div className="border-b border-white/5 px-2 py-2 last:border-b-0">
-      <span className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1">
+    <div
+      className="px-2 py-2 last:border-b-0"
+      style={{ borderBottom: "1px solid #E8D5A3" }}
+    >
+      <span
+        className="text-[9px] font-mono uppercase tracking-widest block mb-1"
+        style={{ color: "#8B7355" }}
+      >
         {label}
       </span>
 
@@ -57,7 +62,7 @@ export function ArcGauge({
         {/* Glow filter for danger state */}
         <defs>
           <filter id={`glow-${label.replace(/\s+/g, "-")}`}>
-            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -69,7 +74,7 @@ export function ArcGauge({
         <path
           d={describeArc(CX, CY, RADIUS, 180, 360)}
           fill="none"
-          stroke="rgba(255, 255, 255, 0.05)"
+          stroke="#E8D5A3"
           strokeWidth={STROKE}
           strokeLinecap="round"
         />
@@ -88,7 +93,7 @@ export function ArcGauge({
               "stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1), stroke 300ms",
           }}
           filter={
-            isBad ? `url(#glow-${label.replace(/\s+/g, "-")})` : `drop-shadow(0 0 3px ${color}80)`
+            isBad ? `url(#glow-${label.replace(/\s+/g, "-")})` : undefined
           }
           className={isBad ? "gauge-glow" : undefined}
         />
@@ -105,7 +110,7 @@ export function ArcGauge({
               y1={CY + Math.sin(angle) * innerR}
               x2={CX + Math.cos(angle) * outerR}
               y2={CY + Math.sin(angle) * outerR}
-              stroke="rgba(255, 255, 255, 0.1)"
+              stroke="#C4A46C"
               strokeWidth={0.5}
             />
           );
@@ -120,7 +125,6 @@ export function ArcGauge({
           fontSize="12"
           fontFamily="monospace"
           fontWeight="bold"
-          className={glowClass}
           style={{ transition: "fill 300ms" }}
         >
           {formatValue(animatedValue)}

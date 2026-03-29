@@ -5,10 +5,10 @@ import { useEffect, useRef } from "react";
 type Severity = "good" | "warn" | "bad" | "neutral";
 
 const SEVERITY_HEX: Record<Severity, string> = {
-  good: "#2dd4bf", // Electric Teal
-  warn: "#facc15", // Neon Yellow
-  bad: "#f472b6",  // Hot Pink
-  neutral: "#818cf8", // Electric Indigo
+  good: "#3E7C34", // Forest Green
+  warn: "#C97D1A", // Autumn Orange
+  bad: "#B83A52", // Berry Red
+  neutral: "#5A8DB8", // Sky Blue
 };
 
 interface SparklineCardProps {
@@ -73,7 +73,6 @@ export function SparklineCard({
       const bl = baselineRef.current;
 
       ctx.save();
-      // Reset transform for clear (handle DPR)
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
@@ -84,7 +83,6 @@ export function SparklineCard({
         return;
       }
 
-      // Compute y domain
       let yMin = Math.min(...vals);
       let yMax = Math.max(...vals);
 
@@ -93,13 +91,11 @@ export function SparklineCard({
         yMax = Math.max(yMax, domain[1]);
       }
 
-      // Add padding so lines don't touch the very edge
       const range = yMax - yMin;
       const padding = range * 0.15 || 1;
       yMin -= padding;
       yMax += padding;
 
-      // Ensure baseline is included if it exists
       if (bl !== undefined) {
         yMin = Math.min(yMin, bl - padding * 0.5);
         yMax = Math.max(yMax, bl + padding * 0.5);
@@ -112,7 +108,7 @@ export function SparklineCard({
       if (bl !== undefined) {
         const by = scaleY(bl);
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.strokeStyle = "#C4A46C";
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.moveTo(0, by);
@@ -122,11 +118,10 @@ export function SparklineCard({
       }
 
       if (vals.length === 1) {
-        // Single point — draw a dot
         const y = scaleY(vals[0]);
         const pulse = Math.sin(now / 400) * 0.4 + 0.6;
         ctx.shadowColor = color;
-        ctx.shadowBlur = 6 * pulse;
+        ctx.shadowBlur = 4 * pulse;
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(W / 2, y, 3, 0, Math.PI * 2);
@@ -137,7 +132,6 @@ export function SparklineCard({
         return;
       }
 
-      // Build points
       const step = W / (vals.length - 1);
       const points: [number, number][] = vals.map((v, i) => [
         i * step,
@@ -146,7 +140,7 @@ export function SparklineCard({
 
       // Area fill gradient
       const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, `${color}33`); // 20% opacity
+      grad.addColorStop(0, `${color}33`);
       grad.addColorStop(1, `${color}00`);
 
       ctx.beginPath();
@@ -171,22 +165,22 @@ export function SparklineCard({
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.shadowColor = color;
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur = 3;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Pulsing glow dot on latest point
+      // Dot on latest point
       const last = points[points.length - 1];
       const pulse = Math.sin(now / 400) * 0.4 + 0.6;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 8 * pulse;
-      ctx.fillStyle = "#fff";
+      ctx.shadowBlur = 4 * pulse;
+      ctx.fillStyle = "#FDF5E6";
       ctx.beginPath();
       ctx.arc(last[0], last[1], 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      // Outer glow ring
+      // Outer ring
       ctx.globalAlpha = 0.3 * pulse;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
@@ -204,16 +198,21 @@ export function SparklineCard({
   }, [domain]);
 
   const severityColor = SEVERITY_HEX[severity];
-  const glowClass = severity === "good" ? "neon-text-teal" : severity === "warn" ? "neon-text-yellow" : severity === "bad" ? "neon-text-pink" : "neon-text-indigo";
 
   return (
-    <div className="border-b border-white/5 px-2 py-1.5 last:border-b-0">
+    <div
+      className="px-2 py-1.5 last:border-b-0"
+      style={{ borderBottom: "1px solid #E8D5A3" }}
+    >
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">
+        <span
+          className="text-[9px] font-mono uppercase tracking-widest"
+          style={{ color: "#8B7355" }}
+        >
           {label}
         </span>
         <span
-          className={`text-[11px] font-mono font-bold tabular-nums ${glowClass}`}
+          className="text-[11px] font-mono font-bold tabular-nums"
           style={{ color: severityColor }}
         >
           {formatValue(currentValue)}

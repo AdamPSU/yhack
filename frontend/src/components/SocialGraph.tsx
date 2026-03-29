@@ -107,6 +107,8 @@ export function SocialGraph({
   const hoveredRef = useRef<string | null>(null);
   const dragRef = useRef<GraphNode | null>(null);
   const spritesheetRef = useRef<HTMLImageElement | null>(null);
+  const zoomRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<HTMLCanvasElement, unknown> | null>(null);
   const [hovered, setHovered] = useState<GraphNode | null>(null);
   const [dims, setDims] = useState({ w: 680, h: 500 });
 
@@ -131,7 +133,7 @@ export function SocialGraph({
     };
   }, []);
 
-  // Resize canvas with DPR
+  // Resize canvas with DPR + attach zoom
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -142,6 +144,14 @@ export function SocialGraph({
     canvas.style.height = `${dims.h}px`;
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.scale(dpr, dpr);
+
+    const zoom = d3.zoom<HTMLCanvasElement, unknown>()
+      .scaleExtent([0.3, 4])
+      .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
+        zoomRef.current = event.transform;
+      });
+    d3.select(canvas).call(zoom);
+    zoomBehaviorRef.current = zoom;
   }, [dims]);
 
   // Build / update simulation
@@ -282,7 +292,7 @@ export function SocialGraph({
 
     ctx.clearRect(0, 0, dims.w, dims.h);
 
-    // Subtle radial gradient background
+    // Subtle radial gradient background (fixed, not zoomed)
     const bgGrad = ctx.createRadialGradient(
       dims.w / 2,
       dims.h / 2,
@@ -295,6 +305,11 @@ export function SocialGraph({
     bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, dims.w, dims.h);
+
+    // Apply zoom transform
+    ctx.save();
+    ctx.translate(zoomRef.current.x, zoomRef.current.y);
+    ctx.scale(zoomRef.current.k, zoomRef.current.k);
 
     // Node position lookup
     const posMap = new Map<string, { x: number; y: number }>();
@@ -562,7 +577,9 @@ export function SocialGraph({
       ctx.globalAlpha = 1.0;
     }
 
-    // ── Legend ──────────────────────────────────────────────
+    ctx.restore();
+
+    // ── Legend (fixed position, not affected by zoom) ──────
     drawLegend(ctx, dims.w);
 
     rafRef.current = requestAnimationFrame(draw);
@@ -580,10 +597,16 @@ export function SocialGraph({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    /** Transform screen coords to graph coords (accounting for zoom) */
+    function screenToGraph(sx: number, sy: number): [number, number] {
+      return zoomRef.current.invert([sx, sy]) as [number, number];
+    }
+
     function getNodeAt(mx: number, my: number): GraphNode | null {
+      const [gx, gy] = screenToGraph(mx, my);
       for (const n of nodesRef.current) {
-        const dx = (n.x ?? 0) - mx;
-        const dy = (n.y ?? 0) - my;
+        const dx = (n.x ?? 0) - gx;
+        const dy = (n.y ?? 0) - gy;
         if (dx * dx + dy * dy < (nodeRadius(n) + 6) ** 2) return n;
       }
       return null;
@@ -597,8 +620,9 @@ export function SocialGraph({
     const onMove = (e: MouseEvent) => {
       const { x, y } = getMousePos(e);
       if (dragRef.current) {
-        dragRef.current.fx = x;
-        dragRef.current.fy = y;
+        const [gx, gy] = screenToGraph(x, y);
+        dragRef.current.fx = gx;
+        dragRef.current.fy = gy;
         simRef.current?.alpha(0.3).restart();
         return;
       }
@@ -613,8 +637,9 @@ export function SocialGraph({
       const node = getNodeAt(x, y);
       if (node) {
         dragRef.current = node;
-        node.fx = x;
-        node.fy = y;
+        const [gx, gy] = screenToGraph(x, y);
+        node.fx = gx;
+        node.fy = gy;
         canvas!.style.cursor = "grabbing";
         simRef.current?.alphaTarget(0.3).restart();
       }
@@ -662,16 +687,31 @@ export function SocialGraph({
       )
     : [];
 
+  const resetZoom = useCallback(() => {
+    const canvas = canvasRef.current;
+    const zoom = zoomBehaviorRef.current;
+    if (canvas && zoom) {
+      d3.select(canvas).call(zoom.transform, d3.zoomIdentity);
+    }
+  }, []);
+
   return (
     <div ref={containerRef} className="relative h-full w-full">
       <canvas ref={canvasRef} className="block h-full w-full" />
+      <button
+        type="button"
+        onClick={resetZoom}
+        className="absolute top-2 left-2 z-10 rounded border border-white/20 bg-[#060010]/90 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/50 hover:text-white/80 hover:border-purple-500/50 transition-colors"
+      >
+        Reset Zoom
+      </button>
 
       {hovNode && (
         <div
           className="pointer-events-none absolute z-50"
           style={{
-            left: Math.min((hovNode.x ?? 0) + 18, dims.w - 180),
-            top: Math.max((hovNode.y ?? 0) - 20, 4),
+            left: Math.min(zoomRef.current.applyX(hovNode.x ?? 0) + 18, dims.w - 180),
+            top: Math.max(zoomRef.current.applyY(hovNode.y ?? 0) - 20, 4),
           }}
         >
           <div className="rounded-md bg-[#060010]/95 border border-white/20 px-3 py-2 shadow-xl backdrop-blur-sm min-w-[140px] neon-border-purple">

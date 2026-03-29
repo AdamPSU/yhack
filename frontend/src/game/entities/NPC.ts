@@ -2,15 +2,33 @@ import * as Phaser from "phaser";
 import type { NPCHoverInfo, NPCState } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { TILE_SIZE } from "../config";
-import { getNPCTile } from "../map/TileRegistry";
+import {
+  type CharacterType,
+  type Direction as NPCDirection,
+  getAnimKey,
+  getIdleFrame,
+} from "../map/NPCCharacterRegistry";
 
-const CHAT_BUBBLE_Y_OFFSET = 2;
+function dirToNPCDir(dir: NPCState["direction"]): NPCDirection {
+  switch (dir) {
+    case "up":
+      return "north";
+    case "down":
+      return "south";
+    case "left":
+      return "west";
+    case "right":
+      return "east";
+  }
+}
 
 export class NPC extends Phaser.GameObjects.Sprite {
   readonly npcId: string;
   readonly npcName: string;
   readonly charIndex: number;
+  readonly characterType: CharacterType;
   profession = "";
+  role = "";
   category = "";
   reputation = 0.5;
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
@@ -40,22 +58,23 @@ export class NPC extends Phaser.GameObjects.Sprite {
     scene: Phaser.Scene,
     id: string,
     name: string,
+    characterType: CharacterType,
     charIndex: number,
     tileX: number,
     tileY: number,
   ) {
-    // Static single-frame character tile — no directional animation
-    const frame = getNPCTile(charIndex);
+    const idleFrame = getIdleFrame(characterType, "south");
     super(
       scene,
       tileX * TILE_SIZE + TILE_SIZE / 2,
       tileY * TILE_SIZE + TILE_SIZE / 2,
       "city-tiles",
-      frame,
+      idleFrame,
     );
 
     this.npcId = id;
     this.npcName = name;
+    this.characterType = characterType;
     this.charIndex = charIndex;
     this.tileX = tileX;
     this.tileY = tileY;
@@ -72,12 +91,12 @@ export class NPC extends Phaser.GameObjects.Sprite {
     scene.add.existing(this);
   }
 
-  /** Track direction for state reporting (sprite stays static) */
   face(dir: NPCState["direction"]) {
     this.direction = dir;
-    // Kenney RPG Urban characters are single static tiles — no directional frames.
-    // We flip the sprite horizontally when facing left for visual variety.
-    this.setFlipX(dir === "left");
+    const npcDir = dirToNPCDir(dir);
+    if (!this.isMoving) {
+      this.setFrame(getIdleFrame(this.characterType, npcDir));
+    }
   }
 
   /** Tween-move to an adjacent tile with bob animation. Rejects moves > 2 tiles to prevent teleporting. */
@@ -90,14 +109,21 @@ export class NPC extends Phaser.GameObjects.Sprite {
 
     // Guard: reject long-distance moves to prevent teleporting
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) return Promise.resolve();
-    if (dx > 0) this.face("right");
-    else if (dx < 0) this.face("left");
-    else if (dy > 0) this.face("down");
-    else if (dy < 0) this.face("up");
+
+    let dir: NPCState["direction"];
+    if (dx > 0) dir = "right";
+    else if (dx < 0) dir = "left";
+    else if (dy > 0) dir = "down";
+    else dir = "up";
+
+    this.direction = dir;
+    const npcDir = dirToNPCDir(dir);
 
     this.tileX = col;
     this.tileY = row;
     this.isMoving = true;
+
+    this.play(getAnimKey(this.characterType, npcDir));
 
     const targetY = row * TILE_SIZE + TILE_SIZE / 2;
 
@@ -131,6 +157,8 @@ export class NPC extends Phaser.GameObjects.Sprite {
           this.bobTween = undefined;
           this.setScale(1, 1);
           this.setAngle(0);
+          this.stop();
+          this.setFrame(getIdleFrame(this.characterType, npcDir));
           this.isMoving = false;
           resolve();
         },
@@ -146,6 +174,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
       id: this.npcId,
       name: this.npcName,
       profession: this.profession,
+      role: this.role,
       reputation: this.reputation,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
@@ -177,12 +206,11 @@ export class NPC extends Phaser.GameObjects.Sprite {
       id: this.npcId,
       name: this.npcName,
       profession: this.profession,
+      role: this.role,
       reputation: this.reputation,
       category: this.category,
       x: (this.x - cam.scrollX) * cam.zoom,
-      // Anchor slightly above the 1x1 sprite center; a full half-tile offset
-      // pushes the DOM bubble too far toward the top-left visually.
-      y: (this.y - CHAT_BUBBLE_Y_OFFSET - cam.scrollY) * cam.zoom,
+      y: (this.y - cam.scrollY) * cam.zoom,
       direction: this.direction,
       state: this.npcState,
       message: this.message,

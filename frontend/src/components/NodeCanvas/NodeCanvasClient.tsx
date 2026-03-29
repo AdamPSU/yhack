@@ -1,13 +1,19 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
-const NodeCanvas = dynamic(() => import('./index'), { ssr: false });
+const NodeCanvas = dynamic(() => import("./index"), { ssr: false });
 
-export default function NodeCanvasClient() {
+interface NodeCanvasClientProps {
+  onSimulateStart?: () => void;
+}
+
+export default function NodeCanvasClient({
+  onSimulateStart,
+}: NodeCanvasClientProps) {
   return (
-    <div style={{ width: '100%', height: 420 }}>
-      <NodeCanvas />
+    <div style={{ width: "100%", height: "calc(100vh - 100px)" }}>
+      <NodeCanvas onSimulateStart={onSimulateStart} />
     </div>
   );
 }

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useRef } from 'react';
-import NodeWrapper from './NodeWrapper';
-import { useForm } from './FormContext';
+import { useRef } from "react";
+import { useForm } from "./FormContext";
+import NodeWrapper from "./NodeWrapper";
 
-const PDF_ACCEPTED = '.pdf';
-const CSV_ACCEPTED = '.csv';
+const PDF_ACCEPTED = ".pdf";
+const CSV_ACCEPTED = ".csv";
 
 export default function PolicyNode() {
   const {
@@ -23,9 +23,9 @@ export default function PolicyNode() {
   const csvRef = useRef<HTMLInputElement>(null);
 
   return (
-    <NodeWrapper 
-      badge="01" 
-      title="POLICY" 
+    <NodeWrapper
+      badge="01"
+      title="POLICY"
       description="Upload one primary policy PDF, then add optional notes and trend CSVs."
       hasTarget={false}
     >
@@ -44,20 +44,38 @@ export default function PolicyNode() {
             <label
               htmlFor="policy-pdf-node"
               data-testid="upload-pdf-button"
-              className={`rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer hover:border-white hover:text-white ${
-                uploadingPrimary ? 'opacity-50 cursor-wait text-white/50' : 'text-white'
-              }`}
+              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
+              style={{
+                color: uploadingPrimary ? "#A0824A" : "#3D2510",
+                background: "#E8D5A3",
+                opacity: uploadingPrimary ? 0.6 : 1,
+              }}
             >
-              {uploadingPrimary ? 'Uploading PDF...' : '↑ Primary Policy PDF'}
+              {uploadingPrimary
+                ? "Uploading PDF..."
+                : "\u2191 Primary Policy PDF"}
             </label>
-            <span className="text-[9px] font-mono text-white/60">
-              {primaryPolicy ? 'READY' : 'REQUIRED'}
+            <span
+              className="text-[9px] font-mono"
+              style={{ color: primaryPolicy ? "#3E7C34" : "#B83A52" }}
+            >
+              {primaryPolicy ? "\u2605 READY" : "REQUIRED"}
             </span>
           </div>
           {primaryPolicy && (
-            <div className="rpg-panel border-white/20 bg-black/30 p-2 text-[9px] font-mono text-white/80">
-              <div className="text-white">{primaryPolicy.filename}</div>
-              <div className="mt-1 line-clamp-4 whitespace-pre-wrap text-white/60">
+            <div
+              className="rounded p-2 text-[9px] font-mono"
+              style={{
+                background: "#FFF8DC",
+                border: "1px solid #C4A46C",
+                color: "#6B4C2A",
+              }}
+            >
+              <div style={{ color: "#3D2510" }}>{primaryPolicy.filename}</div>
+              <div
+                className="mt-1 line-clamp-4 whitespace-pre-wrap"
+                style={{ color: "#8B7355" }}
+              >
                 {primaryPolicy.preview_text}
               </div>
             </div>
@@ -71,9 +89,19 @@ export default function PolicyNode() {
             data-testid="policy-textarea"
             placeholder="Optional supporting notes. Use this for analysis focus, caveats, scenario framing, or what you want the simulation to pay attention to."
             rows={6}
-            className="rpg-panel w-full resize-none p-3 text-xs leading-relaxed font-mono text-white placeholder-white/40 outline-none focus:border-purple-400/50 transition-colors"
+            className="rpg-panel w-full resize-none p-3 text-xs leading-relaxed font-mono outline-none transition-colors"
+            style={{
+              color: "#3D2510",
+              background: "#FFF8DC",
+              borderColor: notesText.length > 0 ? "#D4A520" : undefined,
+            }}
           />
-          <span className="absolute right-2 bottom-2 text-[9px] font-mono text-white/60">{notesText.length} chars</span>
+          <span
+            className="absolute right-2 bottom-2 text-[9px] font-mono"
+            style={{ color: "#A0824A" }}
+          >
+            {notesText.length} chars
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -91,13 +119,16 @@ export default function PolicyNode() {
             <label
               htmlFor="policy-csv-node"
               data-testid="upload-csv-button"
-              className={`rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer hover:border-white hover:text-white ${
-                uploadingTrends ? 'opacity-50 cursor-wait text-white/50' : 'text-white'
-              }`}
+              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
+              style={{
+                color: uploadingTrends ? "#A0824A" : "#3D2510",
+                background: "#E8D5A3",
+                opacity: uploadingTrends ? 0.6 : 1,
+              }}
             >
-              {uploadingTrends ? 'Uploading CSV...' : '+ Trend CSV'}
+              {uploadingTrends ? "Uploading CSV..." : "+ Trend CSV"}
             </label>
-            <span className="text-[9px] font-mono text-white/60">
+            <span className="text-[9px] font-mono" style={{ color: "#8B7355" }}>
               {trendSources.length} attached
             </span>
           </div>
@@ -106,21 +137,30 @@ export default function PolicyNode() {
               {trendSources.map((source) => (
                 <div
                   key={source.id}
-                  className="rpg-panel flex items-start gap-2 border-white/20 bg-black/30 p-2 text-[9px] font-mono text-white/80"
+                  className="flex items-start gap-2 rounded p-2 text-[9px] font-mono"
+                  style={{
+                    background: "#FFF8DC",
+                    border: "1px solid #C4A46C",
+                    color: "#6B4C2A",
+                  }}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-white">{source.filename}</div>
-                    <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-white/60">
+                    <div style={{ color: "#3D2510" }}>{source.filename}</div>
+                    <div
+                      className="mt-1 line-clamp-3 whitespace-pre-wrap"
+                      style={{ color: "#8B7355" }}
+                    >
                       {source.summary}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeTrendSource(source.id)}
-                    className="text-white/50 transition hover:text-white"
+                    className="transition-opacity hover:opacity-60"
+                    style={{ color: "#B83A52" }}
                     data-testid={`remove-trend-${source.id}`}
                   >
-                    ×
+                    {"\u00D7"}
                   </button>
                 </div>
               ))}
@@ -128,7 +168,10 @@ export default function PolicyNode() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 text-[9px] font-mono text-white/60">
+        <div
+          className="flex items-center gap-2 text-[9px] font-mono"
+          style={{ color: "#A0824A" }}
+        >
           <span>PDF policy required</span>
           <span className="ml-auto">CSV trends optional</span>
         </div>

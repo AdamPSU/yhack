@@ -37,6 +37,7 @@ export interface NPCState {
   id: string;
   name: string;
   profession?: string;
+  role?: string;
   category?: string;
   reputation?: number;
   x: number;
@@ -50,6 +51,7 @@ export interface NPCHoverInfo {
   id: string;
   name: string;
   profession: string;
+  role?: string;
   reputation: number;
   x: number;
   y: number;

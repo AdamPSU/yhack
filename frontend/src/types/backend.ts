@@ -41,9 +41,11 @@ export interface BackendNPC {
   bio: string;
   persona: string;
   mbti: string;
-  country: string;
-  profession: string;
-  interested_topics: string[];
+  country:string;
+  profession:string;
+  role:BackendRole;
+  industry?:string;
+  interested_topics:string[];
   income_level: "low" | "medium" | "high";
   political_leaning: number; // -1 to 1
   reputation: number; // 0-1

@@ -24,6 +24,12 @@ import {
   isHRoadRow as ccityIsHRoadRow,
 } from "../map/ProceduralCity";
 import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
+import {
+  ALL_CHARACTERS,
+  ALL_DIRECTIONS,
+  getAnimKey,
+  getWalkFrames,
+} from "../map/NPCCharacterRegistry";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -138,7 +144,8 @@ export class WorldScene extends Phaser.Scene {
 
     eventBridge.on("sim:camera-snap-npc", this.onCameraSnapNPC, this);
 
-    // ─── NPC System ───
+    // ─── NPC Animations & System ───
+    this.registerNPCAnimations();
     this.npcManager = new NPCManager(
       this,
       this.getBuildingPositions(),
@@ -168,6 +175,8 @@ export class WorldScene extends Phaser.Scene {
       this.citypackChunkManager.update(this.cameras.main);
     }
 
+    this.npcManager?.refreshActiveBubblePositions();
+
     // Keyboard panning
     if (this.cursors) {
       const cam = this.cameras.main;
@@ -176,6 +185,25 @@ export class WorldScene extends Phaser.Scene {
       if (this.cursors.right.isDown) cam.scrollX += speed;
       if (this.cursors.up.isDown) cam.scrollY -= speed;
       if (this.cursors.down.isDown) cam.scrollY += speed;
+    }
+  }
+
+  private registerNPCAnimations() {
+    for (const char of ALL_CHARACTERS) {
+      for (const dir of ALL_DIRECTIONS) {
+        const key = getAnimKey(char, dir);
+        if (this.anims.exists(key)) continue;
+        const [frameA, frameB] = getWalkFrames(char, dir);
+        this.anims.create({
+          key,
+          frames: [
+            { key: "city-tiles", frame: frameA },
+            { key: "city-tiles", frame: frameB },
+          ],
+          frameRate: 6,
+          repeat: -1,
+        });
+      }
     }
   }
 
@@ -387,6 +415,7 @@ export class WorldScene extends Phaser.Scene {
 
     cam.scrollX = Math.round(cam.scrollX + data.dx);
     cam.scrollY = Math.round(cam.scrollY + data.dy);
+    this.npcManager?.refreshActiveBubblePositions();
   }
 
   private onCameraZoom(data: { delta: number; x?: number; y?: number }) {
@@ -396,7 +425,7 @@ export class WorldScene extends Phaser.Scene {
     const zoomStep = 0.2;
     const minZoom = 0.5;
     const maxZoom = 5.0;
-    
+
     const oldZoom = cam.zoom;
     const nextZoom = Phaser.Math.Clamp(
       oldZoom + data.delta * zoomStep,
@@ -412,18 +441,18 @@ export class WorldScene extends Phaser.Scene {
       // We want pointWorldBefore == pointWorldAfter
       // (mouseX / oldZoom) + oldScrollX == (mouseX / nextZoom) + nextScrollX
       // nextScrollX = oldScrollX + mouseX * (1/oldZoom - 1/nextZoom)
-      
+
       const mouseX = data.x;
       const mouseY = data.y;
-      
+
       cam.setZoom(nextZoom);
       cam.scrollX += mouseX * (1 / oldZoom - 1 / nextZoom);
       cam.scrollY += mouseY * (1 / oldZoom - 1 / nextZoom);
     } else {
       cam.setZoom(nextZoom);
     }
+    this.npcManager?.refreshActiveBubblePositions();
   }
-
 
   private onCameraSnapNPC(data: { npcId: string }) {
     const npc = this.npcManager?.getNPC(data.npcId);
@@ -431,6 +460,7 @@ export class WorldScene extends Phaser.Scene {
     const targetX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
     const targetY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
     this.cameras.main.pan(targetX, targetY, 400, "Power2");
+    this.npcManager?.refreshActiveBubblePositions();
   }
 
   private onPhaseChange(data: { phase: number; month: number }) {

@@ -14,7 +14,7 @@ export const MAP_CONFIGS = {
   citypack: { tileSize: 16, cols: 100, rows: 80, spacing: 0 },
 } as const;
 
-export let selectedMap: MapType = "ccity";
+export let selectedMap: MapType = "citypack";
 export function setSelectedMap(m: MapType) {
   selectedMap = m;
 }

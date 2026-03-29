@@ -34,25 +34,35 @@ function eventIcon(type: SimEvent["type"]): string {
 function eventAccent(type: SimEvent["type"]): string {
   switch (type) {
     case "reaction":
-      return "text-white/40";
+      return "sdv-text-muted";
     case "price_change":
-      return "text-yellow-400 neon-text-yellow";
+      return "sdv-text-gold";
     case "layoff":
-      return "text-pink-500 neon-text-pink";
+      return "sdv-text-berry";
     case "protest":
-      return "text-orange-400 neon-text-yellow";
+      return "sdv-text-orange";
     case "closure":
-      return "text-pink-600 neon-text-pink";
+      return "sdv-text-berry";
     case "strike":
-      return "text-yellow-500 neon-text-yellow";
+      return "sdv-text-orange";
     case "policy_response":
-      return "text-teal-400 neon-text-teal";
+      return "sdv-text-green";
     case "phase_change":
-      return "text-purple-400 neon-text-purple";
+      return "sdv-text-purple";
     default:
-      return "text-white/20";
+      return "sdv-text-muted";
   }
 }
+
+// Stardew color classes applied via inline style below
+const SDV_COLORS: Record<string, string> = {
+  "sdv-text-muted": "#8B7355",
+  "sdv-text-gold": "#C97D1A",
+  "sdv-text-berry": "#B83A52",
+  "sdv-text-orange": "#C97D1A",
+  "sdv-text-green": "#3E7C34",
+  "sdv-text-purple": "#7B68EE",
+};
 
 export function EventFeed({ events, onEventClick }: EventFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -66,7 +76,10 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
       {/* Events */}
       <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin">
         {events.length === 0 && (
-          <div className="flex h-full items-center justify-center text-[10px] font-mono text-white/10 uppercase tracking-widest">
+          <div
+            className="flex h-full items-center justify-center text-[10px] font-mono uppercase tracking-widest"
+            style={{ color: "#A0824A" }}
+          >
             Awaiting simulation...
           </div>
         )}
@@ -76,7 +89,12 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
             return (
               <div
                 key={event.id}
-                className="my-2 border-y border-white/5 py-1.5 text-center text-[8px] font-pixel text-purple-400 neon-text-purple"
+                className="my-2 py-1.5 text-center text-[8px] font-pixel"
+                style={{
+                  color: "#5B3A1E",
+                  borderTop: "1px solid #C4A46C",
+                  borderBottom: "1px solid #C4A46C",
+                }}
                 data-testid="phase-marker"
               >
                 {event.message}
@@ -84,32 +102,64 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
             );
           }
 
+          const accentClass = eventAccent(event.type);
+          const accentColor = SDV_COLORS[accentClass] ?? "#8B7355";
+
           return (
             <div
               key={event.id}
-              className={`mb-1 px-2 py-1.5 rounded border border-transparent ${onEventClick ? "cursor-pointer hover:bg-white/5 hover:border-white/5 transition-colors" : ""}`}
+              className={`mb-1 px-2 py-1.5 rounded ${onEventClick ? "cursor-pointer transition-colors" : ""}`}
+              style={onEventClick ? {} : undefined}
+              onMouseEnter={
+                onEventClick
+                  ? (e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "rgba(196,164,108,0.15)";
+                    }
+                  : undefined
+              }
+              onMouseLeave={
+                onEventClick
+                  ? (e) => {
+                      (e.currentTarget as HTMLElement).style.background = "";
+                    }
+                  : undefined
+              }
               data-testid="event-item"
               onClick={onEventClick ? () => onEventClick(event) : undefined}
             >
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`text-[10px] font-mono ${eventAccent(event.type)}`}
+                  className="text-[10px] font-mono"
+                  style={{ color: accentColor }}
                 >
                   {eventIcon(event.type)}
                 </span>
-                <span className="text-[10px] font-mono font-bold text-white/90 neon-text-white">
+                <span
+                  className="text-[10px] font-mono font-bold"
+                  style={{ color: "#3D2510" }}
+                >
                   {event.agentName}
                 </span>
                 {event.agentCategory && (
-                  <span className="text-[9px] font-mono text-white/30">
+                  <span
+                    className="text-[9px] font-mono"
+                    style={{ color: "#A0824A" }}
+                  >
                     {event.agentCategory}
                   </span>
                 )}
-                <span className="ml-auto text-[9px] font-mono tabular-nums text-white/20">
+                <span
+                  className="ml-auto text-[9px] font-mono tabular-nums"
+                  style={{ color: "#A0824A" }}
+                >
                   M{event.month}
                 </span>
               </div>
-              <p className="mt-0.5 text-[10px] font-mono leading-relaxed text-white/40">
+              <p
+                className="mt-0.5 text-[10px] font-mono leading-relaxed"
+                style={{ color: "#6B4C2A" }}
+              >
                 {event.message}
               </p>
             </div>

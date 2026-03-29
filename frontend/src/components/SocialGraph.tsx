@@ -12,11 +12,11 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#e8a43a",
-  friend: "#5ab85a",
-  employer: "#50a0d4",
-  colleague: "#8a7a62",
-  neighbor: "#5a4a32",
+  family: "#a855f7",  // Purple
+  friend: "#2dd4bf",  // Teal
+  employer: "#ffffff",
+  colleague: "#818cf8", // Indigo
+  neighbor: "#475569",
 };
 
 const EDGE_LABELS: Record<BackendRelType, string> = {
@@ -28,26 +28,26 @@ const EDGE_LABELS: Record<BackendRelType, string> = {
 };
 
 const MOOD_COLORS: Record<string, string> = {
-  angry: "#d45050",
-  anxious: "#e87840",
-  worried: "#e8a43a",
-  neutral: "#8a7a62",
-  hopeful: "#5ab85a",
-  excited: "#e8c840",
+  angry: "#f472b6",
+  anxious: "#fbbf24",
+  worried: "#facc15",
+  neutral: "#818cf8",
+  hopeful: "#2dd4bf",
+  excited: "#a855f7",
 };
 
 const BEHAVIOR_COLORS: Record<string, string> = {
-  keep: "#5a4a32",
-  compromise: "#e8a43a",
-  adopt: "#f0e6d2",
+  keep: "#475569",
+  compromise: "#facc15",
+  adopt: "#ffffff",
 };
 
 function politicalColor(leaning: number): string {
   const t = (leaning + 1) / 2;
   if (t <= 0.5) {
-    return d3.interpolateRgb("#4a90c4", "#c4b490")(t / 0.5);
+    return d3.interpolateRgb("#2dd4bf", "#818cf8")(t / 0.5);
   }
-  return d3.interpolateRgb("#c4b490", "#c45050")((t - 0.5) / 0.5);
+  return d3.interpolateRgb("#818cf8", "#f472b6")((t - 0.5) / 0.5);
 }
 
 // ── Types ──────────────────────────────────────────────────
@@ -279,7 +279,7 @@ export function SocialGraph({
       dims.h / 2,
       dims.w * 0.6,
     );
-    bgGrad.addColorStop(0, "rgba(58, 46, 30, 0.12)");
+    bgGrad.addColorStop(0, "rgba(168, 85, 247, 0.05)");
     bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, dims.w, dims.h);
@@ -506,7 +506,7 @@ export function SocialGraph({
       ctx.stroke();
 
       // Label
-      ctx.fillStyle = isDimmed ? "#2a2015" : "#c4b490";
+      ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)";
       ctx.font = `${isHov ? "bold 9px" : "8px"} monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
@@ -518,7 +518,7 @@ export function SocialGraph({
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 1;
       }
-      ctx.fillText(node.name.split(" ")[0], x, y + hovR + 5);
+      ctx.fillText(node.name.split(" ")[0].toUpperCase(), x, y + hovR + 5);
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
 
@@ -637,41 +637,48 @@ export function SocialGraph({
             top: Math.max((hovNode.y ?? 0) - 20, 4),
           }}
         >
-          <div className="rounded-md bg-[#12100c]/95 border border-[#4a3c2a] px-3 py-2 shadow-xl backdrop-blur-sm min-w-[140px]">
+          <div className="rounded-md bg-[#060010]/95 border border-white/20 px-3 py-2 shadow-xl backdrop-blur-sm min-w-[140px] neon-border-purple">
             {/* Name & role */}
-            <div className="text-[11px] font-mono font-bold text-[#e8a43a]">
+            <div className="text-[10px] font-pixel text-purple-400 neon-text-purple">
               {hovNode.name}
             </div>
-            <div className="text-[9px] font-mono text-[#6a5a42] capitalize">
+            <div className="text-[8px] font-mono text-white/40 uppercase tracking-widest mt-0.5">
               {(hovNode.role ?? "").replace("_", " ")}
             </div>
 
             {/* Stats row */}
-            <div className="mt-1.5 flex items-center gap-3 text-[9px] font-mono">
+            <div className="mt-2 flex items-center gap-3 text-[9px] font-mono">
               <span className="flex items-center gap-1">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: MOOD_COLORS[hovNode.mood] || "#8a7a62" }}
+                  style={{ background: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
                 />
-                <span style={{ color: MOOD_COLORS[hovNode.mood] || "#8a7a62" }}>
+                <span 
+                  className={hovNode.mood === 'angry' ? 'neon-text-pink' : 
+                             (hovNode.mood === 'anxious' || hovNode.mood === 'worried') ? 'neon-text-yellow' :
+                             hovNode.mood === 'hopeful' ? 'neon-text-teal' :
+                             hovNode.mood === 'excited' ? 'neon-text-purple' : 'neon-text-indigo'}
+                  style={{ color: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
+                >
                   {hovNode.mood}
                 </span>
               </span>
               <span
+                className={hovNode.political_leaning > 0.3 ? "neon-text-pink" : hovNode.political_leaning < -0.3 ? "neon-text-teal" : "neon-text-indigo"}
                 style={{ color: politicalColor(hovNode.political_leaning) }}
               >
                 {hovNode.political_leaning > 0.3
-                  ? "conservative"
+                  ? "CONSERVATIVE"
                   : hovNode.political_leaning < -0.3
-                    ? "progressive"
-                    : "moderate"}
+                    ? "PROGRESSIVE"
+                    : "MODERATE"}
               </span>
             </div>
 
             {/* Connections */}
             {hovLinks.length > 0 && (
-              <div className="mt-1.5 border-t border-[#3a2e1e] pt-1.5">
-                <div className="text-[8px] font-mono text-[#5a4a32] uppercase mb-0.5">
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="text-[8px] font-pixel text-purple-400/40 uppercase mb-1">
                   Connections ({hovLinks.length})
                 </div>
                 {hovLinks.slice(0, 4).map((l) => {
@@ -687,15 +694,15 @@ export function SocialGraph({
                         className="inline-block h-1.5 w-3 rounded-sm"
                         style={{ background: EDGE_COLORS[l.rel_type] }}
                       />
-                      <span className="text-[#8a7a62]">
+                      <span className="text-white/60">
                         {other?.name.split(" ")[0] ?? "?"}
                       </span>
-                      <span className="text-[#5a4a32]">{l.rel_type}</span>
+                      <span className="text-white/20 uppercase tracking-tighter">{l.rel_type}</span>
                     </div>
                   );
                 })}
                 {hovLinks.length > 4 && (
-                  <div className="text-[8px] font-mono text-[#5a4a32]">
+                  <div className="text-[8px] font-mono text-white/20 mt-1 uppercase">
                     +{hovLinks.length - 4} more
                   </div>
                 )}
@@ -727,18 +734,18 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
 
   // Background
   ctx.globalAlpha = 0.88;
-  ctx.fillStyle = "#12100c";
+  ctx.fillStyle = "#060010";
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, 4);
   ctx.fill();
-  ctx.strokeStyle = "#3a2e1e";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.globalAlpha = 1.0;
 
   // Title
   ctx.font = "bold 7px monospace";
-  ctx.fillStyle = "#5a4a32";
+  ctx.fillStyle = "rgba(168, 85, 247, 0.6)";
   ctx.textAlign = "left";
   y += 11;
   ctx.fillText("RELATIONSHIPS", x + 6, y);
@@ -763,7 +770,7 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "#8a7a62";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
     ctx.fillText(label, x + 24, y + 3);
     y += lh;
   }
@@ -776,12 +783,12 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.fillStyle = politicalColor(t * 2 - 1);
     ctx.fillRect(x + 8 + i, y, 1, 5);
   }
-  ctx.fillStyle = "#6a5a42";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
   ctx.font = "6px monospace";
   ctx.textAlign = "left";
-  ctx.fillText("Prog", x + 6, y + 13);
+  ctx.fillText("PROG", x + 6, y + 13);
   ctx.textAlign = "right";
-  ctx.fillText("Cons", x + w - 6, y + 13);
+  ctx.fillText("CONS", x + w - 6, y + 13);
   ctx.textAlign = "left";
 }
 

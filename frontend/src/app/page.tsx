@@ -71,13 +71,13 @@ export default function Home() {
             <div className="relative z-[100] w-full max-w-2xl text-center">
               <ASCIITextHero />
               <p
-                className="text-[10px] tracking-[0.3em] uppercase text-white/40 mt-[4px] italic"
+                className="text-[10px] tracking-[0.3em] uppercase text-white/40 mt-[4px] italic neon-text-white"
                 style={{
                   textShadow:
                     "0 0 12px rgba(255,255,255,0.4), 0 0 30px rgba(255,255,255,0.2)",
                 }}
               >
-                Agent-based Governance and Outcome Response Analysis
+                Synthetic Individual Modeling & Universal Logic Agent-based Complex Response Analysis
               </p>
             </div>
 

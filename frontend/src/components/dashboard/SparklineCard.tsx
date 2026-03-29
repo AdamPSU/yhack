@@ -5,10 +5,10 @@ import { useEffect, useRef } from "react";
 type Severity = "good" | "warn" | "bad" | "neutral";
 
 const SEVERITY_HEX: Record<Severity, string> = {
-  good: "#5ab85a",
-  warn: "#e8a43a",
-  bad: "#d45050",
-  neutral: "#d4c4a0",
+  good: "#2dd4bf", // Electric Teal
+  warn: "#facc15", // Neon Yellow
+  bad: "#f472b6",  // Hot Pink
+  neutral: "#818cf8", // Electric Indigo
 };
 
 interface SparklineCardProps {
@@ -85,16 +85,24 @@ export function SparklineCard({
       }
 
       // Compute y domain
-      let yMin: number;
-      let yMax: number;
+      let yMin = Math.min(...vals);
+      let yMax = Math.max(...vals);
+
       if (domain) {
-        [yMin, yMax] = domain;
-      } else {
-        yMin = Math.min(...vals);
-        yMax = Math.max(...vals);
-        const padding = (yMax - yMin) * 0.15 || 1;
-        yMin -= padding;
-        yMax += padding;
+        yMin = Math.min(yMin, domain[0]);
+        yMax = Math.max(yMax, domain[1]);
+      }
+
+      // Add padding so lines don't touch the very edge
+      const range = yMax - yMin;
+      const padding = range * 0.15 || 1;
+      yMin -= padding;
+      yMax += padding;
+
+      // Ensure baseline is included if it exists
+      if (bl !== undefined) {
+        yMin = Math.min(yMin, bl - padding * 0.5);
+        yMax = Math.max(yMax, bl + padding * 0.5);
       }
 
       const scaleY = (v: number) =>
@@ -104,7 +112,7 @@ export function SparklineCard({
       if (bl !== undefined) {
         const by = scaleY(bl);
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = "#3a2e1e";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.moveTo(0, by);
@@ -162,7 +170,10 @@ export function SparklineCard({
       ctx.lineWidth = 1.5;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 4;
       ctx.stroke();
+      ctx.shadowBlur = 0;
 
       // Pulsing glow dot on latest point
       const last = points[points.length - 1];
@@ -193,15 +204,16 @@ export function SparklineCard({
   }, [domain]);
 
   const severityColor = SEVERITY_HEX[severity];
+  const glowClass = severity === "good" ? "neon-text-teal" : severity === "warn" ? "neon-text-yellow" : severity === "bad" ? "neon-text-pink" : "neon-text-indigo";
 
   return (
-    <div className="border-b border-[#3a2e1e] px-2 py-1.5 last:border-b-0">
+    <div className="border-b border-white/5 px-2 py-1.5 last:border-b-0">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-mono uppercase text-[#8a7a62]">
+        <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">
           {label}
         </span>
         <span
-          className="text-[11px] font-mono font-bold tabular-nums"
+          className={`text-[11px] font-mono font-bold tabular-nums ${glowClass}`}
           style={{ color: severityColor }}
         >
           {formatValue(currentValue)}

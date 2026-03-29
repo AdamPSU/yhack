@@ -188,6 +188,31 @@ export class WorldScene extends Phaser.Scene {
 
     this.npcManager?.refreshActiveBubblePositions();
 
+    // Camera spring bounce for citypack
+    if (selectedMap === "citypack") {
+      const cam = this.cameras.main;
+      const SOFT_X_MIN = 160;
+      const SOFT_X_MAX = 1440;
+      const SOFT_Y_MIN = 80;
+      const SOFT_Y_MAX = 1200;
+      const SPRING = 0.08;
+
+      const cx = cam.scrollX + cam.width / (2 * cam.zoom);
+      const cy = cam.scrollY + cam.height / (2 * cam.zoom);
+
+      let tx = cx;
+      let ty = cy;
+      if (cx < SOFT_X_MIN) tx = cx + (SOFT_X_MIN - cx) * SPRING;
+      else if (cx > SOFT_X_MAX) tx = cx + (SOFT_X_MAX - cx) * SPRING;
+      if (cy < SOFT_Y_MIN) ty = cy + (SOFT_Y_MIN - cy) * SPRING;
+      else if (cy > SOFT_Y_MAX) ty = cy + (SOFT_Y_MAX - cy) * SPRING;
+
+      if (tx !== cx || ty !== cy) {
+        cam.scrollX = Math.round(tx - cam.width / (2 * cam.zoom));
+        cam.scrollY = Math.round(ty - cam.height / (2 * cam.zoom));
+      }
+    }
+
     // Keyboard panning
     if (this.cursors) {
       const cam = this.cameras.main;
@@ -424,30 +449,8 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.getMainCamera();
     if (!cam) return;
 
-    if (selectedMap !== "citypack") {
-      cam.scrollX = Math.round(cam.scrollX + data.dx);
-      cam.scrollY = Math.round(cam.scrollY + data.dy);
-      this.npcManager?.refreshActiveBubblePositions();
-      return;
-    }
-
-    const SOFT_X_MIN = 160;
-    const SOFT_X_MAX = 1440;
-    const SOFT_Y_MIN = 80;
-    const SOFT_Y_MAX = 1200;
-    const RESISTANCE = 0.25;
-
-    const cx = cam.scrollX + cam.width / (2 * cam.zoom);
-    const cy = cam.scrollY + cam.height / (2 * cam.zoom);
-
-    const inSoftX = cx >= SOFT_X_MIN && cx <= SOFT_X_MAX;
-    const inSoftY = cy >= SOFT_Y_MIN && cy <= SOFT_Y_MAX;
-
-    const dx = inSoftX ? data.dx : data.dx * RESISTANCE;
-    const dy = inSoftY ? data.dy : data.dy * RESISTANCE;
-
-    cam.scrollX = Math.round(cam.scrollX + dx);
-    cam.scrollY = Math.round(cam.scrollY + dy);
+    cam.scrollX = Math.round(cam.scrollX + data.dx);
+    cam.scrollY = Math.round(cam.scrollY + data.dy);
     this.npcManager?.refreshActiveBubblePositions();
   }
 

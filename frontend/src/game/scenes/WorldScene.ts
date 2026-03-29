@@ -5,11 +5,12 @@ import {
   CENTER_BOUNDS,
   GAME_HEIGHT,
   GAME_WIDTH,
-  MAP_COLS,
-  MAP_ROWS,
+  getMapConfig,
+  selectedMap,
 } from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
 import { ChunkManager } from "../map/ChunkManager";
+import { CitypackChunkManager } from "../map/CitypackChunkManager";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -22,6 +23,10 @@ export class WorldScene extends Phaser.Scene {
   private chunkManager?: ChunkManager;
   private useChunks = false;
 
+  // Citypack procedural map
+  private citypackChunkManager?: CitypackChunkManager;
+  private useCitypackChunks = false;
+
   private phaseOverlay!: Phaser.GameObjects.Rectangle;
   private npcManager!: NPCManager;
   private simEventHandler!: SimEventHandler;
@@ -31,22 +36,42 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    // Try chunk-based infinite map first
-    try {
-      this.chunkManager = new ChunkManager(this);
-      if (this.chunkManager.isReady()) {
-        this.useChunks = true;
-        // Load initial chunks around origin (where the city starts)
-        this.chunkManager.update(this.cameras.main);
+    if (selectedMap === "citypack") {
+      try {
+        this.citypackChunkManager = new CitypackChunkManager(this);
+        if (this.citypackChunkManager.isReady()) {
+          this.useCitypackChunks = true;
+          this.citypackChunkManager.update(this.cameras.main);
+        }
+      } catch (e) {
+        console.warn("CitypackChunkManager failed:", e);
       }
-    } catch (e) {
-      console.warn("ChunkManager failed, falling back to static map:", e);
-      this.useChunks = false;
+    } else if (selectedMap !== "pico8") {
+      try {
+        this.chunkManager = new ChunkManager(this);
+        if (this.chunkManager.isReady()) {
+          this.useChunks = true;
+          this.chunkManager.update(this.cameras.main);
+        }
+      } catch (e) {
+        console.warn("ChunkManager failed, falling back to static map:", e);
+        this.useChunks = false;
+      }
     }
 
-    // Fallback: load static Tiled JSON map
-    if (!this.useChunks) {
+    // Fallback or pico8: load static Tiled JSON map
+    if (!this.useChunks && !this.useCitypackChunks) {
       this.initStaticMap();
+    }
+
+    // Pico-8 map is 440×240px — zoom and center it to fill the canvas
+    if (!this.useChunks && selectedMap === "pico8") {
+      const mc = getMapConfig(); // { tileSize: 8, cols: 55, rows: 30 }
+      const mapPixelW = mc.cols * mc.tileSize; // 440
+      const mapPixelH = mc.rows * mc.tileSize; // 240
+      const zoom = Math.min(GAME_WIDTH / mapPixelW, GAME_HEIGHT / mapPixelH);
+      this.cameras.main.setZoom(zoom);
+      this.cameras.main.centerOn(mapPixelW / 2, mapPixelH / 2);
     }
 
     // Phase-change color overlay (sits above buildings, below NPCs)
@@ -68,8 +93,9 @@ export class WorldScene extends Phaser.Scene {
 
     // ─── NPC System ───
     // When using chunks, the ground grid is relative to CENTER_BOUNDS
-    const gridRowOffset = this.useChunks ? CENTER_BOUNDS.minRow : 0;
-    const gridColOffset = this.useChunks ? CENTER_BOUNDS.minCol : 0;
+    const usesChunks = this.useChunks || this.useCitypackChunks;
+    const gridRowOffset = usesChunks ? CENTER_BOUNDS.minRow : 0;
+    const gridColOffset = usesChunks ? CENTER_BOUNDS.minCol : 0;
     this.npcManager = new NPCManager(
       this,
       this.getBuildingPositions(),
@@ -85,9 +111,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update() {
-    // Update chunk loading/unloading based on camera position
     if (this.useChunks && this.chunkManager) {
       this.chunkManager.update(this.cameras.main);
+    }
+    if (this.useCitypackChunks && this.citypackChunkManager) {
+      this.citypackChunkManager.update(this.cameras.main);
     }
   }
 
@@ -97,20 +125,34 @@ export class WorldScene extends Phaser.Scene {
     const map = this.make.tilemap({ key: "city" });
     this.staticMap = map;
 
-    const tileset = map.addTilesetImage("urban", "urban");
+    const mc = getMapConfig();
+    const tilesetKey = selectedMap === "pico8" ? "pico8" : "urban";
+    // For pico8, the tileset name in the JSON is "city-tileset"; for ccity it's "urban"
+    const tilesetName = selectedMap === "pico8" ? "city-tileset" : "urban";
+    const tileset = map.addTilesetImage(
+      tilesetName,
+      tilesetKey,
+      mc.tileSize,
+      mc.tileSize,
+      0,
+      mc.spacing,
+    );
     if (!tileset) {
       console.error("Failed to load tileset");
       return;
     }
 
-    const groundLayer = map.createLayer("ground", tileset);
+    const groundLayerName = selectedMap === "pico8" ? "Terrain" : "ground";
+    const buildingLayerName = selectedMap === "pico8" ? "Objects" : "buildings";
+
+    const groundLayer = map.createLayer(groundLayerName, tileset);
     if (!groundLayer) {
       console.error("Failed to create ground layer");
       return;
     }
     this.staticGroundLayer = groundLayer;
 
-    const buildingLayer = map.createLayer("buildings", tileset);
+    const buildingLayer = map.createLayer(buildingLayerName, tileset);
     if (!buildingLayer) {
       console.error("Failed to create building layer");
       return;
@@ -122,6 +164,15 @@ export class WorldScene extends Phaser.Scene {
   // ─── Shared tile queries (delegate to chunks or static) ───
 
   getBuildingPositions(): BuildingPositions {
+    if (this.useCitypackChunks && this.citypackChunkManager) {
+      return this.citypackChunkManager.getBuildingPositions(
+        CENTER_BOUNDS.minCol,
+        CENTER_BOUNDS.minRow,
+        CENTER_BOUNDS.maxCol,
+        CENTER_BOUNDS.maxRow,
+      );
+    }
+
     if (this.useChunks && this.chunkManager) {
       return this.chunkManager.getBuildingPositions(
         CENTER_BOUNDS.minCol,
@@ -151,8 +202,9 @@ export class WorldScene extends Phaser.Scene {
     let factoryIdx = 0;
     let houseIdx = 0;
 
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
+    const mc = getMapConfig();
+    for (let r = 0; r < mc.rows; r++) {
+      for (let c = 0; c < mc.cols; c++) {
         const tile = this.staticBuildingLayer.getTileAt(c, r);
         if (!tile) continue;
         const g = tile.index;
@@ -175,6 +227,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   getGroundGrid(): number[][] {
+    if (this.useCitypackChunks && this.citypackChunkManager) {
+      return this.citypackChunkManager.getGroundGrid(
+        CENTER_BOUNDS.minCol,
+        CENTER_BOUNDS.minRow,
+        CENTER_BOUNDS.maxCol,
+        CENTER_BOUNDS.maxRow,
+      );
+    }
+
     if (this.useChunks && this.chunkManager) {
       return this.chunkManager.getGroundGrid(
         CENTER_BOUNDS.minCol,
@@ -185,10 +246,11 @@ export class WorldScene extends Phaser.Scene {
     }
 
     // Static map
+    const mc = getMapConfig();
     const grid: number[][] = [];
-    for (let r = 0; r < MAP_ROWS; r++) {
+    for (let r = 0; r < mc.rows; r++) {
       grid[r] = [];
-      for (let c = 0; c < MAP_COLS; c++) {
+      for (let c = 0; c < mc.cols; c++) {
         const tile = this.staticGroundLayer?.getTileAt(c, r);
         grid[r][c] = tile ? tile.index : 0;
       }
@@ -197,12 +259,17 @@ export class WorldScene extends Phaser.Scene {
   }
 
   isWalkable(col: number, row: number): boolean {
+    if (this.useCitypackChunks && this.citypackChunkManager) {
+      return this.citypackChunkManager.isWalkable(col, row);
+    }
+
     if (this.useChunks && this.chunkManager) {
       return this.chunkManager.isWalkable(col, row);
     }
 
-    // Static map
-    if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return false;
+    // Static map — use actual map dimensions
+    const mc = getMapConfig();
+    if (col < 0 || col >= mc.cols || row < 0 || row >= mc.rows) return false;
     return !this.staticBuildingLayer?.getTileAt(col, row);
   }
 
@@ -236,5 +303,6 @@ export class WorldScene extends Phaser.Scene {
     this.simEventHandler?.destroy();
     this.npcManager?.destroy();
     this.chunkManager?.destroy();
+    this.citypackChunkManager?.destroy();
   }
 }

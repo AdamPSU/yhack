@@ -1,6 +1,7 @@
 import { CENTER_BOUNDS, MAP_COLS, MAP_ROWS } from "../config";
 import type { NPC } from "../entities/NPC";
 import * as Tiles from "../map/TileRegistry";
+import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
 import type { OccupancyGrid } from "./OccupancyGrid";
 
 type WalkableCheck = (col: number, row: number) => boolean;
@@ -24,6 +25,7 @@ const ROAD_TILES = new Set([
   Tiles.SIDEWALK,
   Tiles.CONCRETE,
   Tiles.CONCRETE_ALT,
+  ...CITYPACK_ROAD_TILES,
 ]);
 
 interface ZoneBounds {

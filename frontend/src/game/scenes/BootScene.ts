@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { selectedMap } from "../config";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -30,9 +31,17 @@ export class BootScene extends Phaser.Scene {
     });
     text.setOrigin(0.5);
 
-    // Load Tiled JSON map + CCity tileset image
-    this.load.tilemapTiledJSON("city", "/assets/maps/city.json");
-    this.load.image("urban", "/assets/citymap_tilesets/CCity_mockup.png");
+    // Load map + tileset based on selected map
+    if (selectedMap === "pico8") {
+      this.load.image("pico8", "/assets/citymap_pico8/tilemap_packed.png");
+      this.load.tilemapTiledJSON("city", "/assets/maps/pico8-city.json");
+    } else if (selectedMap === "citypack") {
+      this.load.image("citypack", "/assets/maps/citypack.png");
+      // No tilemapTiledJSON needed — citypack uses procedural ChunkManager only
+    } else {
+      this.load.image("urban", "/assets/citymap_tilesets/CCity_mockup.png");
+      this.load.tilemapTiledJSON("city", "/assets/maps/city.json");
+    }
 
     // Keep old spritesheet for NPC sprites (still uses Kenney RPG Urban Pack)
     this.load.spritesheet("city-tiles", "/assets/tilesets/tilemap_packed.png", {

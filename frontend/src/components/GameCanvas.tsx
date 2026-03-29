@@ -19,7 +19,14 @@ export function GameCanvas() {
 
     async function initGame() {
       const Phaser = await import("phaser");
-      const { createGameConfig } = await import("@/game/config");
+      const { createGameConfig, setSelectedMap } = await import("@/game/config");
+
+      // Read map param from URL and set before Phaser initializes
+      const params = new URLSearchParams(window.location.search);
+      const mapParam = params.get("map");
+      if (mapParam === "pico8" || mapParam === "ccity" || mapParam === "citypack") {
+        setSelectedMap(mapParam);
+      }
 
       // Try to load the real scenes from Agent A's build
       // turbopackOptional suppresses build errors when these files don't exist yet

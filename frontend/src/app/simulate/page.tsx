@@ -75,8 +75,8 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
     <div
       className="pointer-events-none absolute z-50"
       style={{
-        left: info.x * SCALE_FACTOR + 16,
-        top: info.y * SCALE_FACTOR - 4,
+        left: info.x + 16,
+        top: info.y - 4,
       }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
@@ -147,8 +147,8 @@ function SimulateContent() {
               npcId: npc.id,
               agentName: npc.name,
               message: npc.message,
-              x: npc.x * SCALE_FACTOR,
-              y: npc.y * SCALE_FACTOR,
+              x: npc.x,
+              y: npc.y,
             });
           } else {
             next.delete(npc.id);

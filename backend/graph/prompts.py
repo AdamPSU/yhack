@@ -284,3 +284,58 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   "insights": ["insight 1", "insight 2", "insight 3"]
 }}
 </output_format>"""
+
+ECONOMIC_REPORT_PROMPT = """\
+You are an economic reporter writing the final post-game summary for a simulation about how a policy affected a small town.
+
+<task>
+Write a concise but concrete report about how the policy affected people's livelihoods, the town's mood, and the biggest downstream impacts. Use the simulation evidence below. Do not invent metrics or events that are not supported by the evidence.
+</task>
+
+<focus>
+- Explain how ordinary people ended up feeling.
+- Emphasize jobs, prices, business pressure, and household livelihood effects.
+- Surface the most important winners, losers, and mixed outcomes.
+- Mention social spillovers only when they materially matter to the economic story.
+</focus>
+
+<objective>
+{objective}
+</objective>
+
+<policy_summary>
+{policy_summary}
+</policy_summary>
+
+<simulation_aggregates>
+{aggregate_summary}
+</simulation_aggregates>
+
+<trend_context>
+{trend_context}
+</trend_context>
+
+<notable_event_samples>
+{event_samples}
+</notable_event_samples>
+
+<output_format>
+Respond ONLY with valid JSON (no markdown fences, no commentary):
+{{
+  "headline": "short headline",
+  "summary": "2-4 sentence executive summary",
+  "livelihood_impact": "2-4 sentence explanation of how people's day-to-day economic lives were affected",
+  "top_impacts": [
+    {{
+      "title": "short impact title",
+      "description": "1-2 sentence explanation",
+      "direction": "positive|negative|mixed",
+      "severity": "low|medium|high"
+    }}
+  ],
+  "notable_events": [
+    "short bullet-style sentence",
+    "short bullet-style sentence"
+  ]
+}}
+</output_format>"""

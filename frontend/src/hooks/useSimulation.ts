@@ -8,9 +8,10 @@ import {
   updateMetrics,
 } from "@/lib/metricsEngine";
 import { generateMockSimulation } from "@/mocks/mockBackend";
-import { connectSimulation } from "@/services/wsClient";
+import { connectSimulation, fetchEconomicReport } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
 import type {
+  EconomicReport,
   BackendInfluenceEvent,
   BackendNPC,
   BackendRelationship,
@@ -103,6 +104,9 @@ export function useSimulation(simulationId?: string, record = false) {
     influenceEvents: [],
     version: 0,
   });
+  const [report, setReport] = useState<EconomicReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const recordingRef = useRef<SavedSimulation | null>(null);
@@ -114,6 +118,7 @@ export function useSimulation(simulationId?: string, record = false) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxRoundsRef = useRef(15);
   const lastPhaseRef = useRef(0);
+  const reportRequestedRef = useRef(false);
 
   const drainQueue = useCallback(() => {
     const queue = eventQueueRef.current;
@@ -297,6 +302,10 @@ export function useSimulation(simulationId?: string, record = false) {
       influenceEvents: [],
       version: 0,
     });
+    setReport(null);
+    setReportLoading(false);
+    setReportError(null);
+    reportRequestedRef.current = false;
 
     // ── Mock backend path ──────────────────────────────────
     if (USE_MOCK) {
@@ -457,6 +466,10 @@ export function useSimulation(simulationId?: string, record = false) {
         influenceEvents: [],
         version: 0,
       });
+      setReport(null);
+      setReportLoading(false);
+      setReportError(null);
+      reportRequestedRef.current = false;
 
       maxRoundsRef.current = recording.maxRounds || recording.rounds.length;
       const lookup = npcLookupRef.current;
@@ -496,6 +509,33 @@ export function useSimulation(simulationId?: string, record = false) {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      !simulationId ||
+      USE_MOCK ||
+      !state.isComplete ||
+      reportRequestedRef.current
+    ) {
+      return;
+    }
+
+    reportRequestedRef.current = true;
+    setReportLoading(true);
+    setReportError(null);
+
+    fetchEconomicReport(simulationId)
+      .then((data) => {
+        setReport(data);
+      })
+      .catch((error: Error) => {
+        console.error("[sim] economic report error:", error);
+        setReportError(error.message);
+      })
+      .finally(() => {
+        setReportLoading(false);
+      });
+  }, [simulationId, state.isComplete]);
+
   const getNpc = useCallback((id: string) => npcLookupRef.current.get(id), []);
 
   return {
@@ -505,5 +545,8 @@ export function useSimulation(simulationId?: string, record = false) {
     getRecording,
     graphData,
     getNpc,
+    report,
+    reportLoading,
+    reportError,
   };
 }

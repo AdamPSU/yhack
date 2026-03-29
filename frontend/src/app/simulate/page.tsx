@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
+import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
@@ -177,9 +178,9 @@ function SimulateContent() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
-  const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
-    DEFAULT_OVERLAY_METRICS,
-  );
+  const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(DEFAULT_OVERLAY_METRICS);
+  const [showReport, setShowReport] = useState(false);
+  const reportShownRef = useRef(false);
 
   // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
@@ -387,11 +388,27 @@ function SimulateContent() {
   // Close graph modal on ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowGraph(false);
+      if (e.key === "Escape") {
+        setShowGraph(false);
+        setShowReport(false);
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!sim.isComplete) {
+      reportShownRef.current = false;
+      setShowReport(false);
+      return;
+    }
+    if (reportShownRef.current) return;
+    if (sim.reportLoading || sim.report) {
+      reportShownRef.current = true;
+      setShowReport(true);
+    }
+  }, [sim.isComplete, sim.reportLoading, sim.report]);
 
   // Camera zoom via scroll wheel
   useEffect(() => {
@@ -478,6 +495,17 @@ function SimulateContent() {
               <span className="text-[9px] font-pixel text-teal-400 neon-text-teal">
                 COMPLETE
               </span>
+              <button
+                type="button"
+                onClick={() => setShowReport(true)}
+                className="text-[9px] font-mono text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
+              >
+                {sim.reportLoading
+                  ? "[Report...]"
+                  : sim.report
+                    ? "[Report]"
+                    : "[Report Pending]"}
+              </button>
               {sim.getRecording() && (
                 <button
                   type="button"
@@ -679,6 +707,15 @@ function SimulateContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {showReport && (
+        <EconomicReportModal
+          report={sim.report}
+          loading={sim.reportLoading}
+          error={sim.reportError}
+          onClose={() => setShowReport(false)}
+        />
       )}
     </div>
   );

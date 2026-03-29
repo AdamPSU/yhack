@@ -43,6 +43,9 @@ class SimEvent(BaseModel):
 SourceKind = Literal["pdf", "csv"]
 SourceStatus = Literal["ready"]
 TrendDirection = Literal["up", "down", "flat", "unknown"]
+ReportDirection = Literal["positive", "negative", "mixed"]
+ReportSeverity = Literal["low", "medium", "high"]
+ReportTrend = Literal["up", "down", "flat", "mixed"]
 
 
 class IndicatorSnapshot(BaseModel):
@@ -139,3 +142,55 @@ class NPCRoundResponseV2(BaseModel):
 class ReflectionResponse(BaseModel):
     """Structured response from an NPC's reflection phase."""
     insights: list[str]
+
+
+class ReportImpact(BaseModel):
+    title: str
+    description: str
+    direction: ReportDirection
+    severity: ReportSeverity
+
+
+class ReportStat(BaseModel):
+    label: str
+    value: str
+    trend: ReportTrend | None = None
+
+
+class ChartSlice(BaseModel):
+    label: str
+    value: int = Field(ge=0)
+
+
+class BarChartEntry(BaseModel):
+    label: str
+    value: int = Field(ge=0)
+
+
+class PieChartData(BaseModel):
+    title: str
+    slices: list[ChartSlice]
+
+
+class BarChartData(BaseModel):
+    title: str
+    bars: list[BarChartEntry]
+
+
+class EconomicReportNarrative(BaseModel):
+    headline: str
+    summary: str
+    livelihood_impact: str
+    top_impacts: list[ReportImpact]
+    notable_events: list[str]
+
+
+class EconomicReportResponse(BaseModel):
+    headline: str
+    summary: str
+    livelihood_impact: str
+    top_impacts: list[ReportImpact]
+    key_stats: list[ReportStat]
+    pie_chart: PieChartData
+    bar_chart: BarChartData
+    notable_events: list[str]

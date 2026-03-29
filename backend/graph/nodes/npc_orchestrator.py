@@ -176,9 +176,10 @@ async def generate_npcs(state: SimState) -> dict:
     logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
 
     used_names: set[str] = {c.get("name", "") for c in extracted if c.get("name")}
-    npcs: list[dict] = []
+    
+    # Process extracted NPCs to have base attributes for personality generation
+    npc_bases: list[dict] = []
     for i, char in enumerate(extracted):
-        char["id"] = f"npc_{i + 1:02d}"
         char.setdefault("gender", random.choice(["male", "female", "nonbinary"]))
         char.setdefault("mbti", random.choice(_MBTI_TYPES))
         char.setdefault("country", "USA")
@@ -187,39 +188,38 @@ async def generate_npcs(state: SimState) -> dict:
         char.setdefault("x", random.randint(0, MAX_X))
         char.setdefault("y", random.randint(0, MAX_Y))
         char.setdefault("mood", random.choice(_MOODS))
-        char.setdefault("bio", "A longtime Millfield resident.")
-        char.setdefault("persona", "Speaks plainly when they have something to say.")
-        char.setdefault("profession", char.pop("role", "local resident"))
-        char.setdefault("interested_topics", ["local economy"])
-        char.setdefault("beliefs", ["Honesty is the best policy.", "Hard work pays off."])
-        char.setdefault("controversial_ideas", [])
-        char.setdefault("category", "resident")
-        char["reputation"] = _initial_reputation(char)
-        npcs.append(char)
-        if callback:
-            await callback(char)
+        char.setdefault("bio", "A resident of Millfield.")
+        npc_bases.append(char)
 
-    needed = num_npcs - len(npcs)
+    needed = num_npcs - len(npc_bases)
     if needed > 0:
-        logger.info("generate_npcs: generating %d random NPCs …", needed)
-        bases = [_random_base(len(npcs) + i, used_names) for i in range(needed)]
-        tasks = [
-            asyncio.ensure_future(_generate_personality(b, entities_json, llm))
-            for b in bases
-        ]
-        slot_offset = len(npcs)
-        for i, future in enumerate(asyncio.as_completed(tasks)):
-            npc = await future
-            npc["id"] = f"npc_{slot_offset + i + 1:02d}"
-            npc.setdefault("profession", "local resident")
-            npc.setdefault("interested_topics", ["local economy"])
-            npc.setdefault("beliefs", ["Honesty is the best policy.", "Hard work pays off."])
-            npc.setdefault("controversial_ideas", [])
-            npc.setdefault("category", "resident")
-            npc["reputation"] = _initial_reputation(npc)
-            npcs.append(npc)
-            if callback:
-                await callback(npc)
+        logger.info("generate_npcs: generating %d random NPC bases …", needed)
+        npc_bases.extend([_random_base(len(npc_bases) + i, used_names) for i in range(needed)])
+
+    logger.info("generate_npcs: generating personalities for %d NPCs …", len(npc_bases))
+    tasks = [
+        asyncio.ensure_future(_generate_personality(b, entities_json, llm))
+        for b in npc_bases
+    ]
+    
+    npcs: list[dict] = []
+    # Using enumerate with as_completed results in unordered IDs, which is fine, but we should make sure they are unique
+    for i, future in enumerate(asyncio.as_completed(tasks)):
+        npc = await future
+        npc["id"] = f"npc_{i + 1:02d}"
+        npc.setdefault("country", "USA")
+        npc.setdefault("profession", "local resident")
+        npc.setdefault("interested_topics", ["local economy"])
+        # Ensure LLM-provided beliefs and controversial ideas are captured, fallback only if missing
+        if not npc.get("beliefs"):
+            npc["beliefs"] = ["Community matters.", "Economic stability is key."]
+        if not npc.get("controversial_ideas"):
+            npc["controversial_ideas"] = []
+        npc.setdefault("category", "resident")
+        npc["reputation"] = _initial_reputation(npc)
+        npcs.append(npc)
+        if callback:
+            await callback(npc)
 
     logger.info("generate_npcs: generating relationships …")
     rel_llm = get_llm(max_tokens=2048, model=settings.fast_model_name)

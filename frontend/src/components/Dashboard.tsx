@@ -15,7 +15,8 @@ interface DashboardProps {
   metrics: SimMetrics;
   metricsHistory: SimMetrics[];
   phase: number;
-  month: number;
+  round: number;
+  maxRounds: number;
 }
 
 /* ─── Severity helpers ─── */
@@ -82,7 +83,8 @@ export function Dashboard({
   metrics,
   metricsHistory,
   phase,
-  month,
+  round,
+  maxRounds,
 }: DashboardProps) {
   return (
     <div
@@ -104,7 +106,7 @@ export function Dashboard({
           className="text-[10px] font-mono tabular-nums uppercase tracking-widest"
           style={{ color: "#8B7355" }}
         >
-          Month {month || "-"}
+          Round {round}/{maxRounds}
         </span>
       </div>
 

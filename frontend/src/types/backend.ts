@@ -56,8 +56,6 @@ export interface BackendNPC {
   mood: BackendMood;
   // Internal state from generative agents architecture (populated after round 1+)
   perception?: string;
-  social_strategy?: string;
-  emotional_reaction?: string;
   current_plan?: string;
 }
 
@@ -72,8 +70,6 @@ export interface BackendSimEvent {
 export interface BackendRelationship {
   source_id: string;
   target_id: string;
-  rel_type: BackendRelType;
-  strength: number; // 0-1
   affinity: number; // -1 to 1
   trust: number; // 0-1
 }

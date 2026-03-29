@@ -65,34 +65,20 @@ export function classifyEventType(
 export function roundToPhase(
   round: number,
   maxRounds: number,
-): { phase: number; month: number } {
+): { phase: number } {
   const third = Math.max(1, Math.floor(maxRounds / 3));
 
   let phase: number;
-  let phaseProgress: number;
 
   if (round < third) {
     phase = 1;
-    phaseProgress = round / third;
   } else if (round < third * 2) {
     phase = 2;
-    phaseProgress = (round - third) / third;
   } else {
     phase = 3;
-    phaseProgress = Math.min(
-      1,
-      (round - third * 2) / Math.max(1, maxRounds - third * 2),
-    );
   }
 
-  // Each phase spans 3 months: P1=1-3, P2=4-6, P3=7-9
-  const baseMonth = (phase - 1) * 3 + 1;
-  const month = Math.min(
-    baseMonth + 2,
-    Math.floor(baseMonth + phaseProgress * 2),
-  );
-
-  return { phase, month };
+  return { phase };
 }
 
 /**
@@ -111,7 +97,7 @@ export function adaptEvent(
   const eventType = classifyEventType(backendEvent, npc);
   if (eventType === null) return null;
 
-  const { phase, month } = roundToPhase(round, maxRounds);
+  const { phase } = roundToPhase(round, maxRounds);
 
   return {
     id: `${backendEvent.npc_id}-${round}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -121,7 +107,8 @@ export function adaptEvent(
     agentCategory: npc.category,
     message: backendEvent.message,
     phase,
-    month,
+    round,
+    maxRounds,
     timestamp: Date.now(),
   };
 }

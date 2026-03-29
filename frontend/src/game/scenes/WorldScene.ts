@@ -463,7 +463,7 @@ export class WorldScene extends Phaser.Scene {
     this.npcManager?.refreshActiveBubblePositions();
   }
 
-  private onPhaseChange(data: { phase: number; month: number }) {
+  private onPhaseChange(data: { phase: number; round: number }) {
     const overlay = this.phaseOverlay;
     if (!this.sceneReady || this.cleanedUp || !overlay) return;
 

@@ -100,7 +100,8 @@ MBTI: {mbti}
 </policy_context>
 
 <task>
-Given these fixed attributes, write this person's personality. Their profession and interests should be grounded in the policy world above.
+Given these fixed attributes, write this person's personality. Their profession and interests should be grounded in the policy world above. 
+BE SPECIFIC. Avoid generic traits. Give them unique, potentially polarizing beliefs and at least one controversial idea they truly believe in (even if they keep it secret).
 </task>
 
 <output_format>
@@ -109,9 +110,9 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   "category": "short social/economic role label, e.g. 'factory worker', 'small business owner', 'retiree'",
   "profession": "specific job title",
   "bio": "2-3 sentences of life history grounded in this town and the policy context",
-  "persona": "how they come across to others — speech style, mannerisms, reputation",
-  "beliefs": ["core personal belief 1", "core personal belief 2"],
-  "controversial_ideas": ["an idea they have that might polarize others, if any"],
+  "persona": "how they come across to others — speech style, mannerisms, reputation. Mention how their MBTI affects their communication.",
+  "beliefs": ["a core value they hold", "a specific opinion about the policy", "a personal philosophy"],
+  "controversial_ideas": ["an idea they have that might polarize others, or something they are afraid to say in public"],
   "interested_topics": ["topic1", "topic2", "topic3"]
 }}
 </output_format>"""
@@ -128,10 +129,8 @@ Given the list of NPCs below, generate a realistic set of relationships (approxi
 </npcs>
 
 <requirements>
-<req>Types: "friend", "family", "employer", "neighbor", "colleague"</req>
-<req>Strength 0.0–1.0: how much influence they have on each other</req>
 <req>Each NPC should have at least 1 relationship</req>
-<req>Cluster by profession/industry for colleague/employer ties, by proximity for neighbor ties</req>
+<req>Cluster by profession/industry for potential coworker ties, by proximity for potential neighbor ties</req>
 </requirements>
 
 <output_format>
@@ -140,9 +139,7 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   "relationships": [
     {{
       "source_id": "npc_01",
-      "target_id": "npc_02",
-      "rel_type": "friend|family|employer|neighbor|colleague",
-      "strength": 0.7
+      "target_id": "npc_02"
     }}
   ]
 }}
@@ -218,17 +215,24 @@ Let this shape what you pay attention to and what you talk about, if relevant to
 
 _NPC_ACTION_TYPES = """\
 <action_types>
-<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). Prefer talking to friends, family, or colleagues over strangers when possible. IMPORTANT: The "message" field must be the ACTUAL DIALOGUE — the exact words you say OUT LOUD, in first person, in your own voice and speech style. NOT a narration or summary. Write it like a line in a screenplay. Examples: "Hey Frank, you hear about these tariffs? Could mean overtime for us.", "I swear if they touch my pension I'm walking out.", "Mama, they're bringing jobs back to the mill!"</action>
-<action type="move">Move to any tile on the map (costs your round). Consider moving toward people you care about who aren't nearby yet — check the distant_connections section for directions. The "message" field should describe WHERE you're heading and WHY, e.g. "Heading over to the union hall to see what the guys think."</action>
-<action type="protest">Organize or join a protest. Describe the sign/chant. The "message" field should be vivid — what you're shouting, what your sign says.</action>
-<action type="price_change">If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason. The "message" field should explain the change in your own words.</action>
-<action type="mood_shift">Your mood changes. Include old_mood, new_mood, and the trigger. The "message" field should capture your inner monologue — what you're feeling, not a clinical description.</action>
+<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). 
+- The "message" field must be the ACTUAL DIALOGUE — the exact words you say OUT LOUD, in first person.
+- DIALOGUE RULES:
+  - Stay strictly in character according to your MBTI, persona, and bio.
+  - If you have controversial ideas or strong beliefs, let them leak into your speech if you trust the person, or hide them if you are protecting your reputation.
+  - Your reputation (0-1) dictates how confident or deferential you are. High reputation = authoritative/respected. Low reputation = defensive/ignored.
+  - Use specific vocabulary related to your profession and interests.
+</action>
+<action type="move">Move to any tile on the map. Description in FIRST PERSON, e.g. "I'm heading to the mill to check on the night shift."</action>
+<action type="protest">Join/organize a protest. Describe FIRST PERSON: "I'm holding my sign high, shouting 'No more cuts!'"</action>
+<action type="price_change">Business owners only. Describe FIRST PERSON: "I'm marking up the bread by 50 cents, it's getting too expensive to bake."</action>
+<action type="mood_shift">Internal shift. Describe FIRST PERSON: "I feel a weight lifting as I realize I'm not alone in this."</action>
 </action_types>
 
 <style_rules>
-CRITICAL: Never write the "message" field as a third-person summary like "X discusses Y with Z" or "X's mood shifts to hopeful." Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and speech patterns.
+CRITICAL: Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and MBTI speech patterns.
 Set is_controversial to true ONLY if you are expressing an idea that is likely to polarize others, challenge the status quo, or damage your reputation in some circles.
-</style_rules>"""
+</style_rules>""""""
 
 _NPC_DATA_FIELDS = """\
 Data fields by event_type:
@@ -258,18 +262,13 @@ NPC_ROUND_PROMPT_V2 = f"""\
 <instructions>
 Think through these steps as this character:
 
-<step name="perceive">What stands out to you about the current situation? Consider the policy, people around you, and your memories of what has happened so far. Reference specific memories when relevant.</step>
-
-<step name="social_strategy">
-Consider your reputation and the people nearby. 
-- Who do you like (high affinity)? Who do you distrust? 
+<step name="perceive">
+- What stands out to you about the current situation? 
+- How do you emotionally respond? 
+- What is your social strategy? Consider your reputation and the people nearby (who do you like/trust?). 
 - Is it better to be honest and risk your reputation, or lie/pander to gain social capital?
-- If you have a controversial plan or idea, how will you frame it? Will you share it now or wait?
-- Will you attempt to manipulate someone, or build a genuine bond?
-- How will this interaction affect your reputation in the eyes of the person you are talking to and the wider town?
+- Reference specific memories when relevant.
 </step>
-
-<step name="react">How do you emotionally respond? Consider your personality, income, political views, social connections, and what you remember. Does anything unexpected conflict with your plan?</step>
 
 <step name="plan_check">Does anything that happened change your plans? If so, state your revised plan. If not, leave plan_update as null.</step>
 
@@ -281,9 +280,7 @@ Consider your reputation and the people nearby.
 <output_format>
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{{{
-  "perception": "what you notice and think about the current situation",
-  "social_strategy": "your internal reasoning for how you interact with others this round",
-  "emotional_reaction": "your emotional and internal response",
+  "perception": "your perception of the situation, your emotional reaction, and your social strategy",
   "plan_update": null,
   "events": [
     {{{{

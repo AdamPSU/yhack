@@ -757,7 +757,8 @@ function SimulateContent() {
             metrics={sim.metrics}
             metricsHistory={sim.metricsHistory}
             phase={sim.phase}
-            month={sim.month}
+            round={sim.round}
+            maxRounds={sim.maxRounds}
           />
         </div>
       </div>

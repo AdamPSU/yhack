@@ -4,9 +4,9 @@
   --background: #060010;
   --foreground: #f0e6d2;
   --accent: #ffffff;
-  --surface: #100C08;
+  --surface: #000000;
   --border: rgba(255, 255, 255, 0.5);
-  --panel-bg: #100C08;
+  --panel-bg: #000000;
   --muted: #888888;
 }
 
@@ -20,6 +20,7 @@
   --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-press-start-2p);
 }
 
 body {
@@ -73,39 +74,42 @@ body {
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: var(--border);
+  background: transparent;
   outline: none;
   cursor: pointer;
 }
 .rpg-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
+  width: 12px;
+  height: 20px;
+  border-radius: 1px;
   background: #ffffff;
-  border: 2px solid #aaaaaa;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+  border: 1px solid #666;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
   cursor: pointer;
+  margin-top: -7px; /* Centers thumb on track */
 }
 .rpg-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
+  width: 12px;
+  height: 20px;
+  border-radius: 1px;
   background: #ffffff;
-  border: 2px solid #aaaaaa;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+  border: 1px solid #666;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
   cursor: pointer;
 }
 .rpg-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 3px;
   background: var(--border);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 .rpg-slider::-moz-range-track {
   height: 6px;
   border-radius: 3px;
   background: var(--border);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
 /* Pixel-crisp rendering hint */

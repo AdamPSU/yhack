@@ -6,7 +6,7 @@ const NodeCanvas = dynamic(() => import('./index'), { ssr: false });
 
 export default function NodeCanvasClient() {
   return (
-    <div style={{ width: '100%', height: 500 }}>
+    <div style={{ width: '100%', height: 420 }}>
       <NodeCanvas />
     </div>
   );

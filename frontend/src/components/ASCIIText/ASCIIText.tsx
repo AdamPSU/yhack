@@ -1,5 +1,3 @@
-'use client';
-
 // Component ported and enhanced from https://codepen.io/JuanFuentes/pen/eYEeoyE
 
 import { useEffect, useRef } from 'react';
@@ -37,10 +35,9 @@ void main() {
     float time = uTime;
     vec2 pos = vUv;
 
-    float move = sin(time + mouse) * 0.01;
-    float r = texture2D(uTexture, pos + cos(time * 2. - time + pos.x) * .01).r;
-    float g = texture2D(uTexture, pos + tan(time * .5 + pos.x - time) * .01).g;
-    float b = texture2D(uTexture, pos - cos(time * 2. + time + pos.y) * .01).b;
+    float r = texture2D(uTexture, pos + cos(time * 2. - time + pos.x) * .005).r;
+    float g = texture2D(uTexture, pos + tan(time * .5 + pos.x - time) * .005).g;
+    float b = texture2D(uTexture, pos - cos(time * 2. + time + pos.y) * .005).b;
     float a = texture2D(uTexture, pos).a;
     gl_FragColor = vec4(r, g, b, a);
 }
@@ -139,7 +136,6 @@ class AsciiFilter {
       this.pre.style.transform = 'translate(-50%, -50%)';
       this.pre.style.zIndex = '9';
       this.pre.style.backgroundAttachment = 'fixed';
-      this.pre.style.mixBlendMode = 'difference';
     }
   }
 
@@ -598,17 +594,19 @@ export default function ASCIIText({
           margin: 0;
           user-select: none;
           padding: 0;
-          line-height: 1em;
-          text-align: left;
+          line-height: 1.1em;
           position: absolute;
-          left: 0;
-          top: 0;
-          background-image: linear-gradient(135deg, #e879f9 0%, #a855f7 40%, #818cf8 70%, #60a5fa 100%);
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          text-align: center;
+          width: auto;
+          white-space: pre;
+          background-image: linear-gradient(to right, #e879f9, #a855f7, #60a5fa);
           background-attachment: fixed;
           -webkit-text-fill-color: transparent;
           -webkit-background-clip: text;
           z-index: 9;
-          mix-blend-mode: difference;
         }
       `}</style>
     </div>

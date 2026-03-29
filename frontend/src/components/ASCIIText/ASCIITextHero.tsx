@@ -21,18 +21,24 @@ const techLogos = [
 export default function ASCIITextHero() {
   return (
     <div className="flex flex-col items-center">
-      <div style={{ position: 'relative', width: '100%', height: '160px', filter: 'drop-shadow(0 0 30px rgba(255,255,255,0.5)) drop-shadow(0 0 80px rgba(255,255,255,0.2)) drop-shadow(0 0 140px rgba(255,255,255,0.1))' }}>
+      <div style={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: '160px', 
+        zIndex: 100,
+        filter: 'drop-shadow(0 0 30px rgba(255,255,255,0.5)) drop-shadow(0 0 80px rgba(255,255,255,0.2)) drop-shadow(0 0 140px rgba(255,255,255,0.1))' 
+      }}>
         <ASCIIText
           text="SIMULACRA"
           enableWaves
           asciiFontSize={8}
-          textFontSize={200}
+          textFontSize={300}
           textColor="#ffffff"
-          planeBaseHeight={8}
+          planeBaseHeight={10}
         />
       </div>
       <div 
-        className="w-[360px] mt-[-15px] opacity-40 hover:opacity-100 transition-opacity"
+        className="w-[360px] mt-0 opacity-40 hover:opacity-100 transition-opacity"
         style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.4))' }}
       >
         <LogoLoop
@@ -43,7 +49,7 @@ export default function ASCIITextHero() {
           gap={40}
           hoverSpeed={0}
           fadeOut
-          fadeOutColor="#1a1510"
+          fadeOutColor="#060010"
         />
       </div>
     </div>

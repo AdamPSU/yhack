@@ -8,7 +8,7 @@ export default function RunNode() {
   const canRun = text.trim().length >= 20;
 
   return (
-    <NodeWrapper badge="04" title="RUN" hasSource={false}>
+    <NodeWrapper badge="04" title="RUN" description="Go." hasSource={false}>
       <div className="nodrag nopan flex flex-col items-center gap-3 py-2" style={{ width: 120 }}>
         <button
           type="button"
@@ -18,7 +18,7 @@ export default function RunNode() {
         >
           ▶
         </button>
-        <span className="text-[9px] font-mono text-white/30 text-center">
+        <span className="text-[9px] font-mono text-white/60 text-center">
           {canRun ? 'READY' : `${Math.max(0, 20 - text.trim().length)} chars needed`}
         </span>
       </div>

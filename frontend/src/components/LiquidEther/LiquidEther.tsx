@@ -132,7 +132,7 @@ export default function LiquidEther({
       delta = 0;
       container: HTMLElement | null = null;
       renderer: THREE.WebGLRenderer | null = null;
-      clock: THREE.Clock | null = null;
+      clock: THREE.Timer | null = null;
       init(container: HTMLElement) {
         this.container = container;
         this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -147,8 +147,7 @@ export default function LiquidEther({
         el.style.width = '100%';
         el.style.height = '100%';
         el.style.display = 'block';
-        this.clock = new THREE.Clock();
-        this.clock.start();
+        this.clock = new THREE.Timer();
       }
       resize() {
         if (!this.container) return;
@@ -160,8 +159,9 @@ export default function LiquidEther({
       }
       update() {
         if (!this.clock) return;
+        this.clock.update();
         this.delta = this.clock.getDelta();
-        this.time += this.delta;
+        this.time = this.clock.getElapsed();
       }
     }
     const Common = new CommonClass();

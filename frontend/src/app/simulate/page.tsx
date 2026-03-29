@@ -1,21 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AuroraLayer } from "@/components/ui/aurora-background";
-import { AnimatePresence, motion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
-import LogoLoop from "@/components/LogoLoop/LogoLoop";
-import { NPCProfileModal } from "@/components/NPCProfileModal";
-import { Particles } from "@/components/Particles/Particles";
+import { NPCInteractionModal } from "@/components/NPCInteractionModal";
+import { StatsLegend } from "@/components/StatsLegend";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
-import { simulacraTechLogos } from "@/lib/simulacraTechLogos";
 import type { NPCHoverInfo, SimEvent } from "@/types";
 
 const SocialGraph = dynamic(
@@ -170,19 +165,13 @@ function SimulateContent() {
 
   const handleEventClick = useCallback((event: SimEvent) => {
     setSelectedNpcId(event.agentId);
-    // Removed automatic camera snap to allow manual control
-    /*
-    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-      eventBridge.emitCameraSnapToNPC(event.agentId);
-    });
-    */
   }, []);
 
   const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [showEntryCurtain, setShowEntryCurtain] = useState(true);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [focusScale, setFocusScale] = useState(1);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
@@ -191,11 +180,18 @@ function SimulateContent() {
   const [showReport, setShowReport] = useState(false);
   const reportShownRef = useRef(false);
 
-  // Dismiss entry curtain shortly after first render
   useEffect(() => {
-    const t = setTimeout(() => setShowEntryCurtain(false), 80);
-    return () => clearTimeout(t);
-  }, []);
+    if (focusMode) {
+      setFocusScale(
+        Math.max(
+          window.innerWidth / GAME_WIDTH,
+          window.innerHeight / GAME_HEIGHT,
+        ),
+      );
+    } else {
+      setFocusScale(1);
+    }
+  }, [focusMode]);
 
   // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
@@ -437,23 +433,11 @@ function SimulateContent() {
   if (!simulationId && !isMock && !isReplay) {
     return (
       <div
-        className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6"
+        className="flex min-h-screen flex-col items-center justify-center px-6"
         style={{ background: "#4a7a3b" }}
       >
-        <div className="pointer-events-none absolute inset-0 z-[1]">
-          <Particles
-            variant="rain"
-            className="h-full w-full min-h-0"
-            quantity={88}
-            color="#3D3E45"
-            alphaMin={0.08}
-            alphaMax={0.2}
-            vx={0.18}
-            vy={0.22}
-          />
-        </div>
         <div
-          className="relative z-10 flex max-w-md flex-col items-center gap-4 p-8 text-center"
+          className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
           style={{
             background: "#F5E6C8",
             border: "4px solid #6B4226",
@@ -495,58 +479,13 @@ function SimulateContent() {
 
   return (
     <div
-      className="relative isolate flex h-screen flex-col overflow-hidden"
+      className="relative flex h-screen flex-col overflow-clip"
+      style={{ background: "#4a7a3b" }}
       data-testid="simulate-page"
     >
-      {/* ── Background image (bottom layer) ─────────────────── */}
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <Image
-          src="/background.png"
-          alt=""
-          fill
-          priority
-          className="object-cover object-bottom pixel-crisp"
-        />
-      </div>
-
-      {/* ── Aurora background effect ─────────────────────────── */}
-      <AuroraLayer className="z-[3]" showRadialGradient={false} />
-
-      {/* ── Entry slide curtain ──────────────────────────────── */}
-      <AnimatePresence>
-        {showEntryCurtain && (
-          <motion.div
-            key="entry-curtain"
-            className="fixed inset-0 z-[300]"
-            style={{ background: "#1a1208" }}
-            initial={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ duration: 0.45, ease: [0.76, 0, 0.24, 1] }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ── Subtle dust layer (drifting dots) ──────────────────── */}
-      <div
-        className={`pointer-events-none absolute inset-0 z-[4] ${focusMode ? "hidden" : ""}`}
-        aria-hidden
-      >
-        <Particles
-          variant="dust"
-          className="h-full w-full min-h-0"
-          quantity={70}
-          color="#FDF5E6"
-          alphaMin={0.04}
-          alphaMax={0.12}
-          size={0.5}
-          vx={0.04}
-          vy={0.02}
-        />
-      </div>
-
       {/* Phase indicator bar */}
       <div
-        className={`relative z-30 rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4 panel-slide-top ${focusMode ? "panel-hidden-top" : ""}`}
+        className={`rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4 panel-slide-top ${focusMode ? "panel-hidden-top" : ""}`}
         style={{ background: "#E8D5A3", borderBottom: "3px solid #6B4226" }}
         data-testid="phase-bar"
       >
@@ -668,7 +607,7 @@ function SimulateContent() {
       </div>
 
       {/* Main layout */}
-      <div className="relative z-20 flex min-h-0 flex-1 gap-2 overflow-hidden p-2">
+      <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
         <div
           className={`rpg-panel flex h-full w-64 shrink-0 flex-col panel-slide-left ${focusMode ? "panel-hidden-left" : ""}`}
@@ -709,10 +648,19 @@ function SimulateContent() {
         >
           <div
             ref={canvasContainerRef}
-            className="relative w-full h-full"
+            className="relative shrink-0 canvas-glow canvas-expand"
             style={{
               border: "3px solid #6B4226",
               borderRadius: 4,
+              ...(focusMode
+                ? {
+                    transform: `scale(${focusScale})`,
+                    transformOrigin: "center center",
+                    border: "none",
+                    padding: 0,
+                    boxShadow: "none",
+                  }
+                : {}),
             }}
           >
             <GameCanvas />
@@ -760,17 +708,6 @@ function SimulateContent() {
               </button>
             </div>
 
-            {/* Dashboard overlay - positioned on bottom right */}
-            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
-              <Dashboard
-                metrics={sim.metrics}
-                metricsHistory={sim.metricsHistory}
-                phase={sim.phase}
-                round={sim.round}
-                maxRounds={sim.maxRounds}
-              />
-            </div>
-
             {/* NPC hover tooltip */}
             {hoverInfo && (
               <div
@@ -793,37 +730,16 @@ function SimulateContent() {
         </div>
       </div>
 
-      <footer
-        className={`relative z-30 flex shrink-0 justify-center border-t-[3px] border-[#6B4226] bg-[#E8D5A3] px-2 py-1.5 ${focusMode ? "hidden" : ""}`}
-      >
-        <div className="w-full max-w-3xl text-[#5B3A1E] [&_svg]:shrink-0 [&_a]:opacity-95 [&_a:hover]:opacity-70">
-          <LogoLoop
-            logos={simulacraTechLogos}
-            speed={44}
-            direction="left"
-            logoHeight={18}
-            gap={30}
-            hoverSpeed={0}
-            fadeOut
-            fadeOutColor="#E8D5A3"
-            ariaLabel="Built with"
-          />
-        </div>
-      </footer>
-
+      {/* Viewport-fixed dashboard so it stays fully visible instead of being clipped by the canvas area */}
       <div
-        className={`pointer-events-none absolute inset-0 z-[25] ${focusMode ? "hidden" : ""}`}
-        aria-hidden
+        className={`fixed bottom-3 right-3 z-40 pointer-events-auto ${focusMode ? "opacity-0 pointer-events-none" : ""}`}
       >
-        <Particles
-          variant="rain"
-          className="h-full w-full min-h-0"
-          quantity={96}
-          color="#3D3E45"
-          alphaMin={0.07}
-          alphaMax={0.18}
-          vx={0.2}
-          vy={0.26}
+        <Dashboard
+          metrics={sim.metrics}
+          metricsHistory={sim.metricsHistory}
+          phase={sim.phase}
+          round={sim.round}
+          maxRounds={sim.maxRounds}
         />
       </div>
 
@@ -843,10 +759,11 @@ function SimulateContent() {
         </button>
       )}
 
-      {/* NPC Profile Modal */}
+      {/* NPC Interaction Modal (Profile + Chat side-by-side) */}
       {selectedNpc && (
-        <NPCProfileModal
+        <NPCInteractionModal
           npc={selectedNpc}
+          simulationId={simulationId}
           onClose={() => setSelectedNpcId(null)}
         />
       )}

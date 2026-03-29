@@ -95,6 +95,11 @@ class EventBridge {
     this.emit("sim:npc-mood", { npcId, mood });
   }
 
+  // React → Phaser: snap camera to an NPC by ID
+  emitCameraSnapToNPC(npcId: string) {
+    this.emit("sim:camera-snap-npc", { npcId });
+  }
+
   // Phaser → React
   emitNPCPosition(npc: NPCState) {
     this.emit("sim:npc-position", npc);

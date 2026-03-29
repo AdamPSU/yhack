@@ -123,7 +123,12 @@ function SimulateContent() {
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
   const handleEventClick = useCallback(
-    (event: SimEvent) => setSelectedNpcId(event.agentId),
+    (event: SimEvent) => {
+      setSelectedNpcId(event.agentId);
+      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+        eventBridge.emitCameraSnapToNPC(event.agentId);
+      });
+    },
     [],
   );
 

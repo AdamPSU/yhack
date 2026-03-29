@@ -5,6 +5,7 @@ import {
   CENTER_BOUNDS,
   GAME_HEIGHT,
   GAME_WIDTH,
+  TILE_SIZE,
   getMapConfig,
   proceduralMap,
   selectedMap,
@@ -109,6 +110,7 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.on("sim:phase-change", this.onPhaseChange, this);
     eventBridge.on("sim:camera-pan", this.onCameraPan, this);
     eventBridge.on("sim:camera-zoom", this.onCameraZoom, this);
+    eventBridge.on("sim:camera-snap-npc", this.onCameraSnapNPC, this);
 
     // ─── NPC System ───
     this.npcManager = new NPCManager(
@@ -308,6 +310,14 @@ export class WorldScene extends Phaser.Scene {
     cam.zoom = newZoom;
   }
 
+  private onCameraSnapNPC(data: { npcId: string }) {
+    const npc = this.npcManager?.getNPC(data.npcId);
+    if (!npc) return;
+    const targetX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
+    const targetY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
+    this.cameras.main.pan(targetX, targetY, 400, "Power2");
+  }
+
   private onPhaseChange(data: { phase: number; month: number }) {
     const overlays: Record<number, { color: number; alpha: number }> = {
       1: { color: 0x000000, alpha: 0 },
@@ -322,6 +332,7 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.off("sim:phase-change", this.onPhaseChange, this);
     eventBridge.off("sim:camera-pan", this.onCameraPan, this);
     eventBridge.off("sim:camera-zoom", this.onCameraZoom, this);
+    eventBridge.off("sim:camera-snap-npc", this.onCameraSnapNPC, this);
     this.simEventHandler?.destroy();
     this.npcManager?.destroy();
     this.chunkManager?.destroy();

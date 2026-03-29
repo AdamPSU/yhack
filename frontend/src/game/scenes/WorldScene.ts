@@ -24,6 +24,7 @@ import {
   isHRoadRow as ccityIsHRoadRow,
 } from "../map/ProceduralCity";
 import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
+import { ALL_CHARACTERS, ALL_DIRECTIONS, getAnimKey, getWalkFrames } from "../map/NPCCharacterRegistry";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -136,7 +137,8 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.on("sim:camera-zoom", this.onCameraZoom, this);
     eventBridge.on("sim:camera-snap-npc", this.onCameraSnapNPC, this);
 
-    // ─── NPC System ───
+    // ─── NPC Animations & System ───
+    this.registerNPCAnimations();
     this.npcManager = new NPCManager(
       this,
       this.getBuildingPositions(),
@@ -159,6 +161,25 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.useCitypackChunks && this.citypackChunkManager) {
       this.citypackChunkManager.update(this.cameras.main);
+    }
+  }
+
+  private registerNPCAnimations() {
+    for (const char of ALL_CHARACTERS) {
+      for (const dir of ALL_DIRECTIONS) {
+        const key = getAnimKey(char, dir);
+        if (this.anims.exists(key)) continue;
+        const [frameA, frameB] = getWalkFrames(char, dir);
+        this.anims.create({
+          key,
+          frames: [
+            { key: "city-tiles", frame: frameA },
+            { key: "city-tiles", frame: frameB },
+          ],
+          frameRate: 6,
+          repeat: -1,
+        });
+      }
     }
   }
 

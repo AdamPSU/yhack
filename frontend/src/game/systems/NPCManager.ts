@@ -6,7 +6,8 @@ import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS, TILE_SIZE } from "../config";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
-import { type CarTemplate, CAR_TEMPLATES } from "../map/CarRegistry";
+import { CAR_TEMPLATES, type CarTemplate } from "../map/CarRegistry";
+import { roleToCharacter } from "../map/NPCCharacterRegistry";
 import { MovementSystem } from "./MovementSystem";
 import { OccupancyGrid } from "./OccupancyGrid";
 import { findPath } from "./Pathfinder";
@@ -42,13 +43,20 @@ export class NPCManager {
   private npcZones: Map<string, string> = new Map();
   /** Track active position-update timers per NPC to avoid duplicates */
   private positionTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
+  /** Track active message-expiry timers per NPC so newer chats replace older ones cleanly. */
+  private messageTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
+  /** Track delayed conversation-release timers per NPC to avoid stale releases. */
+  private conversationTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
+  /** Monotonic version per NPC used to invalidate stale conversation callbacks. */
+  private conversationVersions: Map<string, number> = new Map();
 
   constructor(
     scene: Phaser.Scene,
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
     isRoad: (col: number, row: number) => boolean,
-    getRoadType: (col: number, row: number) => "v" | "h" | "none" = () => "none",
+    getRoadType: (col: number, row: number) => "v" | "h" | "none" = () =>
+      "none",
   ) {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
@@ -72,7 +80,16 @@ export class NPCManager {
   private onInitNPCs(backendNPCs: unknown[]) {
     // Clear any existing NPCs (sprites + movement timers)
     this.movement.destroy();
+    for (const timer of this.positionTimers.values()) timer.destroy();
+    this.positionTimers.clear();
+    for (const timer of this.messageTimers.values()) timer.destroy();
+    this.messageTimers.clear();
+    for (const timer of this.conversationTimers.values()) timer.destroy();
+    this.conversationTimers.clear();
+    this.conversationVersions.clear();
     for (const npc of this.npcs.values()) {
+      npc.message = undefined;
+      this.emitNPCPosition(npc);
       npc.destroy();
     }
     this.npcs.clear();
@@ -105,15 +122,21 @@ export class NPCManager {
       [roadTiles[i], roadTiles[j]] = [roadTiles[j], roadTiles[i]];
     }
 
-    const canFitCar = (col: number, row: number, template: CarTemplate): boolean => {
+    const canFitCar = (
+      col: number,
+      row: number,
+      template: CarTemplate,
+    ): boolean => {
       if (template.orientation === "portrait") {
         // 2 wide × 3 tall — check left and right column of vertical road pair
-        return this.getRoadType(col, row) === "v"
-          && this.getRoadType(col + 1, row) === "v"
-          && this.isWalkable(col, row)
-          && this.isWalkable(col + 1, row)
-          && !this.occupancy.isOccupied(col, row)
-          && !this.occupancy.isOccupied(col + 1, row);
+        return (
+          this.getRoadType(col, row) === "v" &&
+          this.getRoadType(col + 1, row) === "v" &&
+          this.isWalkable(col, row) &&
+          this.isWalkable(col + 1, row) &&
+          !this.occupancy.isOccupied(col, row) &&
+          !this.occupancy.isOccupied(col + 1, row)
+        );
       }
       // 3 wide × 2 tall — ALL 6 tiles must be horizontal road and walkable
       for (let dc = 0; dc < template.cols; dc++) {
@@ -176,7 +199,11 @@ export class NPCManager {
         // Mark all tiles of the car footprint as occupied
         for (let dc = 0; dc < template.cols; dc++) {
           for (let dr = 0; dr < template.rows; dr++) {
-            this.occupancy.occupy(`${bn.id}_${dc}_${dr}`, tileX + dc, tileY + dr);
+            this.occupancy.occupy(
+              `${bn.id}_${dc}_${dr}`,
+              tileX + dc,
+              tileY + dr,
+            );
           }
         }
 
@@ -231,8 +258,15 @@ export class NPCManager {
           }
         }
 
-        const charIndex = i % 16;
-        const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+        const charType = roleToCharacter(bn.role, i);
+        const npc = new NPC(
+          this.scene,
+          bn.id,
+          bn.name,
+          charType,
+          tileX,
+          tileY,
+        );
         npc.role = bn.role;
         npc.category = bn.category ?? "";
         npc.sentiment = moodToSentiment(bn.mood);
@@ -303,6 +337,17 @@ export class NPCManager {
     eventBridge.emitNPCPosition(state);
   }
 
+  private clearConversationTimer(npcId: string) {
+    this.conversationTimers.get(npcId)?.destroy();
+    this.conversationTimers.delete(npcId);
+  }
+
+  private bumpConversationVersion(npcId: string): number {
+    const next = (this.conversationVersions.get(npcId) ?? 0) + 1;
+    this.conversationVersions.set(npcId, next);
+    return next;
+  }
+
   private onNPCMove(data: { npcId: string; toX: number; toY: number }) {
     const npc = this.npcs.get(data.npcId);
     if (!npc) return;
@@ -339,6 +384,8 @@ export class NPCManager {
   releaseNPC(npcId: string) {
     const npc = this.npcs.get(npcId);
     if (!npc) return;
+    this.clearConversationTimer(npcId);
+    this.bumpConversationVersion(npcId);
     npc.npcState = "idle";
     this.movement.release(npcId);
     this.movement.startRoaming(npc, this.npcZones.get(npcId));
@@ -354,6 +401,10 @@ export class NPCManager {
 
     // Cancel existing position timer for this NPC if any
     this.positionTimers.get(npcId)?.destroy();
+    this.positionTimers.delete(npcId);
+    // Cancel any prior expiry timer so a newer message cannot be cleared by an older one.
+    this.messageTimers.get(npcId)?.destroy();
+    this.messageTimers.delete(npcId);
 
     // Continuously emit position updates while message is active so React bubble follows NPC
     const posTimer = this.scene.time.addEvent({
@@ -372,9 +423,11 @@ export class NPCManager {
     this.positionTimers.set(npcId, posTimer);
 
     // Clear message after display time
-    this.scene.time.delayedCall(5000, () => {
+    const messageTimer = this.scene.time.delayedCall(5000, () => {
       npc.message = undefined;
+      this.messageTimers.delete(npcId);
     });
+    this.messageTimers.set(npcId, messageTimer);
   }
 
   /** Walk npcA toward npcB, pause for conversation, then release both */
@@ -382,6 +435,11 @@ export class NPCManager {
     const npcA = this.npcs.get(npcIdA);
     const npcB = this.npcs.get(npcIdB);
     if (!npcA || !npcB) return;
+
+    const versionA = this.bumpConversationVersion(npcIdA);
+    const versionB = this.bumpConversationVersion(npcIdB);
+    this.clearConversationTimer(npcIdA);
+    this.clearConversationTimer(npcIdB);
 
     // Override both so they stop roaming
     this.movement.override(npcIdA);
@@ -392,13 +450,24 @@ export class NPCManager {
     const walkPromise = eitherIsDriver
       ? Promise.resolve()
       : (() => {
-          const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
+          const adj = this.findAdjacentWalkable(
+            npcB.tileX,
+            npcB.tileY,
+            npcA.npcId,
+          );
           const goalX = adj ? adj.x : npcB.tileX;
           const goalY = adj ? adj.y : npcB.tileY;
           return this.stepToward(npcA, goalX, goalY, 5);
         })();
 
     walkPromise.then(() => {
+      if (
+        this.conversationVersions.get(npcIdA) !== versionA ||
+        this.conversationVersions.get(npcIdB) !== versionB
+      ) {
+        return;
+      }
+
       // Face each other
       if (npcA.tileX < npcB.tileX) {
         npcA.face("right");
@@ -415,10 +484,22 @@ export class NPCManager {
       }
 
       // Release both after chat bubble fades (6s — slightly after 5s message timeout)
-      this.scene.time.delayedCall(6000, () => {
-        this.releaseNPC(npcIdA);
-        this.releaseNPC(npcIdB);
-      });
+      const scheduleRelease = (npcId: string, version: number) => {
+        const timer = this.scene.time.delayedCall(6000, () => {
+          if (
+            this.conversationVersions.get(npcId) !== version ||
+            this.conversationTimers.get(npcId) !== timer
+          ) {
+            return;
+          }
+          this.conversationTimers.delete(npcId);
+          this.releaseNPC(npcId);
+        });
+        this.conversationTimers.set(npcId, timer);
+      };
+
+      scheduleRelease(npcIdA, versionA);
+      scheduleRelease(npcIdB, versionB);
     });
   }
 
@@ -493,6 +574,11 @@ export class NPCManager {
     eventBridge.off("sim:npc-mood", this.onNPCMood, this);
     for (const t of this.positionTimers.values()) t.destroy();
     this.positionTimers.clear();
+    for (const t of this.messageTimers.values()) t.destroy();
+    this.messageTimers.clear();
+    for (const t of this.conversationTimers.values()) t.destroy();
+    this.conversationTimers.clear();
+    this.conversationVersions.clear();
     this.movement.destroy();
     for (const npc of this.npcs.values()) {
       npc.destroy();

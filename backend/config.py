@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     xai_api_key: str = ""
     k2_api_key: str = ""
     model_name: str = "grok-4.20"
+    fast_model_name: str = "grok-4-1-fast-non-reasoning"
+    reasoning_model_name: str = "grok-4-1-fast-reasoning"
 
     model_config: dict[str, tuple[str, str]] = {"env_file": (".env", ".env.local")}  # pyright: ignore[reportIncompatibleVariableOverride]
 

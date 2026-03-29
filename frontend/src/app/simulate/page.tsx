@@ -102,6 +102,7 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
 interface BubbleState {
   npcId: string;
   agentName: string;
+  agentCategory?: string;
   message: string;
   x: number;
   y: number;
@@ -174,6 +175,7 @@ function SimulateContent() {
             next.set(npc.id, {
               npcId: npc.id,
               agentName: npc.name,
+              agentCategory: npc.category,
               message: npc.message,
               x: npc.x,
               y: npc.y,
@@ -511,6 +513,7 @@ function SimulateContent() {
               <ChatBubble
                 key={b.npcId}
                 agentName={b.agentName}
+                agentCategory={b.agentCategory}
                 message={b.message}
                 x={b.x * SCALE_FACTOR + BORDER_WIDTH}
                 y={b.y * SCALE_FACTOR + BORDER_WIDTH}

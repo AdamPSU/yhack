@@ -36,6 +36,7 @@ export type BackendRelType =
 export interface BackendNPC {
   id: string;
   name: string;
+  category?: string;
   role: BackendRole;
   income_level: "low" | "medium" | "high";
   political_leaning: number; // -1 to 1

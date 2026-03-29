@@ -12,11 +12,11 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#a855f7",
-  friend: "#4ade80",
-  employer: "#f59e0b",
-  colleague: "#06b6d4",
-  neighbor: "rgba(255,255,255,0.25)",
+  family: "#7B68EE",   // sdv-purple
+  friend: "#3E7C34",   // sdv-green
+  employer: "#C97D1A",  // sdv-orange
+  colleague: "#5A8DB8", // sdv-sky
+  neighbor: "#A0824A",  // sdv-wood-light
 };
 
 const EDGE_LABELS: Record<BackendRelType, string> = {
@@ -28,48 +28,48 @@ const EDGE_LABELS: Record<BackendRelType, string> = {
 };
 
 const MOOD_COLORS: Record<string, string> = {
-  angry: "#f43f5e",
-  anxious: "#fb923c",
-  worried: "#facc15",
-  neutral: "rgba(255,255,255,0.2)",
-  hopeful: "#4ade80",
-  excited: "#a78bfa",
+  angry: "#B83A52",    // sdv-berry
+  anxious: "#C97D1A",  // sdv-orange
+  worried: "#D4A520",  // sdv-gold
+  neutral: "#8B7355",  // sdv-muted
+  hopeful: "#3E7C34",  // sdv-green
+  excited: "#7B68EE",  // sdv-purple
 };
 
 const BEHAVIOR_COLORS: Record<string, string> = {
-  keep: "rgba(255,255,255,0.2)",
-  compromise: "#f59e0b",
-  adopt: "#a855f7",
+  keep: "#8B7355",     // sdv-muted
+  compromise: "#D4A520", // sdv-gold
+  adopt: "#3E7C34",    // sdv-green
 };
 
 function politicalColor(leaning: number): string {
   const t = (leaning + 1) / 2;
   if (t <= 0.5) {
-    return d3.interpolateRgb("#14b8a6", "#a855f7")(t / 0.5);
+    return d3.interpolateRgb("#3E7C34", "#5A8DB8")(t / 0.5); // green → sky
   }
-  return d3.interpolateRgb("#a855f7", "#ec4899")((t - 0.5) / 0.5);
+  return d3.interpolateRgb("#5A8DB8", "#B83A52")((t - 0.5) / 0.5); // sky → berry
 }
 
 function roleColor(role: string): string {
   switch (role) {
     case "worker":
     case "farmer":
-      return "#14b8a6";
+      return "#3E7C34";  // sdv-green
     case "business_owner":
     case "shopkeeper":
-      return "#f59e0b";
+      return "#C97D1A";  // sdv-orange
     case "politician":
-      return "#a855f7";
+      return "#7B68EE";  // sdv-purple
     case "retiree":
-      return "#6b7280";
+      return "#8B7355";  // sdv-muted
     case "activist":
-      return "#ec4899";
+      return "#B83A52";  // sdv-berry
     case "student":
-      return "#06b6d4";
+      return "#5A8DB8";  // sdv-sky
     case "driver":
-      return "#f97316";
+      return "#D4A520";  // sdv-gold
     default:
-      return "#8b5cf6";
+      return "#6B4226";  // sdv-wood-mid
   }
 }
 
@@ -315,7 +315,7 @@ export function SocialGraph({
 
     ctx.clearRect(0, 0, dims.w, dims.h);
 
-    // Deep purple background gradient (fixed, not zoomed)
+    // Warm parchment background gradient (fixed, not zoomed)
     const bgGrad = ctx.createRadialGradient(
       dims.w / 2,
       dims.h / 2,
@@ -324,8 +324,8 @@ export function SocialGraph({
       dims.h / 2,
       dims.w * 0.6,
     );
-    bgGrad.addColorStop(0, "#0d0020");
-    bgGrad.addColorStop(1, "#060010");
+    bgGrad.addColorStop(0, "#F5E6C8"); // sdv-parchment
+    bgGrad.addColorStop(1, "#E8D5A3"); // warm tan
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, dims.w, dims.h);
 
@@ -393,7 +393,7 @@ export function SocialGraph({
       }
 
       ctx.globalAlpha = isDimmed
-        ? 0.06
+        ? 0.1
         : isHighlighted
           ? 0.95
           : isRecentlyActive
@@ -444,7 +444,7 @@ export function SocialGraph({
       const eased = 1 - (1 - t) * (1 - t);
       const px = s.x + (e.x - s.x) * eased;
       const py = s.y + (e.y - s.y) * eased;
-      const color = BEHAVIOR_COLORS[p.behavior] || "#a855f7";
+      const color = BEHAVIOR_COLORS[p.behavior] || "#D4A520";
       const fade = t < 0.1 ? t / 0.1 : t > 0.8 ? (1 - t) / 0.2 : 1;
       const pulseSize =
         p.behavior === "adopt" ? 5 : p.behavior === "compromise" ? 4 : 2.5;
@@ -463,7 +463,7 @@ export function SocialGraph({
       ctx.globalAlpha = fade * 0.9;
       ctx.beginPath();
       ctx.arc(px, py, pulseSize, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#FDF5E6";
       ctx.fill();
 
       // Trail particles
@@ -504,8 +504,8 @@ export function SocialGraph({
       // Ambient glow for hovered / flashing nodes
       if ((isHov || isFlashing) && !isDimmed) {
         const glowColor = isHov
-          ? "#a855f7"
-          : MOOD_COLORS[node.mood] || "#a855f7";
+          ? "#D4A520"
+          : MOOD_COLORS[node.mood] || "#D4A520";
         const glowR = hovR + (isFlashing ? 10 + flashIntensity * 6 : 8);
         const glow = ctx.createRadialGradient(x, y, hovR, x, y, glowR);
         glow.addColorStop(0, `${glowColor}40`);
@@ -517,7 +517,7 @@ export function SocialGraph({
       }
 
       // Mood ring (outer arc segments instead of solid ring)
-      const moodColor = MOOD_COLORS[node.mood] || "rgba(255,255,255,0.2)";
+      const moodColor = MOOD_COLORS[node.mood] || "#8B7355";
       ctx.strokeStyle = moodColor;
       ctx.lineWidth = 2;
       const segments = 6;
@@ -540,10 +540,10 @@ export function SocialGraph({
         hovR,
       );
       const baseColor = roleColor(node.role);
-      const lighterColor = d3.interpolateRgb(baseColor, "#fff")(0.35);
+      const lighterColor = d3.interpolateRgb(baseColor, "#FDF5E6")(0.35);
       grad.addColorStop(0, lighterColor);
       grad.addColorStop(0.7, baseColor);
-      grad.addColorStop(1, d3.interpolateRgb(baseColor, "#000")(0.25));
+      grad.addColorStop(1, d3.interpolateRgb(baseColor, "#3D2510")(0.25));
 
       ctx.globalAlpha = isDimmed ? 0.15 : 0.4;
       ctx.beginPath();
@@ -576,20 +576,20 @@ export function SocialGraph({
       }
 
       // Thin crisp border
-      ctx.strokeStyle = isHov ? "rgba(168,85,247,0.8)" : "rgba(255,255,255,0.15)";
+      ctx.strokeStyle = isHov ? "#6B4226" : "#C4A46C";
       ctx.lineWidth = isHov ? 1.5 : 0.5;
       ctx.stroke();
 
       // Label
-      ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)";
+      ctx.fillStyle = isDimmed ? "rgba(61,37,16,0.15)" : "#3D2510";
       ctx.font = `${isHov ? "bold 10px" : "8px"} monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
 
       // Text shadow for readability
       if (!isDimmed) {
-        ctx.shadowColor = "rgba(0,0,0,0.7)";
-        ctx.shadowBlur = 3;
+        ctx.shadowColor = "rgba(245,230,200,0.8)";
+        ctx.shadowBlur = 2;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 1;
       }
@@ -724,7 +724,12 @@ export function SocialGraph({
       <button
         type="button"
         onClick={resetZoom}
-        className="absolute top-2 left-2 z-10 rounded border border-white/20 bg-[#060010]/90 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/50 hover:text-white/80 hover:border-purple-500/50 transition-colors"
+        className="absolute top-2 left-2 z-10 rounded px-2 py-1 font-mono text-[9px] uppercase tracking-wider transition-colors"
+        style={{
+          background: "rgba(245,230,200,0.9)",
+          border: "2px solid #C4A46C",
+          color: "#5B3A1E",
+        }}
       >
         Reset Zoom
       </button>
@@ -737,12 +742,15 @@ export function SocialGraph({
             top: Math.max(zoomRef.current.applyY(hovNode.y ?? 0) - 20, 4),
           }}
         >
-          <div className="rounded-md bg-[#060010]/95 border border-white/20 px-3 py-2 shadow-xl backdrop-blur-sm min-w-[140px] neon-border-purple">
+          <div
+            className="rpg-panel min-w-[140px] px-3 py-2"
+            style={{ background: "#FDF5E6", border: "2px solid #A0824A" }}
+          >
             {/* Name & role */}
-            <div className="text-[10px] font-pixel text-purple-400 neon-text-purple">
+            <div className="text-[10px] font-pixel" style={{ color: "#5B3A1E" }}>
               {hovNode.name}
             </div>
-            <div className="text-[8px] font-mono text-white/40 uppercase tracking-widest mt-0.5">
+            <div className="text-[8px] font-mono uppercase tracking-widest mt-0.5" style={{ color: "#A0824A" }}>
               {(hovNode.role ?? "").replace("_", " ")}
             </div>
 
@@ -751,20 +759,15 @@ export function SocialGraph({
               <span className="flex items-center gap-1">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
+                  style={{ background: MOOD_COLORS[hovNode.mood] || "#8B7355" }}
                 />
-                <span 
-                  className={hovNode.mood === 'angry' ? 'neon-text-pink' : 
-                             (hovNode.mood === 'anxious' || hovNode.mood === 'worried') ? 'neon-text-yellow' :
-                             hovNode.mood === 'hopeful' ? 'neon-text-teal' :
-                             hovNode.mood === 'excited' ? 'neon-text-purple' : 'neon-text-indigo'}
-                  style={{ color: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
+                <span
+                  style={{ color: MOOD_COLORS[hovNode.mood] || "#8B7355" }}
                 >
                   {hovNode.mood}
                 </span>
               </span>
               <span
-                className={hovNode.political_leaning > 0.3 ? "neon-text-pink" : hovNode.political_leaning < -0.3 ? "neon-text-teal" : "neon-text-indigo"}
                 style={{ color: politicalColor(hovNode.political_leaning) }}
               >
                 {hovNode.political_leaning > 0.3
@@ -777,8 +780,8 @@ export function SocialGraph({
 
             {/* Connections */}
             {hovLinks.length > 0 && (
-              <div className="mt-2 border-t border-white/10 pt-2">
-                <div className="text-[8px] font-pixel text-purple-400/40 uppercase mb-1">
+              <div className="mt-2 pt-2" style={{ borderTop: "1px solid #C4A46C" }}>
+                <div className="text-[8px] font-pixel uppercase mb-1" style={{ color: "#A0824A" }}>
                   Connections ({hovLinks.length})
                 </div>
                 {hovLinks.slice(0, 4).map((l) => {
@@ -794,15 +797,15 @@ export function SocialGraph({
                         className="inline-block h-1.5 w-3 rounded-sm"
                         style={{ background: EDGE_COLORS[l.rel_type] }}
                       />
-                      <span className="text-white/60">
+                      <span style={{ color: "#5B3A1E" }}>
                         {other?.name.split(" ")[0] ?? "?"}
                       </span>
-                      <span className="text-white/20 uppercase tracking-tighter">{l.rel_type}</span>
+                      <span style={{ color: "#A0824A" }} className="uppercase tracking-tighter">{l.rel_type}</span>
                     </div>
                   );
                 })}
                 {hovLinks.length > 4 && (
-                  <div className="text-[8px] font-mono text-white/20 mt-1 uppercase">
+                  <div className="text-[8px] font-mono mt-1 uppercase" style={{ color: "#A0824A" }}>
                     +{hovLinks.length - 4} more
                   </div>
                 )}
@@ -833,19 +836,19 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
   const h = 105;
 
   // Background
-  ctx.globalAlpha = 0.9;
-  ctx.fillStyle = "rgba(6,0,16,0.9)";
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = "#FDF5E6";
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, 4);
   ctx.fill();
-  ctx.strokeStyle = "rgba(168,85,247,0.3)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#A0824A";
+  ctx.lineWidth = 2;
   ctx.stroke();
   ctx.globalAlpha = 1.0;
 
   // Title
   ctx.font = "bold 7px monospace";
-  ctx.fillStyle = "rgba(168, 85, 247, 0.6)";
+  ctx.fillStyle = "#5B3A1E";
   ctx.textAlign = "left";
   y += 11;
   ctx.fillText("RELATIONSHIPS", x + 6, y);
@@ -870,7 +873,7 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.fillStyle = "#6B4C2A";
     ctx.fillText(label, x + 24, y + 3);
     y += lh;
   }
@@ -883,7 +886,7 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.fillStyle = politicalColor(t * 2 - 1);
     ctx.fillRect(x + 8 + i, y, 1, 5);
   }
-  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.fillStyle = "#A0824A";
   ctx.font = "6px monospace";
   ctx.textAlign = "left";
   ctx.fillText("PROG", x + 6, y + 13);

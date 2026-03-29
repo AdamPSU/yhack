@@ -3,6 +3,7 @@
 import { io, type Socket } from "socket.io-client";
 import type {
   BackendSimEvent,
+  EconomicReport,
   StartSimulationRequest,
   UploadedContextSource,
   WSInitMsg,
@@ -49,6 +50,16 @@ export async function extractFile(file: File): Promise<string> {
   if (!res.ok) throw new Error(`Extraction failed: ${res.status}`);
   const data = await res.json();
   return data.text as string;
+}
+
+export async function fetchEconomicReport(
+  simulationId: string,
+): Promise<EconomicReport> {
+  const res = await fetch(`${API_BASE}/simulate/${simulationId}/economic-report`);
+  if (!res.ok) {
+    throw new Error(`Economic report failed: ${res.status}`);
+  }
+  return (await res.json()) as EconomicReport;
 }
 
 export async function startSimulation(

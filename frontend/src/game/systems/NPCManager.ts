@@ -43,6 +43,8 @@ export class NPCManager {
   /** Cached shuffled road tiles for incremental NPC spawning */
   private roadTilesCache: { x: number; y: number }[] = [];
   private spawnAreaReady = false;
+  /** Track active position-update timers per NPC to avoid duplicates */
+  private positionTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
 
   constructor(
     scene: Phaser.Scene,
@@ -425,12 +427,16 @@ export class NPCManager {
     npc.message = message;
     this.emitNPCPosition(npc);
 
+    // Cancel existing position timer for this NPC if any
+    this.positionTimers.get(npcId)?.destroy();
+
     // Continuously emit position updates while message is active so React bubble follows NPC
     const posTimer = this.scene.time.addEvent({
-      delay: 100,
+      delay: 16,
       callback: () => {
         if (!npc.message) {
           posTimer.destroy();
+          this.positionTimers.delete(npcId);
           this.emitNPCPosition(npc);
           return;
         }
@@ -438,6 +444,7 @@ export class NPCManager {
       },
       loop: true,
     });
+    this.positionTimers.set(npcId, posTimer);
 
     // Clear message after display time
     this.scene.time.delayedCall(5000, () => {
@@ -561,6 +568,8 @@ export class NPCManager {
     eventBridge.off("sim:init-npcs", this.onInitNPCs, this);
     eventBridge.off("sim:npc-move", this.onNPCMove, this);
     eventBridge.off("sim:npc-mood", this.onNPCMood, this);
+    for (const t of this.positionTimers.values()) t.destroy();
+    this.positionTimers.clear();
     this.movement.destroy();
     for (const npc of this.npcs.values()) {
       npc.destroy();

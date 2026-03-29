@@ -425,6 +425,7 @@ export class WorldScene extends Phaser.Scene {
     this.chunkManager = undefined;
     this.citypackChunkManager?.destroy();
     this.citypackChunkManager = undefined;
+    this.staticGroundLayer = undefined;
     this.staticBuildingLayer = undefined;
     this.phaseOverlay = undefined;
     this.useChunks = false;

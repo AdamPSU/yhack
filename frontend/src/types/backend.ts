@@ -173,6 +173,46 @@ export interface WSErrorMsg {
   message: string;
 }
 
+export interface ReportImpact {
+  title: string;
+  description: string;
+  direction: "positive" | "negative" | "mixed";
+  severity: "low" | "medium" | "high";
+}
+
+export interface ReportStat {
+  label: string;
+  value: string;
+  trend?: "up" | "down" | "flat" | "mixed" | null;
+}
+
+export interface PieChartSlice {
+  label: string;
+  value: number;
+}
+
+export interface BarChartEntry {
+  label: string;
+  value: number;
+}
+
+export interface EconomicReport {
+  headline: string;
+  summary: string;
+  livelihood_impact: string;
+  top_impacts: ReportImpact[];
+  key_stats: ReportStat[];
+  pie_chart: {
+    title: string;
+    slices: PieChartSlice[];
+  };
+  bar_chart: {
+    title: string;
+    bars: BarChartEntry[];
+  };
+  notable_events: string[];
+}
+
 export type WSMessage =
   | WSPolicyAnalysisMsg
   | WSInitMsg

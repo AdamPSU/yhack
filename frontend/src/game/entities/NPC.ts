@@ -4,6 +4,8 @@ import { eventBridge } from "../bridge/EventBridge";
 import { TILE_SIZE } from "../config";
 import { getNPCTile } from "../map/TileRegistry";
 
+const CHAT_BUBBLE_Y_OFFSET = 2;
+
 export class NPC extends Phaser.GameObjects.Sprite {
   readonly npcId: string;
   readonly npcName: string;
@@ -172,9 +174,12 @@ export class NPC extends Phaser.GameObjects.Sprite {
     return {
       id: this.npcId,
       name: this.npcName,
+      role: this.role,
       category: this.category,
       x: (this.x - cam.scrollX) * cam.zoom,
-      y: (this.y - cam.scrollY) * cam.zoom,
+      // Anchor slightly above the 1x1 sprite center; a full half-tile offset
+      // pushes the DOM bubble too far toward the top-left visually.
+      y: (this.y - CHAT_BUBBLE_Y_OFFSET - cam.scrollY) * cam.zoom,
       direction: this.direction,
       state: this.npcState,
       message: this.message,

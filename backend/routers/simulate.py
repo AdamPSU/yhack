@@ -1,13 +1,16 @@
 import logging
 import uuid
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 import socketio
 from fastapi import APIRouter, HTTPException
 
 from graph.builder import build_graph
-from models.schemas import PolicyInput
+from models.schemas import EconomicReportResponse, PolicyInput
 from models.state import SimState
 from services.context_store import get_source
+from services.economic_report import generate_economic_report
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,28 @@ router = APIRouter()
 # Socket.IO server (async mode for FastAPI/uvicorn).
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
-simulations: dict[str, PolicyInput] = {}
+SimulationStatus = Literal["pending", "running", "complete", "error"]
+
+
+@dataclass
+class SimulationRecord:
+    policy: PolicyInput
+    status: SimulationStatus = "pending"
+    policy_text: str = ""
+    trend_summary: str = ""
+    context_summary: str = ""
+    indicator_snapshots: list[dict[str, Any]] = field(default_factory=list)
+    source_summaries: list[str] = field(default_factory=list)
+    entities: list[dict[str, Any]] = field(default_factory=list)
+    final_npcs: list[dict[str, Any]] = field(default_factory=list)
+    relationships: list[dict[str, Any]] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
+    current_round: int = 0
+    error_message: str | None = None
+    economic_report: EconomicReportResponse | None = None
+
+
+simulations: dict[str, SimulationRecord] = {}
 
 
 @router.post("/simulate")
@@ -30,7 +54,7 @@ async def start_simulation(policy: PolicyInput):
         raise HTTPException(status_code=404, detail="One or more CSV trend sources were not found.")
 
     simulation_id = str(uuid.uuid4())
-    simulations[simulation_id] = policy
+    simulations[simulation_id] = SimulationRecord(policy=policy)
     logger.info(
         "POST /simulate → id=%s  rounds=%d  pdf=%s  trends=%d",
         simulation_id,
@@ -47,10 +71,25 @@ async def start_sim(sid: str, data: dict) -> None:
     simulation_id = data.get("simulation_id", "")
     logger.info("sio start_sim  sid=%s  sim=%s", sid, simulation_id)
 
-    policy = simulations.get(simulation_id)
-    if policy is None:
+    record = simulations.get(simulation_id)
+    if record is None:
         await sio.emit("sim_error", {"message": "Simulation not found"}, to=sid)
         return
+
+    policy = record.policy
+    record.status = "running"
+    record.error_message = None
+    record.economic_report = None
+    record.current_round = 0
+    record.events = []
+    record.entities = []
+    record.final_npcs = []
+    record.relationships = []
+    record.policy_text = ""
+    record.trend_summary = ""
+    record.context_summary = ""
+    record.indicator_snapshots = []
+    record.source_summaries = []
 
     graph = build_graph()
 
@@ -91,18 +130,32 @@ async def start_sim(sid: str, data: dict) -> None:
 
     try:
         async for chunk in graph.astream(initial_state):
-            if "parse_policy" in chunk:
+            if "build_context" in chunk:
+                update = chunk["build_context"]
+                record.policy_text = update.get("policy_text", "")
+                record.trend_summary = update.get("trend_summary", "")
+                record.context_summary = update.get("context_summary", "")
+                record.indicator_snapshots = update.get("indicator_snapshots", [])
+                record.source_summaries = update.get("source_summaries", [])
+
+            elif "parse_policy" in chunk:
                 update = chunk["parse_policy"]
+                record.entities = update.get("entities", [])
                 logger.info("sim=%s  parse_policy  entities=%d", simulation_id, len(update["entities"]))
                 await sio.emit("policy_analysis", {"entities": update["entities"]}, to=sid)
 
             elif "generate_npcs" in chunk:
                 update = chunk["generate_npcs"]
+                record.final_npcs = update.get("npcs", [])
+                record.relationships = update.get("relationships", [])
                 logger.info("sim=%s  generate_npcs  npcs=%d  rels=%d", simulation_id, len(update["npcs"]), len(update["relationships"]))
                 await sio.emit("init", {"npcs": update["npcs"], "relationships": update["relationships"]}, to=sid)
 
             elif "run_round" in chunk:
                 update = chunk["run_round"]
+                record.current_round = update.get("current_round", record.current_round)
+                record.final_npcs = update.get("npcs", record.final_npcs)
+                record.events.extend(update.get("events", []))
                 round_num = update["current_round"] - 1
                 logger.info("sim=%s  round %d  events=%d", simulation_id, round_num, len(update["events"]))
                 await sio.emit("round", {
@@ -112,14 +165,38 @@ async def start_sim(sid: str, data: dict) -> None:
                     "influence_events": update.get("influence_events", []),
                 }, to=sid)
 
+        record.status = "complete"
         logger.info("sim=%s  done", simulation_id)
         await sio.emit("done", {}, to=sid)
 
     except Exception as exc:
+        record.status = "error"
+        record.error_message = str(exc)
         logger.exception("Simulation %s failed", simulation_id)
         try:
             await sio.emit("sim_error", {"message": f"Simulation failed: {exc}"}, to=sid)
         except Exception:
             pass
-    finally:
-        simulations.pop(simulation_id, None)
+
+
+@router.get("/simulate/{simulation_id}/economic-report", response_model=EconomicReportResponse)
+async def get_economic_report(simulation_id: str):
+    record = simulations.get(simulation_id)
+    if record is None or record.status != "complete":
+        raise HTTPException(status_code=404, detail="Completed simulation not found.")
+
+    if record.economic_report is not None:
+        return record.economic_report
+
+    record.economic_report = await generate_economic_report(
+        policy_text=record.policy_text,
+        objective=record.policy.objective,
+        entities=record.entities,
+        source_summaries=record.source_summaries,
+        indicator_snapshots=record.indicator_snapshots,
+        final_npcs=record.final_npcs,
+        events=record.events,
+        completed_rounds=record.current_round,
+        max_rounds=record.policy.num_rounds,
+    )
+    return record.economic_report

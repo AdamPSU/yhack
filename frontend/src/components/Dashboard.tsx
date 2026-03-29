@@ -1,64 +1,42 @@
 "use client";
 
+import { ArcGauge } from "@/components/dashboard/ArcGauge";
+import { SparklineCard } from "@/components/dashboard/SparklineCard";
 import type { SimMetrics } from "@/types";
 
 interface DashboardProps {
   metrics: SimMetrics;
+  metricsHistory: SimMetrics[];
   phase: number;
   month: number;
 }
 
-interface MetricCardProps {
-  label: string;
-  value: string;
-  trend: "up" | "down" | "neutral";
-  severity: "good" | "warn" | "bad" | "neutral";
+function priceSeverity(v: number) {
+  const abs = Math.abs(v);
+  if (abs < 3) return "good" as const;
+  if (abs < 7) return "warn" as const;
+  return "bad" as const;
 }
 
-function MetricCard({ label, value, trend, severity }: MetricCardProps) {
-  const severityColor = {
-    good: "text-[#5ab85a]",
-    warn: "text-[#e8a43a]",
-    bad: "text-[#d45050]",
-    neutral: "text-[#d4c4a0]",
-  }[severity];
-
-  const trendArrow = { up: "\u25B2", down: "\u25BC", neutral: "\u25C6" }[trend];
-
-  return (
-    <div className="flex items-center justify-between border-b border-[#3a2e1e] px-2 py-1.5 last:border-b-0">
-      <span className="text-[10px] font-mono uppercase text-[#8a7a62]">
-        {label}
-      </span>
-      <span
-        className={`text-xs font-mono font-bold tabular-nums ${severityColor}`}
-      >
-        {trendArrow} {value}
-      </span>
-    </div>
-  );
+function unempSeverity(v: number) {
+  if (v < 4.5) return "good" as const;
+  if (v < 5.5) return "warn" as const;
+  return "bad" as const;
 }
 
-export function Dashboard({ metrics, phase, month }: DashboardProps) {
-  function priceSeverity(v: number) {
-    if (v < 3) return "good" as const;
-    if (v < 7) return "warn" as const;
-    return "bad" as const;
-  }
+function zeroOneSeverity(v: number, invert = false) {
+  const effective = invert ? 1 - v : v;
+  if (effective > 0.7) return "good" as const;
+  if (effective > 0.4) return "warn" as const;
+  return "bad" as const;
+}
 
-  function unempSeverity(v: number) {
-    if (v < 4.5) return "good" as const;
-    if (v < 5.5) return "warn" as const;
-    return "bad" as const;
-  }
-
-  function zeroOneSeverity(v: number, invert = false) {
-    const effective = invert ? 1 - v : v;
-    if (effective > 0.7) return "good" as const;
-    if (effective > 0.4) return "warn" as const;
-    return "bad" as const;
-  }
-
+export function Dashboard({
+  metrics,
+  metricsHistory,
+  phase,
+  month,
+}: DashboardProps) {
   return (
     <div
       className="rpg-panel flex h-full w-56 flex-col"
@@ -74,43 +52,55 @@ export function Dashboard({ metrics, phase, month }: DashboardProps) {
         </span>
       </div>
 
-      {/* Metrics */}
-      <div className="flex flex-1 flex-col overflow-y-auto px-1 py-1">
-        <MetricCard
+      {/* Charts */}
+      <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin px-1 py-1">
+        {/* Sparkline time-series metrics */}
+        <SparklineCard
           label="Prices"
-          value={`${metrics.priceIndex >= 0 ? "+" : ""}${metrics.priceIndex.toFixed(1)}%`}
-          trend={metrics.priceIndex > 0 ? "up" : "neutral"}
+          values={metricsHistory.map((m) => m.priceIndex)}
+          currentValue={metrics.priceIndex}
+          formatValue={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
           severity={priceSeverity(metrics.priceIndex)}
+          baseline={0}
+          domain={[-10, 15]}
         />
-        <MetricCard
-          label="Unemploy."
-          value={`${metrics.unemploymentRate.toFixed(1)}%`}
-          trend={metrics.unemploymentRate > 4.2 ? "up" : "neutral"}
+        <SparklineCard
+          label="Unemployment"
+          values={metricsHistory.map((m) => m.unemploymentRate)}
+          currentValue={metrics.unemploymentRate}
+          formatValue={(v) => `${v.toFixed(1)}%`}
           severity={unempSeverity(metrics.unemploymentRate)}
+          baseline={4.2}
+          domain={[3, 10]}
         />
-        <MetricCard
-          label="Unrest"
-          value={`${(metrics.socialUnrest * 100).toFixed(0)}%`}
-          trend={metrics.socialUnrest > 0.1 ? "up" : "neutral"}
+        <SparklineCard
+          label="Interest Rate"
+          values={metricsHistory.map((m) => m.interestRate)}
+          currentValue={metrics.interestRate}
+          formatValue={(v) => `${v.toFixed(2)}%`}
+          severity="neutral"
+          baseline={5.25}
+          domain={[3, 8]}
+        />
+
+        {/* Arc gauge ratio metrics */}
+        <ArcGauge
+          label="Social Unrest"
+          value={metrics.socialUnrest}
+          formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.socialUnrest, true)}
         />
-        <MetricCard
-          label="Biz Surv."
-          value={`${(metrics.businessSurvival * 100).toFixed(0)}%`}
-          trend={metrics.businessSurvival < 0.95 ? "down" : "neutral"}
+        <ArcGauge
+          label="Biz Survival"
+          value={metrics.businessSurvival}
+          formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.businessSurvival)}
         />
-        <MetricCard
-          label="Approval"
-          value={`${(metrics.govApproval * 100).toFixed(0)}%`}
-          trend={metrics.govApproval < 0.6 ? "down" : "neutral"}
+        <ArcGauge
+          label="Gov. Approval"
+          value={metrics.govApproval}
+          formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.govApproval)}
-        />
-        <MetricCard
-          label="Int. Rate"
-          value={`${metrics.interestRate.toFixed(2)}%`}
-          trend="neutral"
-          severity="neutral"
         />
       </div>
     </div>

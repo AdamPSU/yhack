@@ -46,9 +46,13 @@ const PHASE_LABELS: Record<number, string> = {
 /** Cap EventFeed to last N events to avoid unbounded React state growth */
 const MAX_FEED_EVENTS = 200;
 
+/** Cap history to last N snapshots (one per round). */
+const MAX_HISTORY = 30;
+
 interface SimulationState {
   events: SimEvent[];
   metrics: SimMetrics;
+  metricsHistory: SimMetrics[];
   phase: number;
   month: number;
   isRunning: boolean;
@@ -85,6 +89,7 @@ export function useSimulation(simulationId?: string) {
   const [state, setState] = useState<SimulationState>({
     events: [],
     metrics: { ...INITIAL_METRICS },
+    metricsHistory: [{ ...INITIAL_METRICS }],
     phase: 0,
     month: 0,
     isRunning: false,
@@ -252,10 +257,14 @@ export function useSimulation(simulationId?: string) {
         msg.npcs,
         msg.events,
       );
-      setState((prev) => ({
-        ...prev,
-        metrics: { ...prev.metrics, ...newMetrics },
-      }));
+      setState((prev) => {
+        const merged = { ...prev.metrics, ...newMetrics };
+        return {
+          ...prev,
+          metrics: merged,
+          metricsHistory: [...prev.metricsHistory, merged].slice(-MAX_HISTORY),
+        };
+      });
 
       if (!timerRef.current && eventQueueRef.current.length > 0) {
         timerRef.current = setTimeout(drainQueue, 800);
@@ -268,6 +277,7 @@ export function useSimulation(simulationId?: string) {
     setState({
       events: [],
       metrics: { ...INITIAL_METRICS },
+      metricsHistory: [{ ...INITIAL_METRICS }],
       phase: 0,
       month: 0,
       isRunning: true,

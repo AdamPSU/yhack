@@ -130,12 +130,13 @@ export class NPC extends Phaser.GameObjects.Sprite {
   }
 
   private emitHoverEvent() {
+    const cam = this.scene.cameras.main;
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
       role: this.role,
-      x: this.x,
-      y: this.y,
+      x: (this.x - cam.scrollX) * cam.zoom,
+      y: (this.y - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,
       state: this.npcState,
     });
@@ -151,13 +152,14 @@ export class NPC extends Phaser.GameObjects.Sprite {
     eventBridge.emitNPCHoverOut();
   }
 
-  /** Snapshot for EventBridge → React chat bubbles */
+  /** Snapshot for EventBridge → React chat bubbles (camera-relative screen coords) */
   toState(): NPCState {
+    const cam = this.scene.cameras.main;
     return {
       id: this.npcId,
       name: this.npcName,
-      x: this.x,
-      y: this.y,
+      x: (this.x - cam.scrollX) * cam.zoom,
+      y: (this.y - cam.scrollY) * cam.zoom,
       direction: this.direction,
       state: this.npcState,
       message: this.message,

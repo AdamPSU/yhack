@@ -9,8 +9,6 @@ import { startSimulation } from "@/services/wsClient";
 import type { SavedSimulation } from "@/types/backend";
 
 const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
-  { id: "ccity", label: "CCity", desc: "Large 80x60 modern city" },
-  { id: "pico8", label: "Pico-8 City", desc: "Compact 55x30 retro town" },
   { id: "citypack", label: "Citypack", desc: "Infinite procedural city" },
 ];
 
@@ -26,7 +24,7 @@ function isSavedSimulation(data: unknown): data is SavedSimulation {
 
 export function PolicyInput() {
   const [text, setText] = useState("");
-  const [mapId, setMapId] = useState<MapType>("ccity");
+  const [mapId, setMapId] = useState<MapType>("citypack");
   const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCustomRun, setLoadingCustomRun] = useState(false);

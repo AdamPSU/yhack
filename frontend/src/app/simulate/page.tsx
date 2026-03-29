@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
@@ -115,12 +116,18 @@ export default function SimulatePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
-  const [leftTab, setLeftTab] = useState<"events" | "graph">("events");
-  // Load policy text from sessionStorage
+  const [showGraph, setShowGraph] = useState(false);
+  const [noPolicy, setNoPolicy] = useState(false);
+
+  // Load policy text from sessionStorage (one-time flag ensures fresh navigation from home page)
   useEffect(() => {
+    const ready = sessionStorage.getItem("agora-policy-ready");
     const stored = sessionStorage.getItem("agora-policy");
-    if (stored) {
+    if (ready && stored) {
+      sessionStorage.removeItem("agora-policy-ready");
       setPolicyText(stored);
+    } else {
+      setNoPolicy(true);
     }
   }, []);
 
@@ -240,6 +247,15 @@ export default function SimulatePage() {
     };
   }, []);
 
+  // Close graph modal on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowGraph(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   // Camera zoom via scroll wheel
   useEffect(() => {
     const el = canvasContainerRef.current;
@@ -258,6 +274,30 @@ export default function SimulatePage() {
   }, []);
 
   const bubbleList = Array.from(bubbles.values());
+
+  if (noPolicy) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
+        <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
+          <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
+            AGORA
+          </span>
+          <p className="text-sm font-mono text-[#d4c4a0]">
+            No policy specified.
+          </p>
+          <p className="text-xs font-mono text-[#8a7a62]">
+            Please describe an economic policy on the home page before running a simulation.
+          </p>
+          <Link
+            href="/"
+            className="rpg-panel mt-2 px-6 py-2 text-xs font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)]"
+          >
+            {">> Enter Policy <<"}
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -305,46 +345,23 @@ export default function SimulatePage() {
 
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
-        {/* Left: Event feed / Social graph (tabbed) */}
+        {/* Left: Event feed */}
         <div className="rpg-panel flex h-full w-64 shrink-0 flex-col">
-          {/* Tab bar */}
-          <div className="flex border-b border-[#3a2e1e]">
-            <button
-              type="button"
-              onClick={() => setLeftTab("events")}
-              className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-colors ${
-                leftTab === "events"
-                  ? "text-[#e8a43a] bg-[#251e15]"
-                  : "text-[#5a4a32] hover:text-[#8a7a62]"
-              }`}
-            >
+          <div className="flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
+            <h2 className="text-[10px] font-mono font-bold uppercase text-[#e8a43a]">
               Event Log
-            </button>
+            </h2>
             <button
               type="button"
-              onClick={() => setLeftTab("graph")}
-              className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-colors ${
-                leftTab === "graph"
-                  ? "text-[#e8a43a] bg-[#251e15]"
-                  : "text-[#5a4a32] hover:text-[#8a7a62]"
-              }`}
+              onClick={() => setShowGraph(true)}
+              className="text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+              title="Open Social Graph"
             >
-              Social Graph
+              [Graph]
             </button>
           </div>
-
-          {/* Tab content */}
           <div className="flex-1 overflow-hidden">
-            {leftTab === "events" ? (
-              <EventFeed events={sim.events} onEventClick={handleEventClick} />
-            ) : (
-              <SocialGraph
-                npcs={sim.graphData.npcs}
-                relationships={sim.graphData.relationships}
-                influenceEvents={sim.graphData.influenceEvents}
-                version={sim.graphData.version}
-              />
-            )}
+            <EventFeed events={sim.events} onEventClick={handleEventClick} />
           </div>
         </div>
 
@@ -421,6 +438,39 @@ export default function SimulatePage() {
           npc={selectedNpc}
           onClose={() => setSelectedNpcId(null)}
         />
+      )}
+
+      {/* Social Graph Modal */}
+      {showGraph && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGraph(false);
+          }}
+        >
+          <div className="rpg-panel relative flex flex-col" style={{ width: 700, height: 560 }}>
+            <div className="flex items-center justify-between border-b border-[#3a2e1e] px-4 py-2">
+              <h2 className="text-[11px] font-mono font-bold uppercase text-[#e8a43a]">
+                Social Graph
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowGraph(false)}
+                className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+              >
+                [ESC]
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <SocialGraph
+                npcs={sim.graphData.npcs}
+                relationships={sim.graphData.relationships}
+                influenceEvents={sim.graphData.influenceEvents}
+                version={sim.graphData.version}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -86,6 +86,41 @@ const PERSONALITIES = [
   "anxious about the future",
 ];
 
+const COUNTRIES = [
+  "United States",
+  "Canada",
+  "Mexico",
+  "South Korea",
+  "Japan",
+  "India",
+  "Germany",
+  "Brazil",
+];
+
+const MBTI_TYPES = [
+  "ENFP",
+  "ISTJ",
+  "INFJ",
+  "ESTP",
+  "INTP",
+  "ESFJ",
+  "ENTJ",
+  "ISFP",
+];
+
+const INTEREST_TOPICS = [
+  "housing",
+  "transit",
+  "small business",
+  "jobs",
+  "education",
+  "inflation",
+  "energy",
+  "healthcare",
+  "community safety",
+  "trade",
+];
+
 const FIRST_NAMES = [
   "Maria",
   "James",
@@ -144,12 +179,35 @@ const LAST_NAMES = [
 
 /** Fixed road positions for driver NPCs (on citypack road columns/rows) */
 const DRIVER_POSITIONS: { x: number; y: number }[] = [
-  { x: 6, y: 5 },   // tileX=12 (road col), tileY=10 (road row)
-  { x: 13, y: 5 },  // tileX=26 (road col), tileY=10 (road row)
-  { x: 6, y: 12 },  // tileX=12 (road col), tileY=24 (road row)
-  { x: 20, y: 5 },  // tileX=40 (road col), tileY=10 (road row)
+  { x: 6, y: 5 }, // tileX=12 (road col), tileY=10 (road row)
+  { x: 13, y: 5 }, // tileX=26 (road col), tileY=10 (road row)
+  { x: 6, y: 12 }, // tileX=12 (road col), tileY=24 (road row)
+  { x: 20, y: 5 }, // tileX=40 (road col), tileY=10 (road row)
   { x: 13, y: 19 }, // tileX=26 (road col), tileY=38 (road row)
 ];
+
+function professionForRole(role: BackendRole, industry: string, index: number): string {
+  switch (role) {
+    case "worker":
+      return `${industry} technician`;
+    case "business_owner":
+      return "small business owner";
+    case "politician":
+      return "city council member";
+    case "student":
+      return "student organizer";
+    case "retiree":
+      return "retired foreman";
+    case "activist":
+      return "community organizer";
+    case "farmer":
+      return "market farmer";
+    case "shopkeeper":
+      return "corner shopkeeper";
+    case "driver":
+      return index % 2 === 0 ? "delivery driver" : "taxi driver";
+  }
+}
 
 function generateNPCs(): BackendNPC[] {
   // Track occupied cells to avoid stacking NPCs
@@ -182,14 +240,38 @@ function generateNPCs(): BackendNPC[] {
             ? "business_owner"
             : ROLES[i % ROLES.length];
 
+    const industry = INDUSTRIES[i % INDUSTRIES.length];
+    const persona = PERSONALITIES[i % PERSONALITIES.length];
+    const profession = professionForRole(role, industry, i);
+    const reputation = Math.round((0.35 + Math.random() * 0.45) * 100) / 100;
+    const interested_topics = [
+      INTEREST_TOPICS[i % INTEREST_TOPICS.length],
+      INTEREST_TOPICS[(i + 3) % INTEREST_TOPICS.length],
+      industry.replace("_", " "),
+    ];
+
     npcs.push({
       id: uid(),
       name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
+      gender: i % 3 === 0 ? "female" : i % 3 === 1 ? "male" : "nonbinary",
+      bio: `${FIRST_NAMES[i]} works as a ${profession} and is known around town for being ${persona}.`,
+      persona,
+      mbti: MBTI_TYPES[i % MBTI_TYPES.length],
+      country: COUNTRIES[i % COUNTRIES.length],
+      profession,
       role,
+      industry,
+      interested_topics,
       income_level: pick(["low", "medium", "high"]),
       political_leaning: Math.round((Math.random() * 2 - 1) * 100) / 100,
-      industry: INDUSTRIES[i % INDUSTRIES.length],
-      personality: PERSONALITIES[i % PERSONALITIES.length],
+      reputation,
+      beliefs: [
+        "Everyday residents should have a real say in local policy.",
+        `${industry.replace("_", " ")} matters to the town economy.`,
+      ],
+      controversial_ideas: [
+        `Prioritize public funding for ${industry.replace("_", " ")} over luxury development.`,
+      ],
       x,
       y,
       mood: i < 8 ? "neutral" : pick(MOODS),
@@ -227,6 +309,8 @@ function generateRelationships(npcs: BackendNPC[]): BackendRelationship[] {
       target_id: npcs[b].id,
       rel_type: pick(REL_TYPES),
       strength: Math.round(Math.random() * 100) / 100,
+      affinity: Math.round((Math.random() * 2 - 1) * 100) / 100,
+      trust: Math.round(Math.random() * 100) / 100,
     });
   }
 

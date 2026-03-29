@@ -46,13 +46,13 @@ export const DIRT = [
 ] as const;
 
 export const DIRT_TL = DIRT[0][0];
-export const DIRT_T  = DIRT[0][1];
+export const DIRT_T = DIRT[0][1];
 export const DIRT_TR = DIRT[0][2];
-export const DIRT_L  = DIRT[1][0];
-export const DIRT_C  = DIRT[1][1]; // center fill (use for any interior cell)
-export const DIRT_R  = DIRT[1][2];
+export const DIRT_L = DIRT[1][0];
+export const DIRT_C = DIRT[1][1]; // center fill (use for any interior cell)
+export const DIRT_R = DIRT[1][2];
 export const DIRT_BL = DIRT[2][0];
-export const DIRT_B  = DIRT[2][1];
+export const DIRT_B = DIRT[2][1];
 export const DIRT_BR = DIRT[2][2];
 
 // ─── Trees (overlay on grass — second layer) ──────────────────────────────────
@@ -62,10 +62,10 @@ export const DIRT_BR = DIRT[2][2];
  * Ground layer under both cells should be GRASS.
  */
 export const TREE1_CANOPY = 2072; // row 0 (top)
-export const TREE1_TRUNK  = 2136; // row 1 (bottom)
+export const TREE1_TRUNK = 2136; // row 1 (bottom)
 
 export const TREE2_CANOPY = 2074;
-export const TREE2_TRUNK  = 2138;
+export const TREE2_TRUNK = 2138;
 
 // ─── Buildings ────────────────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export const BUILDINGS: BuildingTemplate[] = [
   { id: "office2", tiles: OFFICE2, cols: 3, rows: 6, zone: "government" },
   { id: "office3", tiles: OFFICE3, cols: 3, rows: 6, zone: "government" },
   { id: "office4", tiles: OFFICE4, cols: 3, rows: 6, zone: "government" },
-  { id: "shop1",   tiles: SHOP1,   cols: 4, rows: 3, zone: "commercial" },
-  { id: "shop2",   tiles: SHOP2,   cols: 3, rows: 3, zone: "commercial" },
-  { id: "house1",  tiles: HOUSE1,  cols: 3, rows: 3, zone: "residential" },
+  { id: "shop1", tiles: SHOP1, cols: 4, rows: 3, zone: "commercial" },
+  { id: "shop2", tiles: SHOP2, cols: 3, rows: 3, zone: "commercial" },
+  { id: "house1", tiles: HOUSE1, cols: 3, rows: 3, zone: "residential" },
 ];

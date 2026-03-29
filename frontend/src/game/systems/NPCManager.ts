@@ -164,9 +164,19 @@ export class NPCManager {
     }
 
     const charType = roleToCharacter(bn.role, this.npcs.size);
-    const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
+    const npc = new NPC(
+      this.scene,
+      bn.id,
+      bn.name,
+      charType,
+      this.npcs.size,
+      tileX,
+      tileY,
+    );
     npc.role = bn.role;
+    npc.profession = bn.profession;
     npc.category = bn.category ?? "";
+    npc.reputation = bn.reputation;
     npc.sentiment = moodToSentiment(bn.mood);
     this.npcs.set(bn.id, npc);
     this.occupancy.occupy(bn.id, tileX, tileY);
@@ -295,7 +305,9 @@ export class NPCManager {
         if (tileX === -1) continue; // skip if no valid spawn found
 
         const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
+        car.profession = bn.profession;
         car.role = bn.role;
+        car.reputation = bn.reputation;
         car.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, car as unknown as NPC);
 
@@ -362,9 +374,11 @@ export class NPCManager {
         }
 
         const charType = roleToCharacter(bn.role, i);
-        const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
+        const npc = new NPC(this.scene, bn.id, bn.name, charType, i, tileX, tileY);
         npc.role = bn.role;
+        npc.profession = bn.profession;
         npc.category = bn.category ?? "";
+        npc.reputation = bn.reputation;
         npc.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, npc);
         this.occupancy.occupy(bn.id, tileX, tileY);

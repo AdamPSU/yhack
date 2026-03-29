@@ -240,22 +240,8 @@ const rowBlocks = [
 // Zone assignments [rowBlock][colBlock]
 const ZONE_MAP = [
   ["PARK", "PARK", "RESIDENTIAL", "RESIDENTIAL", "COMMERCIAL", "RESIDENTIAL"],
-  [
-    "PARK",
-    "COMMERCIAL",
-    "GOVT",
-    "GOVT",
-    "RESIDENTIAL",
-    "RESIDENTIAL",
-  ],
-  [
-    "RESIDENTIAL",
-    "COMMERCIAL",
-    "GOVT",
-    "GOVT",
-    "COMMERCIAL",
-    "RESIDENTIAL",
-  ],
+  ["PARK", "COMMERCIAL", "GOVT", "GOVT", "RESIDENTIAL", "RESIDENTIAL"],
+  ["RESIDENTIAL", "COMMERCIAL", "GOVT", "GOVT", "COMMERCIAL", "RESIDENTIAL"],
   [
     "RESIDENTIAL",
     "RESIDENTIAL",
@@ -389,10 +375,7 @@ function fillBlock(colBlock, rowBlock, zone) {
         for (const alt of palette) {
           const aw = buildingWidth(alt);
           const ah = buildingHeight(alt);
-          if (
-            curCol + aw - 1 <= endCol &&
-            curRow + ah - 1 <= endRow
-          ) {
+          if (curCol + aw - 1 <= endCol && curRow + ah - 1 <= endRow) {
             if (placeBuilding(alt, curCol, curRow)) {
               curCol += aw + 1; // 1-tile gap
               rowMaxHeight = Math.max(rowMaxHeight, ah);
@@ -494,15 +477,15 @@ function scatterDirt(colBlock, rowBlock) {
   const rb = rowBlocks[rowBlock];
 
   // Place 2-3 dirt patches per residential block
-  const numPatches = 2 + (((colBlock * 3 + rowBlock * 5) % 2 === 0) ? 1 : 0);
+  const numPatches = 2 + ((colBlock * 3 + rowBlock * 5) % 2 === 0 ? 1 : 0);
 
   for (let p = 0; p < numPatches; p++) {
     // Deterministic positions within block
     const offsetCol = Math.floor(
-      (cb.end - cb.start) * (0.2 + 0.3 * p) + (colBlock * 7 + p * 11) % 3
+      (cb.end - cb.start) * (0.2 + 0.3 * p) + ((colBlock * 7 + p * 11) % 3),
     );
     const offsetRow = Math.floor(
-      (rb.end - rb.start) * (0.3 + 0.2 * p) + (rowBlock * 5 + p * 7) % 3
+      (rb.end - rb.start) * (0.3 + 0.2 * p) + ((rowBlock * 5 + p * 7) % 3),
     );
 
     const patchCol = cb.start + (offsetCol % (cb.end - cb.start - 2));
@@ -596,7 +579,7 @@ const map = {
 
 const outPath = path.join(
   __dirname,
-  "../public/assets/maps/citypack-city.json"
+  "../public/assets/maps/citypack-city.json",
 );
 fs.writeFileSync(outPath, JSON.stringify(map));
 
@@ -620,6 +603,6 @@ for (let i = 0; i < W * H; i++) {
 }
 
 console.log(
-  `Terrain: ${roadCount} road, ${grassCount} grass, ${dirtCount} dirt tiles`
+  `Terrain: ${roadCount} road, ${grassCount} grass, ${dirtCount} dirt tiles`,
 );
 console.log(`Objects: ${objectCount} building/tree tiles`);

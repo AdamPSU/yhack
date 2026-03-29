@@ -270,9 +270,9 @@ export function generateCitypackChunk(cx: number, cy: number): ChunkData {
     };
 
     const palette = palettes[zone];
-    const shuffled = rng.shuffle(
-      [...palette] as ReadonlyArray<ReadonlyArray<number>>[],
-    );
+    const shuffled = rng.shuffle([...palette] as ReadonlyArray<
+      ReadonlyArray<number>
+    >[]);
 
     let lr = 1;
     while (lr < CHUNK_SIZE - 1) {

@@ -39,21 +39,21 @@ const initialNodes: Node[] = [
   {
     id: "policy",
     type: "policyNode",
-    position: { x: 0, y: 0 },
+    position: { x: 50, y: 200 },
     data: {},
     draggable: false,
   },
   {
     id: "config",
     type: "configNode",
-    position: { x: 500, y: 30 },
+    position: { x: 600, y: 140 },
     data: {},
     draggable: false,
   },
   {
     id: "run",
     type: "runNode",
-    position: { x: 860, y: 60 },
+    position: { x: 1050, y: 220 },
     data: {},
     draggable: false,
   },
@@ -94,7 +94,7 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const [numRounds, setNumRounds] = useState(5);
   const [objective, setObjective] = useState("");
   const mapId: MapType = "citypack";
-  const setMapId = (_: MapType) => {};
+  const setMapId = useCallback((_: MapType) => {}, []);
   const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [uploadingTrends, setUploadingTrends] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -184,7 +184,6 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
     numNpcs,
     numRounds,
     objective,
-    mapId,
     record,
     router,
     isSimulating,
@@ -233,7 +232,7 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       reader.readAsText(file);
       e.target.value = "";
     },
-    [mapId, router],
+    [router],
   );
 
   const formValue = useMemo(
@@ -268,7 +267,6 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       numNpcs,
       numRounds,
       objective,
-      mapId,
       primaryPolicy,
       trendSources,
       uploadingPrimary,
@@ -282,6 +280,7 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
       handleLoadCustomRun,
       handleLoadFile,
       loadingCustomRun,
+      setMapId,
     ],
   );
 
@@ -299,16 +298,15 @@ export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         proOptions={{ hideAttribution: true }}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         nodesDraggable={false}
         nodesConnectable={false}
-        panOnDrag
+        panOnDrag={false}
         zoomOnScroll={false}
         zoomOnPinch={false}
         zoomOnDoubleClick={false}
-        minZoom={0.5}
-        maxZoom={1.2}
+        minZoom={1}
+        maxZoom={1}
       />
     </FormContext.Provider>
   );

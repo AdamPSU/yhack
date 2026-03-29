@@ -12,11 +12,11 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#7B68EE",   // sdv-purple
-  friend: "#3E7C34",   // sdv-green
-  employer: "#C97D1A",  // sdv-orange
+  family: "#7B68EE", // sdv-purple
+  friend: "#3E7C34", // sdv-green
+  employer: "#C97D1A", // sdv-orange
   colleague: "#5A8DB8", // sdv-sky
-  neighbor: "#A0824A",  // sdv-wood-light
+  neighbor: "#A0824A", // sdv-wood-light
 };
 
 const EDGE_LABELS: Record<BackendRelType, string> = {
@@ -131,7 +131,10 @@ export function SocialGraph({
   const dragRef = useRef<GraphNode | null>(null);
   const spritesheetRef = useRef<HTMLImageElement | null>(null);
   const zoomRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-  const zoomBehaviorRef = useRef<d3.ZoomBehavior<HTMLCanvasElement, unknown> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<
+    HTMLCanvasElement,
+    unknown
+  > | null>(null);
   const [hovered, setHovered] = useState<GraphNode | null>(null);
   const [dims, setDims] = useState({ w: 680, h: 500 });
 
@@ -168,7 +171,8 @@ export function SocialGraph({
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.scale(dpr, dpr);
 
-    const zoom = d3.zoom<HTMLCanvasElement, unknown>()
+    const zoom = d3
+      .zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.3, 4])
       .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
         zoomRef.current = event.transform;
@@ -567,10 +571,14 @@ export function SocialGraph({
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
           sheet,
-          srcX, srcY, 16, 16,
+          srcX,
+          srcY,
+          16,
+          16,
           x - drawSize / 2,
           y - drawSize / 2,
-          drawSize, drawSize,
+          drawSize,
+          drawSize,
         );
         ctx.restore();
       }
@@ -738,7 +746,10 @@ export function SocialGraph({
         <div
           className="pointer-events-none absolute z-50"
           style={{
-            left: Math.min(zoomRef.current.applyX(hovNode.x ?? 0) + 18, dims.w - 180),
+            left: Math.min(
+              zoomRef.current.applyX(hovNode.x ?? 0) + 18,
+              dims.w - 180,
+            ),
             top: Math.max(zoomRef.current.applyY(hovNode.y ?? 0) - 20, 4),
           }}
         >
@@ -800,7 +811,12 @@ export function SocialGraph({
                       <span style={{ color: "#5B3A1E" }}>
                         {other?.name.split(" ")[0] ?? "?"}
                       </span>
-                      <span style={{ color: "#A0824A" }} className="uppercase tracking-tighter">{l.rel_type}</span>
+                      <span
+                        style={{ color: "#A0824A" }}
+                        className="uppercase tracking-tighter"
+                      >
+                        {l.rel_type}
+                      </span>
                     </div>
                   );
                 })}

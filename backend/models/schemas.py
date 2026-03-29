@@ -21,6 +21,9 @@ class NPC(BaseModel):
     interested_topics: list[str]
     income_level: Literal["low", "medium", "high"]
     political_leaning: float = Field(ge=-1, le=1)
+    reputation: float = Field(default=0.5, ge=0, le=1)
+    beliefs: list[str] = Field(default_factory=list)
+    controversial_ideas: list[str] = Field(default_factory=list)
     x: int = Field(ge=0, le=MAX_X)
     y: int = Field(ge=0, le=MAX_Y)
 
@@ -30,6 +33,8 @@ class Relationship(BaseModel):
     target_id: str
     rel_type: Literal["friend", "family", "employer", "neighbor", "colleague"]
     strength: float = Field(default=0.5, ge=0, le=1)
+    affinity: float = Field(default=0.0, ge=-1, le=1)
+    trust: float = Field(default=0.5, ge=0, le=1)
 
 
 class SimEvent(BaseModel):
@@ -106,6 +111,7 @@ class EconomicImpact(BaseModel):
 
 class PolicyAnalysis(BaseModel):
     """Structured response from the policy parsing LLM call."""
+
     sectors: list[str]
     stakeholders: list[StakeholderInfo]
     economic_impacts: list[EconomicImpact]
@@ -114,14 +120,17 @@ class PolicyAnalysis(BaseModel):
 
 class NPCGenerationResponse(BaseModel):
     """Structured response from the NPC generation LLM call."""
+
     npcs: list[NPC]
     relationships: list[Relationship]
 
 
 class RawNPCEvent(BaseModel):
     """A single event produced by an NPC during a simulation round."""
+
     event_type: Literal["chat", "move", "protest", "price_change", "mood_shift"]
     message: str
+    is_controversial: bool = Field(default=False, description="Whether this action expresses a highly controversial or polarizing idea.")
     data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -133,14 +142,19 @@ class NPCRoundResponseV2(BaseModel):
 
     Based on the generative agents architecture (Park et al., 2023).
     """
+
     perception: str
     emotional_reaction: str
+    social_strategy: str = Field(
+        description="Internal reasoning for choosing words or actions, including whether to lie or build reputation."
+    )
     plan_update: str | None = None
     events: list[RawNPCEvent]
 
 
 class ReflectionResponse(BaseModel):
     """Structured response from an NPC's reflection phase."""
+
     insights: list[str]
 
 

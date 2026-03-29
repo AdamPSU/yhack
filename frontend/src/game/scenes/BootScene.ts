@@ -44,7 +44,10 @@ export class BootScene extends Phaser.Scene {
         spacing: 0,
       });
       if (!proceduralMap) {
-        this.load.tilemapTiledJSON("citypack-city", "/assets/maps/citypack-city.json");
+        this.load.tilemapTiledJSON(
+          "citypack-city",
+          "/assets/maps/citypack-city.json",
+        );
       }
     } else {
       this.load.image("urban", "/assets/citymap_tilesets/CCity_mockup.png");

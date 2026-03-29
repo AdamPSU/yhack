@@ -29,9 +29,9 @@ export default function PolicyNode() {
       description="Upload one primary policy PDF, then add optional notes and trend CSVs."
       hasTarget={false}
     >
-      <div className="nodrag nopan space-y-3" style={{ width: 400 }}>
+      <div className="nodrag nopan space-y-3" style={{ width: 480 }}>
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               ref={pdfRef}
               type="file"
@@ -60,6 +60,36 @@ export default function PolicyNode() {
               style={{ color: primaryPolicy ? "#3E7C34" : "#B83A52" }}
             >
               {primaryPolicy ? "\u2605 READY" : "REQUIRED"}
+            </span>
+
+            <span className="text-[9px] font-mono" style={{ color: "#C4A46C" }}>
+              |
+            </span>
+
+            <input
+              ref={csvRef}
+              type="file"
+              accept={CSV_ACCEPTED}
+              onChange={handleTrendFiles}
+              className="hidden"
+              id="policy-csv-node"
+              data-testid="trend-csv-input"
+              multiple
+            />
+            <label
+              htmlFor="policy-csv-node"
+              data-testid="upload-csv-button"
+              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
+              style={{
+                color: uploadingTrends ? "#A0824A" : "#3D2510",
+                background: "#E8D5A3",
+                opacity: uploadingTrends ? 0.6 : 1,
+              }}
+            >
+              {uploadingTrends ? "Uploading CSV..." : "+ Trend CSV"}
+            </label>
+            <span className="text-[9px] font-mono" style={{ color: "#8B7355" }}>
+              {trendSources.length} attached
             </span>
           </div>
           {primaryPolicy && (
@@ -104,77 +134,41 @@ export default function PolicyNode() {
           </span>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              ref={csvRef}
-              type="file"
-              accept={CSV_ACCEPTED}
-              onChange={handleTrendFiles}
-              className="hidden"
-              id="policy-csv-node"
-              data-testid="trend-csv-input"
-              multiple
-            />
-            <label
-              htmlFor="policy-csv-node"
-              data-testid="upload-csv-button"
-              className="rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer transition-opacity hover:opacity-80"
-              style={{
-                color: uploadingTrends ? "#A0824A" : "#3D2510",
-                background: "#E8D5A3",
-                opacity: uploadingTrends ? 0.6 : 1,
-              }}
-            >
-              {uploadingTrends ? "Uploading CSV..." : "+ Trend CSV"}
-            </label>
-            <span className="text-[9px] font-mono" style={{ color: "#8B7355" }}>
-              {trendSources.length} attached
-            </span>
-          </div>
-          {trendSources.length > 0 && (
-            <div className="space-y-1">
-              {trendSources.map((source) => (
-                <div
-                  key={source.id}
-                  className="flex items-start gap-2 rounded p-2 text-[9px] font-mono"
-                  style={{
-                    background: "#FFF8DC",
-                    border: "1px solid #C4A46C",
-                    color: "#6B4C2A",
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div style={{ color: "#3D2510" }}>{source.filename}</div>
-                    <div
-                      className="mt-1 line-clamp-3 whitespace-pre-wrap"
-                      style={{ color: "#8B7355" }}
-                    >
-                      {source.summary}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeTrendSource(source.id)}
-                    className="transition-opacity hover:opacity-60"
-                    style={{ color: "#B83A52" }}
-                    data-testid={`remove-trend-${source.id}`}
+        {/* CSV previews */}
+        {trendSources.length > 0 && (
+          <div className="space-y-1">
+            {trendSources.map((source) => (
+              <div
+                key={source.id}
+                className="flex items-start gap-2 rounded p-2 text-[9px] font-mono"
+                style={{
+                  background: "#FFF8DC",
+                  border: "1px solid #C4A46C",
+                  color: "#6B4C2A",
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <div style={{ color: "#3D2510" }}>{source.filename}</div>
+                  <div
+                    className="mt-1 line-clamp-3 whitespace-pre-wrap"
+                    style={{ color: "#8B7355" }}
                   >
-                    {"\u00D7"}
-                  </button>
+                    {source.summary}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div
-          className="flex items-center gap-2 text-[9px] font-mono"
-          style={{ color: "#A0824A" }}
-        >
-          <span>PDF policy required</span>
-          <span className="ml-auto">CSV trends optional</span>
-        </div>
+                <button
+                  type="button"
+                  onClick={() => removeTrendSource(source.id)}
+                  className="transition-opacity hover:opacity-60"
+                  style={{ color: "#B83A52" }}
+                  data-testid={`remove-trend-${source.id}`}
+                >
+                  {"\u00D7"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </NodeWrapper>
   );

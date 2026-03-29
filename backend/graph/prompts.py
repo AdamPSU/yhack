@@ -110,6 +110,8 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   "profession": "specific job title",
   "bio": "2-3 sentences of life history grounded in this town and the policy context",
   "persona": "how they come across to others — speech style, mannerisms, reputation",
+  "beliefs": ["core personal belief 1", "core personal belief 2"],
+  "controversial_ideas": ["an idea they have that might polarize others, if any"],
   "interested_topics": ["topic1", "topic2", "topic3"]
 }}
 </output_format>"""
@@ -153,41 +155,65 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 _NPC_PREAMBLE = """\
 You are simulating the behavior of a single person in a small town reacting to a new economic policy. Stay in character and produce realistic, sometimes surprising reactions."""
 
-_NPC_CHARACTER_BLOCK = """\
+_MBTI_ARCHETYPES = """
+<mbti_guidelines>
+- INTJ (Architect): Strategic, logical, uses complex vocabulary, skeptical of inefficient ideas.
+- INTP (Logician): Analytical, detached, focuses on theory and data, precise in speech.
+- ENTJ (Commander): Decisive, assertive, uses business/leadership terms, focused on results.
+- ENTP (Debater): Provocative, quick-witted, enjoys playing devil's advocate, uses humor/irony.
+- INFJ (Advocate): Idealistic, metaphorical, focuses on deeper meaning and human potential.
+- INFP (Mediator): Values-driven, poetic, highly empathetic, focuses on authenticity and harmony.
+- ENFJ (Protagonist): Charismatic, persuasive, focuses on community and collective growth.
+- ENFP (Campaigner): Enthusiastic, imaginative, uses expressive language, focuses on new possibilities.
+- ISTJ (Logistician): Practical, factual, uses precise details, values tradition and reliability.
+- ISFJ (Defender): Supportive, detailed, focuses on practical help and maintaining stability.
+- ESTJ (Executive): Organized, direct, uses clear instructions, values rules and efficiency.
+- ESFJ (Consul): Social, cooperative, focuses on social harmony and following group norms.
+- ISTP (Virtuoso): Action-oriented, brief, focuses on mechanics and problem-solving, pragmatic.
+- ISFP (Adventurer): Sensitive, quiet, focuses on personal values and aesthetic/sensory details.
+- ESTP (Entrepreneur): Energetic, bold, uses slang/colloquialisms, focuses on immediate action.
+- ESFP (Entertainer): Spontaneous, playful, uses lively language, focuses on social engagement.
+</mbti_guidelines>"""
+
+_NPC_CHARACTER_BLOCK = f"""\
 <character>
-<name>{npc_name}</name>
-<gender>{npc_gender}</gender>
-<profession>{npc_profession}</profession>
-<country>{npc_country}</country>
-<mbti>{npc_mbti}</mbti>
-<bio>{npc_bio}</bio>
-<persona>{npc_persona}</persona>
-<interested_topics>{npc_interested_topics}</interested_topics>
-<income_level>{npc_income}</income_level>
-<political_leaning description="-1 = far left, 1 = far right">{npc_leaning}</political_leaning>
-<position x="{npc_x}" y="{npc_y}"/>
+<name>{{npc_name}}</name>
+<gender>{{npc_gender}}</gender>
+<profession>{{npc_profession}}</profession>
+<country>{{npc_country}}</country>
+<mbti>{{npc_mbti}}</mbti>
+{_MBTI_ARCHETYPES}
+<bio>{{npc_bio}}</bio>
+<beliefs>{{npc_beliefs}}</beliefs>
+<controversial_ideas>{{npc_controversial_ideas}}</controversial_ideas>
+<persona>{{npc_persona}}</persona>
+<interested_topics>{{npc_interested_topics}}</interested_topics>
+<income_level>{{npc_income}}</income_level>
+<political_leaning description="-1 = far left, 1 = far right">{{npc_leaning}}</political_leaning>
+<reputation description="0 = pariah, 1 = town hero">{{npc_reputation}}</reputation>
+<position x="{{npc_x}}" y="{{npc_y}}"/>
 </character>
 
 <policy>
-{policy_summary}
+{{policy_summary}}
 </policy>
 
 <simulation_focus>
-The simulation is examining: {objective}
+The simulation is examining: {{objective}}
 Let this shape what you pay attention to and what you talk about, if relevant to your character.
 </simulation_focus>
 
 <simulation_state>
-<round current="{current_round}" max="{max_rounds}"/>
-{round_context}
+<round current="{{current_round}}" max="{{max_rounds}}"/>
+{{round_context}}
 </simulation_state>
 
 <nearby_characters description="within 2 tiles of you">
-{nearby_npcs}
+{{nearby_npcs}}
 </nearby_characters>
 
 <distant_connections description="people you care about, not nearby">
-{social_targets}
+{{social_targets}}
 </distant_connections>"""
 
 _NPC_ACTION_TYPES = """\
@@ -201,6 +227,7 @@ _NPC_ACTION_TYPES = """\
 
 <style_rules>
 CRITICAL: Never write the "message" field as a third-person summary like "X discusses Y with Z" or "X's mood shifts to hopeful." Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and speech patterns.
+Set is_controversial to true ONLY if you are expressing an idea that is likely to polarize others, challenge the status quo, or damage your reputation in some circles.
 </style_rules>"""
 
 _NPC_DATA_FIELDS = """\
@@ -233,11 +260,20 @@ Think through these steps as this character:
 
 <step name="perceive">What stands out to you about the current situation? Consider the policy, people around you, and your memories of what has happened so far. Reference specific memories when relevant.</step>
 
+<step name="social_strategy">
+Consider your reputation and the people nearby. 
+- Who do you like (high affinity)? Who do you distrust? 
+- Is it better to be honest and risk your reputation, or lie/pander to gain social capital?
+- If you have a controversial plan or idea, how will you frame it? Will you share it now or wait?
+- Will you attempt to manipulate someone, or build a genuine bond?
+- How will this interaction affect your reputation in the eyes of the person you are talking to and the wider town?
+</step>
+
 <step name="react">How do you emotionally respond? Consider your personality, income, political views, social connections, and what you remember. Does anything unexpected conflict with your plan?</step>
 
 <step name="plan_check">Does anything that happened change your plans? If so, state your revised plan. If not, leave plan_update as null.</step>
 
-<step name="act">What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character and align with your current plan. Prefer interacting with people you have relationships with over strangers.</step>
+<step name="act">What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character and align with your current plan. Prefer interacting with people you have relationships with over strangers. Your dialogue MUST match your MBTI guidelines, personal beliefs, and social standing.</step>
 </instructions>
 
 {_NPC_ACTION_TYPES}
@@ -246,12 +282,14 @@ Think through these steps as this character:
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{{{
   "perception": "what you notice and think about the current situation",
+  "social_strategy": "your internal reasoning for how you interact with others this round",
   "emotional_reaction": "your emotional and internal response",
   "plan_update": null,
   "events": [
     {{{{
       "event_type": "chat|move|protest|price_change|mood_shift",
       "message": "human-readable description of what happened",
+      "is_controversial": false,
       "data": {{{{}}}}
     }}}}
   ]

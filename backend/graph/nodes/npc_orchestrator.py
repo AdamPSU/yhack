@@ -23,12 +23,33 @@ from models.state import SimState
 logger = logging.getLogger(__name__)
 
 _MBTI_TYPES = [
-    "INTJ", "INTP", "ENTJ", "ENTP",
-    "INFJ", "INFP", "ENFJ", "ENFP",
-    "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-    "ISTP", "ISFP", "ESTP", "ESFP",
+    "INTJ",
+    "INTP",
+    "ENTJ",
+    "ENTP",
+    "INFJ",
+    "INFP",
+    "ENFJ",
+    "ENFP",
+    "ISTJ",
+    "ISFJ",
+    "ESTJ",
+    "ESFJ",
+    "ISTP",
+    "ISFP",
+    "ESTP",
+    "ESFP",
 ]
-_MOODS = ["hopeful", "anxious", "angry", "neutral", "excited", "worried", "skeptical", "determined"]
+_MOODS = [
+    "hopeful",
+    "anxious",
+    "angry",
+    "neutral",
+    "excited",
+    "worried",
+    "skeptical",
+    "determined",
+]
 _INCOME_LEVELS = ["low", "medium", "high"]
 
 
@@ -77,7 +98,9 @@ def _clamp_positions(npcs: list[dict]) -> list[dict]:
     return npcs
 
 
-async def _extract_characters(source_text: str, entities_json: str, llm: ChatOpenAI) -> list[dict]:
+async def _extract_characters(
+    source_text: str, entities_json: str, llm: ChatOpenAI
+) -> list[dict]:
     """Try to extract named characters from the source text."""
     prompt = EXTRACT_CHARACTERS_PROMPT.format(
         source_text=source_text[:4000],
@@ -88,7 +111,9 @@ async def _extract_characters(source_text: str, entities_json: str, llm: ChatOpe
     return data.get("characters", [])
 
 
-async def _generate_personality(base: dict, entities_json: str, llm: ChatOpenAI) -> dict:
+async def _generate_personality(
+    base: dict, entities_json: str, llm: ChatOpenAI
+) -> dict:
     """Ask LLM only for personality fields; all other attrs are pre-generated."""
     prompt = GENERATE_NPC_PERSONALITY_PROMPT.format(
         name=base["name"],
@@ -103,10 +128,12 @@ async def _generate_personality(base: dict, entities_json: str, llm: ChatOpenAI)
     return {**base, **data}
 
 
-async def _generate_relationships(npcs: list[dict], entities_json: str, llm: ChatOpenAI) -> list[dict]:
+async def _generate_relationships(
+    npcs: list[dict], entities_json: str, llm: ChatOpenAI
+) -> list[dict]:
     """Generate a social network across the assembled NPC roster."""
     summary_lines = [
-        f'{n["id"]}: {n.get("name", "?")} — {n.get("profession", "?")} x={n.get("x")}, y={n.get("y")}'
+        f"{n['id']}: {n.get('name', '?')} — {n.get('profession', '?')} x={n.get('x')}, y={n.get('y')}"
         for n in npcs
     ]
     target_rels = max(15, int(len(npcs) * 1.5))
@@ -117,6 +144,24 @@ async def _generate_relationships(npcs: list[dict], entities_json: str, llm: Cha
     response = await llm.ainvoke(prompt)
     data = parse_llm_json(response.content, fallback={"relationships": []})  # type: ignore[arg-type]
     return data.get("relationships", [])
+
+
+def _initial_reputation(npc: dict) -> float:
+    """Heuristic for starting reputation based on social standing."""
+    rep = 0.5
+    if npc.get("income_level") == "high":
+        rep += 0.1
+    elif npc.get("income_level") == "low":
+        rep -= 0.05
+
+    prof = npc.get("profession", "").lower()
+    if any(
+        k in prof for k in ["doctor", "lawyer", "owner", "professor", "judge", "mayor"]
+    ):
+        rep += 0.2
+    if any(k in prof for k in ["activist", "drifter", "protester"]):
+        rep -= 0.1
+    return round(max(0.1, min(0.95, rep)), 2)
 
 
 async def generate_npcs(state: SimState) -> dict:
@@ -146,7 +191,10 @@ async def generate_npcs(state: SimState) -> dict:
         char.setdefault("persona", "Speaks plainly when they have something to say.")
         char.setdefault("profession", char.pop("role", "local resident"))
         char.setdefault("interested_topics", ["local economy"])
+        char.setdefault("beliefs", ["Honesty is the best policy.", "Hard work pays off."])
+        char.setdefault("controversial_ideas", [])
         char.setdefault("category", "resident")
+        char["reputation"] = _initial_reputation(char)
         npcs.append(char)
         if callback:
             await callback(char)
@@ -155,14 +203,20 @@ async def generate_npcs(state: SimState) -> dict:
     if needed > 0:
         logger.info("generate_npcs: generating %d random NPCs …", needed)
         bases = [_random_base(len(npcs) + i, used_names) for i in range(needed)]
-        tasks = [asyncio.ensure_future(_generate_personality(b, entities_json, llm)) for b in bases]
+        tasks = [
+            asyncio.ensure_future(_generate_personality(b, entities_json, llm))
+            for b in bases
+        ]
         slot_offset = len(npcs)
         for i, future in enumerate(asyncio.as_completed(tasks)):
             npc = await future
             npc["id"] = f"npc_{slot_offset + i + 1:02d}"
             npc.setdefault("profession", "local resident")
             npc.setdefault("interested_topics", ["local economy"])
+            npc.setdefault("beliefs", ["Honesty is the best policy.", "Hard work pays off."])
+            npc.setdefault("controversial_ideas", [])
             npc.setdefault("category", "resident")
+            npc["reputation"] = _initial_reputation(npc)
             npcs.append(npc)
             if callback:
                 await callback(npc)
@@ -170,6 +224,14 @@ async def generate_npcs(state: SimState) -> dict:
     logger.info("generate_npcs: generating relationships …")
     rel_llm = get_llm(max_tokens=2048, model=settings.fast_model_name)
     relationships = await _generate_relationships(npcs, entities_json, rel_llm)
+
+    # Ensure all relationships have affinity and trust
+    for rel in relationships:
+        rel.setdefault(
+            "affinity", round(random.uniform(-0.1, 0.3), 2)
+        )  # Default slightly positive/neutral
+        rel.setdefault("trust", round(random.uniform(0.3, 0.7), 2))
+
     logger.info("generate_npcs: created %d relationships", len(relationships))
 
     npcs = _clamp_positions(npcs)

@@ -24,7 +24,12 @@ import {
   isHRoadRow as ccityIsHRoadRow,
 } from "../map/ProceduralCity";
 import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
-import { ALL_CHARACTERS, ALL_DIRECTIONS, getAnimKey, getWalkFrames } from "../map/NPCCharacterRegistry";
+import {
+  ALL_CHARACTERS,
+  ALL_DIRECTIONS,
+  getAnimKey,
+  getWalkFrames,
+} from "../map/NPCCharacterRegistry";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -169,6 +174,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.useCitypackChunks && this.citypackChunkManager) {
       this.citypackChunkManager.update(this.cameras.main);
     }
+
+    this.npcManager?.refreshActiveBubblePositions();
 
     // Keyboard panning
     if (this.cursors) {
@@ -408,6 +415,7 @@ export class WorldScene extends Phaser.Scene {
 
     cam.scrollX = Math.round(cam.scrollX + data.dx);
     cam.scrollY = Math.round(cam.scrollY + data.dy);
+    this.npcManager?.refreshActiveBubblePositions();
   }
 
   private onCameraZoom(data: { delta: number; x?: number; y?: number }) {
@@ -417,7 +425,7 @@ export class WorldScene extends Phaser.Scene {
     const zoomStep = 0.2;
     const minZoom = 0.5;
     const maxZoom = 5.0;
-    
+
     const oldZoom = cam.zoom;
     const nextZoom = Phaser.Math.Clamp(
       oldZoom + data.delta * zoomStep,
@@ -433,18 +441,18 @@ export class WorldScene extends Phaser.Scene {
       // We want pointWorldBefore == pointWorldAfter
       // (mouseX / oldZoom) + oldScrollX == (mouseX / nextZoom) + nextScrollX
       // nextScrollX = oldScrollX + mouseX * (1/oldZoom - 1/nextZoom)
-      
+
       const mouseX = data.x;
       const mouseY = data.y;
-      
+
       cam.setZoom(nextZoom);
       cam.scrollX += mouseX * (1 / oldZoom - 1 / nextZoom);
       cam.scrollY += mouseY * (1 / oldZoom - 1 / nextZoom);
     } else {
       cam.setZoom(nextZoom);
     }
+    this.npcManager?.refreshActiveBubblePositions();
   }
-
 
   private onCameraSnapNPC(data: { npcId: string }) {
     const npc = this.npcManager?.getNPC(data.npcId);
@@ -452,6 +460,7 @@ export class WorldScene extends Phaser.Scene {
     const targetX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
     const targetY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
     this.cameras.main.pan(targetX, targetY, 400, "Power2");
+    this.npcManager?.refreshActiveBubblePositions();
   }
 
   private onPhaseChange(data: { phase: number; month: number }) {

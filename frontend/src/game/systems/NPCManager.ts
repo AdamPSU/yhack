@@ -94,7 +94,10 @@ export class NPCManager {
     }
     for (let i = this.roadTilesCache.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [this.roadTilesCache[i], this.roadTilesCache[j]] = [this.roadTilesCache[j], this.roadTilesCache[i]];
+      [this.roadTilesCache[i], this.roadTilesCache[j]] = [
+        this.roadTilesCache[j],
+        this.roadTilesCache[i],
+      ];
     }
     this.spawnAreaReady = true;
   }
@@ -107,7 +110,12 @@ export class NPCManager {
     this.occupancy.clear();
     this.roadTilesCache = [];
     this.spawnAreaReady = false;
-    this.movement = new MovementSystem(this.scene, this.isWalkable, this.isRoad, this.occupancy);
+    this.movement = new MovementSystem(
+      this.scene,
+      this.isWalkable,
+      this.isRoad,
+      this.occupancy,
+    );
   }
 
   private onAddNPC(bn: BackendNPC) {
@@ -133,8 +141,14 @@ export class NPCManager {
       }
     }
     if (tileX === -1) {
-      tileX = Math.max(CENTER_BOUNDS.minCol, Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()));
-      tileY = Math.max(CENTER_BOUNDS.minRow, Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()));
+      tileX = Math.max(
+        CENTER_BOUNDS.minCol,
+        Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
+      );
+      tileY = Math.max(
+        CENTER_BOUNDS.minRow,
+        Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
+      );
     }
 
     const charType = roleToCharacter(bn.role, this.npcs.size);
@@ -334,14 +348,7 @@ export class NPCManager {
         }
 
         const charType = roleToCharacter(bn.role, i);
-        const npc = new NPC(
-          this.scene,
-          bn.id,
-          bn.name,
-          charType,
-          tileX,
-          tileY,
-        );
+        const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
         npc.role = bn.role;
         npc.category = bn.category ?? "";
         npc.sentiment = moodToSentiment(bn.mood);
@@ -425,6 +432,14 @@ export class NPCManager {
 
   getAllNPCs(): NPC[] {
     return [...this.npcs.values()];
+  }
+
+  /** Re-emit positions for NPCs with active bubbles so camera pan/zoom stays in sync. */
+  refreshActiveBubblePositions() {
+    for (const npc of this.npcs.values()) {
+      if (!npc.message) continue;
+      this.emitNPCPosition(npc);
+    }
   }
 
   /** Override movement: NPC stops roaming and enters protest/override state at current position */

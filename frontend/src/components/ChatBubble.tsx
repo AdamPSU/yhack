@@ -17,12 +17,12 @@ export function ChatBubble({
 }: ChatBubbleProps) {
   return (
     <div
-      className="pointer-events-none absolute z-30 will-change-[left,top]"
+      className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full will-change-[left,top]"
       style={{ left: x, top: y }}
       data-testid="chat-bubble"
     >
       <div
-        className="rpg-panel px-2.5 py-1.5"
+        className="rpg-panel w-[260px] max-w-[260px] px-2.5 py-1.5"
         style={{ background: "#FDF5E6", border: "2px solid #A0824A" }}
       >
         <div className="flex items-baseline gap-1.5">
@@ -36,7 +36,7 @@ export function ChatBubble({
           )}
         </div>
         <p
-          className="mt-1 text-[10px] font-mono leading-snug"
+          className="mt-1 whitespace-normal break-words text-[10px] font-mono leading-snug"
           style={{ color: "#6B4C2A" }}
         >
           {message.length > 80 ? `${message.slice(0, 80)}...` : message}
@@ -53,13 +53,6 @@ export function ChatBubble({
           style={{ borderTopColor: "#FDF5E6" }}
         />
         <div className="h-3 w-[2px]" style={{ background: "#C4A46C" }} />
-        <div
-          className="h-[4px] w-[4px] rounded-full"
-          style={{
-            background: "#D4A520",
-            boxShadow: "0 0 4px rgba(212,165,32,0.5)",
-          }}
-        />
       </div>
     </div>
   );

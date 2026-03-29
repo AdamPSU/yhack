@@ -1,4 +1,4 @@
-# PolicySim - Economic Policy Simulator
+# SIMULACRA - Economic Policy Simulator
 
 ## What This Is
 A hackathon project that simulates how economic policies cascade to everyday life. Users input ~500 words of policy text, and 25 LLM-powered NPC agents simulate reactions — from price changes to protests — visualized in a pixel-art SimCity/Pokemon-style world.

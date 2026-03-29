@@ -18,10 +18,10 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
 
-logger = logging.getLogger("policysim")
+logger = logging.getLogger("simulacra")
 
 # ── App ──────────────────────────────────────────────────────────────
-app = FastAPI(title="PolicySim", version="0.1.0")
+app = FastAPI(title="SIMULACRA", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +39,7 @@ sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
 app = sio_asgi  # type: ignore[assignment]
 
 logger.info(
-    "PolicySim ready — provider=%s model=%s base_url=%s",
+    "SIMULACRA ready — provider=%s model=%s base_url=%s",
     settings.provider.value,
     settings.get_model("default"),
     settings.base_url,

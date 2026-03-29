@@ -1,4 +1,4 @@
-# PolicySim Backend
+# SIMULACRA Backend
 
 FastAPI + LangGraph backend that orchestrates 25 LLM-powered NPC agents simulating reactions to economic policy, with opinion dynamics grounded in peer-reviewed social science.
 

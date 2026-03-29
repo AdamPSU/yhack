@@ -388,11 +388,18 @@ function SimulateContent() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY < 0 ? 1 : -1;
-      
-      // Get relative mouse position within the container
-      const rect = el.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+
+      const zoomTarget =
+        el.querySelector("canvas") ??
+        el.querySelector("[data-testid='game-canvas']");
+      const rect =
+        zoomTarget instanceof HTMLElement
+          ? zoomTarget.getBoundingClientRect()
+          : el.getBoundingClientRect();
+      const scaleX = rect.width > 0 ? GAME_WIDTH / rect.width : 1;
+      const scaleY = rect.height > 0 ? GAME_HEIGHT / rect.height : 1;
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
 
       import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
         eventBridge.emitCameraZoom(delta, mouseX, mouseY);
@@ -432,7 +439,6 @@ function SimulateContent() {
       setShowReport(true);
     }
   }, [sim.isComplete, sim.reportLoading, sim.report]);
-
 
   const bubbleList = Array.from(bubbles.values());
 

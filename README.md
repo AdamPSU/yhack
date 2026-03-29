@@ -17,21 +17,6 @@
 
 ---
 
-## 🖼 Demo
-
-<!-- Replace with actual screenshot or GIF -->
-```
-┌─────────────────────────────────────────────────────┐
-│  [ Screenshot / GIF goes here ]                     │
-│                                                     │
-│  > bun dev  →  localhost:3000                       │
-└─────────────────────────────────────────────────────┘
-```
-
-*Live demo coming soon — run it locally with the Quick Start below.*
-
----
-
 ## 🗺 What It Does
 
 | Step | What happens |

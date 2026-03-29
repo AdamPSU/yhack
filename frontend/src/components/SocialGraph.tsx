@@ -61,6 +61,7 @@ interface GraphNode extends d3.SimulationNodeDatum {
   // animation state
   flashUntil: number;
   connectionCount: number;
+  charIndex: number;
 }
 
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
@@ -105,6 +106,7 @@ export function SocialGraph({
   const rafRef = useRef<number>(0);
   const hoveredRef = useRef<string | null>(null);
   const dragRef = useRef<GraphNode | null>(null);
+  const spritesheetRef = useRef<HTMLImageElement | null>(null);
   const [hovered, setHovered] = useState<GraphNode | null>(null);
   const [dims, setDims] = useState({ w: 680, h: 500 });
 
@@ -118,6 +120,15 @@ export function SocialGraph({
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Load NPC spritesheet once on mount
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/assets/tilesets/tilemap_packed.png";
+    img.onload = () => {
+      spritesheetRef.current = img;
+    };
   }, []);
 
   // Resize canvas with DPR
@@ -151,7 +162,7 @@ export function SocialGraph({
       connCount.set(r.target_id, (connCount.get(r.target_id) || 0) + 1);
     }
 
-    const nodes: GraphNode[] = npcs.map((npc) => {
+    const nodes: GraphNode[] = npcs.map((npc, i) => {
       const prev = existingPositions.get(npc.id);
       return {
         id: npc.id,
@@ -161,6 +172,7 @@ export function SocialGraph({
         mood: npc.mood,
         flashUntil: 0,
         connectionCount: connCount.get(npc.id) || 0,
+        charIndex: i % 16,
         ...(prev || {}),
       };
     });
@@ -480,7 +492,7 @@ export function SocialGraph({
         ctx.stroke();
       }
 
-      // Node fill — gradient sphere effect
+      // Node fill — gradient sphere effect (semi-transparent so sprite shows through)
       const grad = ctx.createRadialGradient(
         x - r * 0.3,
         y - r * 0.3,
@@ -495,10 +507,35 @@ export function SocialGraph({
       grad.addColorStop(0.7, baseColor);
       grad.addColorStop(1, d3.interpolateRgb(baseColor, "#000")(0.25));
 
+      ctx.globalAlpha = isDimmed ? 0.15 : 0.4;
       ctx.beginPath();
       ctx.arc(x, y, hovR, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
+      ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
+
+      // Draw NPC sprite clipped to node circle
+      const sheet = spritesheetRef.current;
+      if (sheet) {
+        const charIdx = node.charIndex;
+        const srcX = (23 + (charIdx % 4)) * 16;
+        const srcY = (14 + Math.floor(charIdx / 4)) * 16;
+        const drawSize = hovR * 1.6;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, hovR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+          sheet,
+          srcX, srcY, 16, 16,
+          x - drawSize / 2,
+          y - drawSize / 2,
+          drawSize, drawSize,
+        );
+        ctx.restore();
+      }
 
       // Thin crisp border
       ctx.strokeStyle = isHov ? "#f0e6d2" : "rgba(0,0,0,0.3)";

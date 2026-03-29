@@ -94,6 +94,7 @@ interface SimulationState {
   isRunning: boolean;
   isComplete: boolean;
   latestEvent: SimEvent | null;
+  error: string | null;
 }
 
 // Cache EventBridge module to avoid per-event dynamic import overhead
@@ -133,6 +134,7 @@ export function useSimulation(simulationId?: string, record = false) {
     isRunning: false,
     isComplete: false,
     latestEvent: null,
+    error: null,
   });
 
   const [graphData, setGraphData] = useState<GraphData>({
@@ -337,6 +339,7 @@ export function useSimulation(simulationId?: string, record = false) {
       isRunning: true,
       isComplete: false,
       latestEvent: null,
+      error: null,
     });
     npcLookupRef.current = new Map();
     relationshipsRef.current = [];
@@ -502,14 +505,18 @@ export function useSimulation(simulationId?: string, record = false) {
 
         onError: (message) => {
           console.error("[sim] error:", message);
-          setState((prev) => ({ ...prev, isRunning: false }));
+          setState((prev) => ({ ...prev, isRunning: false, error: message }));
         },
       });
 
       cleanupRef.current = cleanup;
     } catch (err) {
       console.error("Failed to start simulation:", err);
-      setState((prev) => ({ ...prev, isRunning: false }));
+      setState((prev) => ({
+        ...prev,
+        isRunning: false,
+        error: err instanceof Error ? err.message : "Connection failed",
+      }));
     }
   }, [simulationId, record, processRound, processNPCEvents]);
 
@@ -526,6 +533,7 @@ export function useSimulation(simulationId?: string, record = false) {
         isRunning: true,
         isComplete: false,
         latestEvent: null,
+        error: null,
       });
       npcLookupRef.current = new Map();
       relationshipsRef.current = [];

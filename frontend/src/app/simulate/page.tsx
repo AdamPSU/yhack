@@ -824,6 +824,37 @@ function SimulateContent() {
           onClose={() => setShowReport(false)}
         />
       )}
+
+      {/* Error overlay — shown when backend restarts or simulation is lost */}
+      {sim.error && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div
+            className="rpg-panel px-6 py-4 text-center"
+            style={{ background: "#FDF5E6" }}
+          >
+            <p
+              className="font-mono text-sm font-bold"
+              style={{ color: "#B83A52" }}
+            >
+              Connection Lost
+            </p>
+            <p
+              className="mt-2 font-mono text-xs"
+              style={{ color: "#6B4C2A" }}
+            >
+              The simulation server restarted. Please go back and start a new
+              simulation.
+            </p>
+            <a
+              href="/"
+              className="mt-3 block font-mono text-xs underline"
+              style={{ color: "#A0824A" }}
+            >
+              {"<-"} Back to home
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

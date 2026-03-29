@@ -245,10 +245,13 @@ def _build_round_context(current_round: int, max_rounds: int, events: list[dict[
     return " ".join(parts)
 
 
-def _policy_summary(entities: list[dict[str, Any]]) -> str:
+def _policy_summary(entities: list[dict[str, Any]], context_summary: str = "") -> str:
     """Condense parsed policy entities into a readable summary for NPCs."""
     if not entities:
-        return "A new economic policy has been announced, but details are unclear."
+        base = "A new economic policy has been announced, but details are unclear."
+        if context_summary:
+            return f"{base}\n\nAdditional context:\n{context_summary}"
+        return base
 
     e = entities[0]
     sectors = ", ".join(e.get("sectors", [])[:6]) or "various sectors"
@@ -261,11 +264,14 @@ def _policy_summary(entities: list[dict[str, Any]]) -> str:
     impacts_str = "\n".join(impacts) if impacts else "  - Details still emerging"
     controversy = e.get("controversy_level", "medium")
 
-    return (
+    summary = (
         f"A new policy affecting {sectors} has been announced.\n"
         f"Key expected impacts:\n{impacts_str}\n"
         f"Controversy level: {controversy}"
     )
+    if context_summary:
+        return f"{summary}\n\nAdditional context:\n{context_summary}"
+    return summary
 
 
 @dataclass
@@ -591,7 +597,10 @@ async def run_round(state: SimState) -> dict[str, Any]:
 
     logger.info("run_round: starting round %d/%d  (%d NPCs) …", current_round + 1, max_rounds, len(npcs))
 
-    policy_text = _policy_summary(state.get("entities", []))
+    policy_text = _policy_summary(
+        state.get("entities", []),
+        state.get("context_summary", ""),
+    )
     round_context = _build_round_context(current_round, max_rounds, events)
     rel_map = _build_relationship_map(state.get("relationships", []))
     name_to_id = {npc.get("name", ""): npc.get("id", "") for npc in npcs}

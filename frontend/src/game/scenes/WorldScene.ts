@@ -19,6 +19,7 @@ import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
   // Static map (fallback)
+  private staticGroundLayer?: Phaser.Tilemaps.TilemapLayer;
   private staticBuildingLayer?: Phaser.Tilemaps.TilemapLayer;
 
   // Infinite procedural map
@@ -42,6 +43,7 @@ export class WorldScene extends Phaser.Scene {
   create() {
     this.sceneReady = false;
     this.cleanedUp = false;
+    this.staticGroundLayer = undefined;
     this.staticBuildingLayer = undefined;
     this.chunkManager = undefined;
     this.citypackChunkManager = undefined;
@@ -199,6 +201,7 @@ export class WorldScene extends Phaser.Scene {
       console.error("Failed to create ground layer");
       return;
     }
+    this.staticGroundLayer = groundLayer;
 
     const buildingLayer = map.createLayer(buildingLayerName, tileset);
     if (!buildingLayer) {

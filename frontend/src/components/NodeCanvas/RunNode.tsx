@@ -4,8 +4,14 @@ import NodeWrapper from './NodeWrapper';
 import { useForm } from './FormContext';
 
 export default function RunNode() {
-  const { text, handleSimulate, isSimulating } = useForm();
-  const canRun = text.trim().length >= 20 && !isSimulating;
+  const {
+    primaryPolicy,
+    uploadingPrimary,
+    uploadingTrends,
+    handleSimulate,
+    isSimulating,
+  } = useForm();
+  const canRun = primaryPolicy !== null && !isSimulating && !uploadingPrimary && !uploadingTrends;
 
   return (
     <NodeWrapper badge="04" title="RUN" description="Go." hasSource={false}>
@@ -20,7 +26,13 @@ export default function RunNode() {
           {isSimulating ? '...' : '▶'}
         </button>
         <span className="text-[9px] font-mono text-white/60 text-center">
-          {isSimulating ? 'SIMULATING...' : (canRun ? 'READY' : `${Math.max(0, 20 - text.trim().length)} chars needed`)}
+          {isSimulating
+            ? 'SIMULATING...'
+            : canRun
+              ? 'READY'
+              : uploadingPrimary
+                ? 'PROCESSING PDF...'
+                : 'UPLOAD PDF'}
         </span>
       </div>
     </NodeWrapper>

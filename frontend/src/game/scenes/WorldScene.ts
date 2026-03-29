@@ -122,6 +122,17 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.centerOn((100 * 16) / 2, (80 * 16) / 2);
     }
 
+    if (selectedMap === "citypack") {
+      const MAP_PX_W = 100 * TILE_SIZE; // 1600
+      const MAP_PX_H = 80 * TILE_SIZE; // 1280
+      const minZoom = Math.max(GAME_WIDTH / MAP_PX_W, GAME_HEIGHT / MAP_PX_H);
+      this.cameras.main.setZoom(Math.max(this.cameras.main.zoom, minZoom));
+      this.cameras.main.setBounds(0, 0, MAP_PX_W, MAP_PX_H, true);
+      (this as any)._minZoom = minZoom;
+      (this as any)._mapPxW = MAP_PX_W;
+      (this as any)._mapPxH = MAP_PX_H;
+    }
+
     // Snap camera to integer pixels to prevent tile seams during pan/zoom
     this.cameras.main.roundPixels = true;
 
@@ -413,8 +424,30 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.getMainCamera();
     if (!cam) return;
 
-    cam.scrollX = Math.round(cam.scrollX + data.dx);
-    cam.scrollY = Math.round(cam.scrollY + data.dy);
+    if (selectedMap !== "citypack") {
+      cam.scrollX = Math.round(cam.scrollX + data.dx);
+      cam.scrollY = Math.round(cam.scrollY + data.dy);
+      this.npcManager?.refreshActiveBubblePositions();
+      return;
+    }
+
+    const SOFT_X_MIN = 160;
+    const SOFT_X_MAX = 1440;
+    const SOFT_Y_MIN = 80;
+    const SOFT_Y_MAX = 1200;
+    const RESISTANCE = 0.25;
+
+    const cx = cam.scrollX + cam.width / (2 * cam.zoom);
+    const cy = cam.scrollY + cam.height / (2 * cam.zoom);
+
+    const inSoftX = cx >= SOFT_X_MIN && cx <= SOFT_X_MAX;
+    const inSoftY = cy >= SOFT_Y_MIN && cy <= SOFT_Y_MAX;
+
+    const dx = inSoftX ? data.dx : data.dx * RESISTANCE;
+    const dy = inSoftY ? data.dy : data.dy * RESISTANCE;
+
+    cam.scrollX = Math.round(cam.scrollX + dx);
+    cam.scrollY = Math.round(cam.scrollY + dy);
     this.npcManager?.refreshActiveBubblePositions();
   }
 
@@ -423,7 +456,7 @@ export class WorldScene extends Phaser.Scene {
     if (!cam) return;
 
     const zoomStep = 0.2;
-    const minZoom = 0.5;
+    const minZoom = (this as any)._minZoom ?? 0.5;
     const maxZoom = 5.0;
 
     const oldZoom = cam.zoom;

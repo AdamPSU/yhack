@@ -16,13 +16,36 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+def _supports_reasoning_effort(model_name: str, base_url: str) -> bool:
+    """Return True only for model families we know accept reasoning_effort."""
+    if "api.openai.com" not in base_url:
+        return False
+
+    openai_reasoning_prefixes = ("o1", "o3", "o4", "gpt-5")
+    return model_name.startswith(openai_reasoning_prefixes)
+
+
 def get_llm(max_tokens: int = 4096, model: str | None = None, reasoning_effort: str | None = None) -> ChatOpenAI:
     """Create a ChatOpenAI instance for the currently configured model."""
-    extra_body = {"reasoning_effort": reasoning_effort} if reasoning_effort else None
+    model_name = model or settings.model_name
+    base_url = settings.llm_base_url_for(model_name)
+    api_key = settings.llm_api_key_for(model_name)
+
+    extra_body = None
+    if reasoning_effort and _supports_reasoning_effort(model_name, base_url):
+        extra_body = {"reasoning_effort": reasoning_effort}
+    elif reasoning_effort:
+        logger.info(
+            "Skipping reasoning_effort=%s for model=%s base_url=%s",
+            reasoning_effort,
+            model_name,
+            base_url,
+        )
+
     return ChatOpenAI(
-        model=model or settings.model_name,
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
+        model=model_name,
+        api_key=api_key,
+        base_url=base_url,
         max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
         extra_body=extra_body,  # pyright: ignore[reportCallIssue]
     )

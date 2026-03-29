@@ -10,7 +10,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useRouter } from 'next/navigation';
-import { extractFile } from '@/services/wsClient';
+import { extractFile, startSimulation } from '@/services/wsClient';
 import { type MapType, setSelectedMap } from '@/game/constants';
 import { FormContext } from './FormContext';
 import PolicyNode from './PolicyNode';
@@ -48,6 +48,7 @@ export default function NodeCanvas() {
   const [objective, setObjective] = useState('');
   const [mapId, setMapId] = useState<MapType>('ccity');
   const [extracting, setExtracting] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
 
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
@@ -68,16 +69,34 @@ export default function NodeCanvas() {
     }
   }, []);
 
-  const handleSimulate = useCallback(() => {
-    if (text.trim().length < 20) return;
+  const handleSimulate = useCallback(async () => {
+    if (text.trim().length < 20 || isSimulating) return;
+    
+    setIsSimulating(true);
     setSelectedMap(mapId);
-    sessionStorage.setItem('agora-policy', text);
-    sessionStorage.setItem('agora-num-npcs', numNpcs.toString());
-    sessionStorage.setItem('agora-num-rounds', numRounds.toString());
-    sessionStorage.setItem('agora-objective', objective);
-    sessionStorage.setItem('agora-map-id', mapId);
-    router.push('/simulate');
-  }, [text, numNpcs, numRounds, objective, mapId, router]);
+    
+    try {
+      const simId = await startSimulation(
+        text,
+        numRounds,
+        numNpcs,
+        objective,
+        mapId
+      );
+      
+      sessionStorage.setItem('agora-policy', text);
+      sessionStorage.setItem('agora-num-npcs', numNpcs.toString());
+      sessionStorage.setItem('agora-num-rounds', numRounds.toString());
+      sessionStorage.setItem('agora-objective', objective);
+      sessionStorage.setItem('agora-map-id', mapId);
+      
+      router.push(`/simulate?id=${simId}`);
+    } catch (err) {
+      console.error('Failed to start simulation:', err);
+      alert('Failed to start simulation. Is the backend running?');
+      setIsSimulating(false);
+    }
+  }, [text, numNpcs, numRounds, objective, mapId, router, isSimulating]);
 
   const formValue = useMemo(() => ({
     text, setText,
@@ -86,8 +105,9 @@ export default function NodeCanvas() {
     objective, setObjective,
     mapId, setMapId,
     fileName, extracting,
+    isSimulating,
     handleFile, handleSimulate,
-  }), [text, numNpcs, numRounds, objective, mapId, fileName, extracting, handleFile, handleSimulate]);
+  }), [text, numNpcs, numRounds, objective, mapId, fileName, extracting, isSimulating, handleFile, handleSimulate]);
 
   return (
     <FormContext.Provider value={formValue}>

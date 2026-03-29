@@ -15,6 +15,7 @@ export interface FormState {
   setMapId: (v: string) => void;
   fileName: string | null;
   extracting: boolean;
+  isSimulating: boolean;
   handleFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSimulate: () => void;
 }

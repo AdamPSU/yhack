@@ -372,7 +372,7 @@ export function useSimulation(simulationId?: string, record = false) {
             msg.relationships.length,
           );
           if (recordingRef.current) {
-            recordingRef.current.initMsg = { type: "init", ...msg };
+            recordingRef.current.initMsg = msg;
           }
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {

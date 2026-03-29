@@ -4,7 +4,9 @@ import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS, TILE_SIZE } from "../config";
+import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
+import { CAR_TEMPLATES } from "../map/CarRegistry";
 import { MovementSystem } from "./MovementSystem";
 import { OccupancyGrid } from "./OccupancyGrid";
 import { findPath } from "./Pathfinder";
@@ -148,16 +150,30 @@ export class NPCManager {
         }
       }
 
-      const charIndex = i % 16;
-      const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
-      npc.role = bn.role;
-      npc.sentiment = moodToSentiment(bn.mood);
-      this.npcs.set(bn.id, npc);
-      this.occupancy.occupy(bn.id, tileX, tileY);
+      if (bn.role === "driver") {
+        // Spawn a Car entity for driver NPCs
+        const template = CAR_TEMPLATES[i % CAR_TEMPLATES.length];
+        const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
+        car.role = bn.role;
+        car.sentiment = moodToSentiment(bn.mood);
+        this.npcs.set(bn.id, car as unknown as NPC);
+        this.occupancy.occupy(bn.id, tileX, tileY);
 
-      const zone = roleToZone(bn.role);
-      this.npcZones.set(bn.id, zone);
-      this.movement.startRoaming(npc, zone);
+        const zone = roleToZone(bn.role);
+        this.npcZones.set(bn.id, zone);
+        this.movement.startRoaming(car as unknown as NPC, zone);
+      } else {
+        const charIndex = i % 16;
+        const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+        npc.role = bn.role;
+        npc.sentiment = moodToSentiment(bn.mood);
+        this.npcs.set(bn.id, npc);
+        this.occupancy.occupy(bn.id, tileX, tileY);
+
+        const zone = roleToZone(bn.role);
+        this.npcZones.set(bn.id, zone);
+        this.movement.startRoaming(npc, zone);
+      }
     }
 
     // Center camera on NPC cluster
@@ -291,13 +307,18 @@ export class NPCManager {
     this.movement.override(npcIdA);
     this.movement.override(npcIdB);
 
-    // Find a walkable tile adjacent to npcB (not B's tile itself)
-    const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
-    const goalX = adj ? adj.x : npcB.tileX;
-    const goalY = adj ? adj.y : npcB.tileY;
+    // Drivers stay in their lane — skip walk-toward to avoid leaving road tiles
+    const eitherIsDriver = npcA.role === "driver" || npcB.role === "driver";
+    const walkPromise = eitherIsDriver
+      ? Promise.resolve()
+      : (() => {
+          const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
+          const goalX = adj ? adj.x : npcB.tileX;
+          const goalY = adj ? adj.y : npcB.tileY;
+          return this.stepToward(npcA, goalX, goalY, 5);
+        })();
 
-    // Step-walk npcA toward npcB (max 5 steps to avoid long paths)
-    this.stepToward(npcA, goalX, goalY, 5).then(() => {
+    walkPromise.then(() => {
       // Face each other
       if (npcA.tileX < npcB.tileX) {
         npcA.face("right");

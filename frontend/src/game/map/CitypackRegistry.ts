@@ -2,7 +2,7 @@
  * Citypack tileset tile ID registry.
  * Tileset: citypack.png — 16×16px tiles, 64 columns wide, margin=0, spacing=0
  * Asset path: /assets/maps/citypack.png
- * IDs are 1-indexed (firstgid=1).
+ * IDs are 0-indexed (same as CCity). GID = tileIndex + 1 when used in Tiled JSON or putTileAt.
  */
 
 // ─── Roads ───────────────────────────────────────────────────────────────────
@@ -16,15 +16,18 @@ export const ROAD_EDGE_RIGHT = 2565; // edge on right side
 export const ROAD_EDGE_BOTH = 2567; // edge on both left and right sides
 export const ROAD_EDGE_LEFT = 2569; // edge on left side
 
-/** All road/walkable tile IDs */
+/**
+ * Road tile GIDs (0-indexed ID + 1) — matches values returned by
+ * getGroundGrid (Phaser tile.index = GID) and the procedural generator (gid()).
+ */
 export const ROAD_TILES = new Set([
-  ROAD_BLANK,
-  ROAD_DASH_H,
-  ROAD_DASH_V,
-  ROAD_CURVE_BR,
-  ROAD_EDGE_RIGHT,
-  ROAD_EDGE_BOTH,
-  ROAD_EDGE_LEFT,
+  ROAD_BLANK + 1,
+  ROAD_DASH_H + 1,
+  ROAD_DASH_V + 1,
+  ROAD_CURVE_BR + 1,
+  ROAD_EDGE_RIGHT + 1,
+  ROAD_EDGE_BOTH + 1,
+  ROAD_EDGE_LEFT + 1,
 ]);
 
 // ─── Ground ───────────────────────────────────────────────────────────────────

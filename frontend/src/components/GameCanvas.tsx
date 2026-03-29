@@ -126,8 +126,8 @@ export function GameCanvas() {
       data-testid="game-canvas"
       className="rpg-panel overflow-hidden pixel-crisp box-border"
       style={{
-        width: GAME_WIDTH * SCALE_FACTOR + 4,
-        height: GAME_HEIGHT * SCALE_FACTOR + 4,
+        width: GAME_WIDTH * SCALE_FACTOR,
+        height: GAME_HEIGHT * SCALE_FACTOR,
       }}
     />
   );

@@ -40,7 +40,7 @@ export function createGameConfig(
   scenes: Phaser.Types.Scenes.SceneType[],
 ): Phaser.Types.Core.GameConfig {
   return {
-    type: Phaser.AUTO,
+    type: Phaser.CANVAS,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     parent,

@@ -15,81 +15,81 @@ const H = 80;
 
 // ─── Tile GIDs (from CitypackRegistry.ts) ───────────────────────────────────
 
-const GRASS = 3269;
-const ROAD_BLANK = 2435; // intersection / plain road
-const ROAD_DASH_H = 2437; // horizontal dashed center line
-const ROAD_DASH_V = 2439; // vertical dashed center line
+const GRASS = 3270;
+const ROAD_BLANK = 2436; // intersection / plain road
+const ROAD_DASH_H = 2438; // horizontal dashed center line
+const ROAD_DASH_V = 2440; // vertical dashed center line
 
 // Dirt 3x3 patch tiles
-const DIRT_TL = 3086;
-const DIRT_T = 3088;
-const DIRT_TR = 3090;
-const DIRT_L = 3214;
-const DIRT_C = 3216;
-const DIRT_R = 3218;
-const DIRT_BL = 3342;
-const DIRT_B = 3344;
-const DIRT_BR = 3346;
+const DIRT_TL = 3087;
+const DIRT_T = 3089;
+const DIRT_TR = 3091;
+const DIRT_L = 3215;
+const DIRT_C = 3217;
+const DIRT_R = 3219;
+const DIRT_BL = 3343;
+const DIRT_B = 3345;
+const DIRT_BR = 3347;
 
 // Trees (1w x 2h, canopy on top, trunk on bottom)
-const TREE1_CANOPY = 2072;
-const TREE1_TRUNK = 2136;
-const TREE2_CANOPY = 2074;
-const TREE2_TRUNK = 2138;
+const TREE1_CANOPY = 2073;
+const TREE1_TRUNK = 2137;
+const TREE2_CANOPY = 2075;
+const TREE2_TRUNK = 2139;
 
 // Buildings (GIDs from registry — each is [row][col])
 const OFFICE1 = [
-  [130, 131, 132],
-  [194, 195, 196],
-  [258, 259, 260],
-  [322, 323, 324],
-  [386, 387, 388],
-  [450, 451, 452],
+  [131, 132, 133],
+  [195, 196, 197],
+  [259, 260, 261],
+  [323, 324, 325],
+  [387, 388, 389],
+  [451, 452, 453],
 ]; // 3w x 6h
 
 const OFFICE2 = [
-  [135, 136, 137],
-  [199, 200, 201],
-  [263, 264, 265],
-  [327, 328, 329],
-  [391, 392, 393],
-  [455, 456, 457],
+  [136, 137, 138],
+  [200, 201, 202],
+  [264, 265, 266],
+  [328, 329, 330],
+  [392, 393, 394],
+  [456, 457, 458],
 ]; // 3w x 6h
 
 const OFFICE3 = [
-  [140, 141, 142],
-  [204, 205, 206],
-  [268, 269, 270],
-  [332, 333, 334],
-  [396, 397, 398],
-  [460, 461, 462],
+  [141, 142, 143],
+  [205, 206, 207],
+  [269, 270, 271],
+  [333, 334, 335],
+  [397, 398, 399],
+  [461, 462, 463],
 ]; // 3w x 6h
 
 const OFFICE4 = [
-  [1106, 1107, 1108],
-  [1170, 1171, 1172],
-  [1234, 1235, 1236],
-  [1298, 1299, 1300],
-  [1362, 1363, 1364],
-  [1426, 1427, 1428],
+  [1107, 1108, 1109],
+  [1171, 1172, 1173],
+  [1235, 1236, 1237],
+  [1299, 1300, 1301],
+  [1363, 1364, 1365],
+  [1427, 1428, 1429],
 ]; // 3w x 6h
 
 const SHOP1 = [
-  [705, 706, 707, 708],
-  [769, 770, 771, 772],
-  [833, 834, 835, 836],
+  [706, 707, 708, 709],
+  [770, 771, 772, 773],
+  [834, 835, 836, 837],
 ]; // 4w x 3h
 
 const SHOP2 = [
-  [711, 712, 713],
-  [775, 776, 777],
-  [839, 840, 841],
+  [712, 713, 714],
+  [776, 777, 778],
+  [840, 841, 842],
 ]; // 3w x 3h
 
 const HOUSE1 = [
-  [1095, 1096, 1097],
-  [1159, 1160, 1161],
-  [1223, 1224, 1225],
+  [1096, 1097, 1098],
+  [1160, 1161, 1162],
+  [1224, 1225, 1226],
 ]; // 3w x 3h
 
 // ─── Seeded RNG (deterministic) ─────────────────────────────────────────────
@@ -548,7 +548,7 @@ const map = {
   renderorder: "right-down",
   type: "map",
   version: "1.10",
-  tiledversion: "1.10.2",
+  tiledversion: "1.12.1",
   nextlayerid: 3,
   nextobjectid: 1,
   layers: [
@@ -581,7 +581,7 @@ const map = {
     {
       columns: 64,
       firstgid: 1,
-      image: "/assets/maps/citypack.png",
+      image: "citypack.png",
       imageheight: 1024,
       imagewidth: 1024,
       margin: 0,

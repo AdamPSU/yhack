@@ -7,6 +7,14 @@ export const GAME_WIDTH = MAP_COLS * TILE_SIZE; // 1280
 export const GAME_HEIGHT = MAP_ROWS * TILE_SIZE; // 960
 export const SCALE_FACTOR = 2; // render at 2x for crisp pixels
 
+// Center bounds for NPC confinement — keeps NPCs in the visible demo area
+export const CENTER_BOUNDS = {
+  minCol: 11,
+  maxCol: 68,
+  minRow: 7,
+  maxRow: 53,
+} as const;
+
 export function createGameConfig(
   parent: string | HTMLElement,
   scenes: Phaser.Types.Scenes.SceneType[],

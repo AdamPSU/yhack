@@ -21,7 +21,8 @@ export function PolicyInput() {
 
   async function handleSimulate() {
     if (text.trim().length < 20 || loading) return;
-    const proceduralParam = mapId === "citypack" && procedural ? "&procedural=true" : "";
+    const proceduralParam =
+      mapId === "citypack" && procedural ? "&procedural=true" : "";
     if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
       router.push(`/simulate?map=${mapId}${proceduralParam}`);
       return;
@@ -67,13 +68,24 @@ export function PolicyInput() {
                 {opt.desc}
               </span>
               {opt.id === "citypack" && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setProcedural(p => !p); }}
-                  className="mt-1 text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProcedural((p) => !p);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      setProcedural((p) => !p);
+                    }
+                  }}
+                  className="mt-1 block text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors cursor-pointer"
                 >
-                  [{procedural ? "■" : "□"}] Procedural: {procedural ? "ON" : "OFF"}
-                </button>
+                  [{procedural ? "■" : "□"}] Procedural:{" "}
+                  {procedural ? "ON" : "OFF"}
+                </span>
               )}
             </button>
           ))}

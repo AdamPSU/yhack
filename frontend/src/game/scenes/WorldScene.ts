@@ -1,10 +1,19 @@
 import * as Phaser from "phaser";
 import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS, GAME_HEIGHT, GAME_WIDTH, getMapConfig, proceduralMap, selectedMap } from "../config";
+import {
+  CENTER_BOUNDS,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  getMapConfig,
+  proceduralMap,
+  selectedMap,
+} from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
 import { ChunkManager } from "../map/ChunkManager";
 import { CitypackChunkManager } from "../map/CitypackChunkManager";
+import { isRoad as citypackIsRoad } from "../map/CitypackProceduralCity";
+import { isRoad as ccityIsRoad } from "../map/ProceduralCity";
 import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
@@ -72,11 +81,12 @@ export class WorldScene extends Phaser.Scene {
     }
 
     // Citypack static map is 100×80 at 16px = 1600×1280px — center camera on map
-    if (!this.useChunks && !this.useCitypackChunks && selectedMap === "citypack") {
-      this.cameras.main.centerOn(
-        (100 * 16) / 2,
-        (80 * 16) / 2,
-      );
+    if (
+      !this.useChunks &&
+      !this.useCitypackChunks &&
+      selectedMap === "citypack"
+    ) {
+      this.cameras.main.centerOn((100 * 16) / 2, (80 * 16) / 2);
     }
 
     // Phase-change color overlay (sits above buildings, below NPCs)
@@ -97,17 +107,11 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.on("sim:camera-zoom", this.onCameraZoom, this);
 
     // ─── NPC System ───
-    // When using chunks, the ground grid is relative to CENTER_BOUNDS
-    const usesChunks = this.useChunks || this.useCitypackChunks;
-    const gridRowOffset = usesChunks ? CENTER_BOUNDS.minRow : 0;
-    const gridColOffset = usesChunks ? CENTER_BOUNDS.minCol : 0;
     this.npcManager = new NPCManager(
       this,
       this.getBuildingPositions(),
       this.isWalkable.bind(this),
-      this.getGroundGrid(),
-      gridRowOffset,
-      gridColOffset,
+      this.getIsRoad(),
     );
     this.simEventHandler = new SimEventHandler(this, this.npcManager);
 
@@ -157,7 +161,14 @@ export class WorldScene extends Phaser.Scene {
     const map = this.make.tilemap({ key: mapKey });
     this.staticMap = map;
 
-    const tileset = map.addTilesetImage(tilesetName, tilesetKey, mc.tileSize, mc.tileSize, 0, mc.spacing);
+    const tileset = map.addTilesetImage(
+      tilesetName,
+      tilesetKey,
+      mc.tileSize,
+      mc.tileSize,
+      0,
+      mc.spacing,
+    );
     if (!tileset) {
       console.error("Failed to load tileset");
       return;
@@ -244,36 +255,18 @@ export class WorldScene extends Phaser.Scene {
     return positions;
   }
 
-  getGroundGrid(): number[][] {
-    if (this.useCitypackChunks && this.citypackChunkManager) {
-      return this.citypackChunkManager.getGroundGrid(
-        CENTER_BOUNDS.minCol,
-        CENTER_BOUNDS.minRow,
-        CENTER_BOUNDS.maxCol,
-        CENTER_BOUNDS.maxRow,
-      );
+  /** Returns a road-check function based on the active map type */
+  private getIsRoad(): (col: number, row: number) => boolean {
+    if (this.useCitypackChunks) {
+      // CitypackProceduralCity.isRoad takes (worldRow, worldCol) — swap
+      return (col, row) => citypackIsRoad(row, col);
     }
-
-    if (this.useChunks && this.chunkManager) {
-      return this.chunkManager.getGroundGrid(
-        CENTER_BOUNDS.minCol,
-        CENTER_BOUNDS.minRow,
-        CENTER_BOUNDS.maxCol,
-        CENTER_BOUNDS.maxRow,
-      );
+    if (this.useChunks) {
+      // ProceduralCity.isRoad takes (worldRow, worldCol) — swap
+      return (col, row) => ccityIsRoad(row, col);
     }
-
-    // Static map
-    const mc = getMapConfig();
-    const grid: number[][] = [];
-    for (let r = 0; r < mc.rows; r++) {
-      grid[r] = [];
-      for (let c = 0; c < mc.cols; c++) {
-        const tile = this.staticGroundLayer?.getTileAt(c, r);
-        grid[r][c] = tile ? tile.index : 0;
-      }
-    }
-    return grid;
+    // Static/pico8 fallback: treat all walkable tiles as roads
+    return (col, row) => this.isWalkable(col, row);
   }
 
   isWalkable(col: number, row: number): boolean {

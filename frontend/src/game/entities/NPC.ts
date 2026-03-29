@@ -25,9 +25,12 @@ function dirToNPCDir(dir: NPCState["direction"]): NPCDirection {
 export class NPC extends Phaser.GameObjects.Sprite {
   readonly npcId: string;
   readonly npcName: string;
+  readonly charIndex: number;
   readonly characterType: CharacterType;
+  profession = "";
   role = "";
   category = "";
+  reputation = 0.5;
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
 
   /** Grid position (in tile coordinates) */
@@ -56,6 +59,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
     id: string,
     name: string,
     characterType: CharacterType,
+    charIndex: number,
     tileX: number,
     tileY: number,
   ) {
@@ -71,6 +75,7 @@ export class NPC extends Phaser.GameObjects.Sprite {
     this.npcId = id;
     this.npcName = name;
     this.characterType = characterType;
+    this.charIndex = charIndex;
     this.tileX = tileX;
     this.tileY = tileY;
 
@@ -168,7 +173,9 @@ export class NPC extends Phaser.GameObjects.Sprite {
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
+      profession: this.profession,
       role: this.role,
+      reputation: this.reputation,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,
@@ -198,7 +205,9 @@ export class NPC extends Phaser.GameObjects.Sprite {
     return {
       id: this.npcId,
       name: this.npcName,
+      profession: this.profession,
       role: this.role,
+      reputation: this.reputation,
       category: this.category,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,

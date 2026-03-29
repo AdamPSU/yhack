@@ -158,7 +158,7 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               className="mt-1 ml-5 text-[9px] font-mono uppercase tracking-widest"
               style={{ color: "#8B7355" }}
             >
-              {npc.role?.replace(/_/g, " ")} · {npc.industry || "Millfield"}
+              {npc.profession || npc.role?.replace(/_/g, " ") || "Resident"} · {npc.mbti} · {npc.industry || "Millfield"}
             </div>
           </div>
           <button
@@ -197,6 +197,12 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               valueColor={moodColor}
             />
             <StatRow
+              label="Reputation"
+              value={`${(npc.reputation * 100).toFixed(0)}%`}
+              valueColor="#2dd4bf"
+              glowClass="neon-text-teal"
+            />
+            <StatRow
               label="Income"
               value={income.text}
               valueColor={income.color}
@@ -206,9 +212,6 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               value={`${npc.political_leaning > 0 ? "+" : ""}${npc.political_leaning.toFixed(1)} ${polLabel}`}
               valueColor={polColor}
             />
-            {npc.personality && (
-              <StatRow label="Type" value={npc.personality} />
-            )}
             <StatRow label="Position" value={`(${npc.x}, ${npc.y})`} />
           </div>
         </div>
@@ -219,6 +222,24 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
           symbol="?"
           content={npc.perception}
           fallback="No thoughts yet..."
+        />
+        <SectionBlock
+          label="Strategy"
+          symbol="#"
+          content={npc.social_strategy}
+          fallback="No strategy formed yet..."
+        />
+        <SectionBlock
+          label="Beliefs"
+          symbol="!"
+          content={npc.beliefs?.join(" · ")}
+          fallback="No defined beliefs..."
+        />
+        <SectionBlock
+          label="Controversial Ideas"
+          symbol="*"
+          content={npc.controversial_ideas?.join(" · ")}
+          fallback="No controversial ideas..."
         />
         <SectionBlock
           label="Feeling"

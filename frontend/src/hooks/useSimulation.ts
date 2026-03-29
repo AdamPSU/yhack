@@ -30,6 +30,7 @@ export interface GraphData {
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
 
 const INITIAL_METRICS: SimMetrics = {
+  eggIndex: 1.0,
   priceIndex: 0,
   unemploymentRate: 4.2,
   socialUnrest: 0.05,

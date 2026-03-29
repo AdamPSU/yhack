@@ -40,6 +40,12 @@ function zeroOneSeverity(v: number, invert = false) {
   return "bad" as const;
 }
 
+function eggSeverity(v: number) {
+  if (v < 1.5) return "good" as const;
+  if (v < 3.0) return "warn" as const;
+  return "bad" as const;
+}
+
 /* ─── Fill ratio normalization ─── */
 
 function normalizePrices(v: number): number {
@@ -52,6 +58,10 @@ function normalizeUnemployment(v: number): number {
 
 function normalizeInterestRate(v: number): number {
   return Math.max(0, Math.min(1, (v - 3) / 5));
+}
+
+function normalizeEggIndex(v: number): number {
+  return Math.max(0, Math.min(1, (v - 0.5) / 4.5));
 }
 
 /* ─── Trend computation ─── */
@@ -100,6 +110,15 @@ export function Dashboard({
 
       {/* Stats */}
       <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin px-1 py-1">
+        <PixelStatBar
+          icon={<CoinIcon />}
+          label="Egg Index"
+          value={metrics.eggIndex}
+          formatValue={(v) => `$${v.toFixed(2)}`}
+          severity={eggSeverity(metrics.eggIndex)}
+          fillRatio={normalizeEggIndex(metrics.eggIndex)}
+          trend={computeTrend(metricsHistory, (m) => m.eggIndex)}
+        />
         <PixelStatBar
           icon={<CoinIcon />}
           label="Prices"

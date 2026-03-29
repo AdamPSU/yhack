@@ -25,6 +25,7 @@ export interface SimEvent {
 }
 
 export interface SimMetrics {
+  eggIndex: number; // Joke metric: price of eggs (multiplier)
   priceIndex: number; // % change from baseline
   unemploymentRate: number; // %
   socialUnrest: number; // 0-1
@@ -36,8 +37,10 @@ export interface SimMetrics {
 export interface NPCState {
   id: string;
   name: string;
+  profession?: string;
   role?: string;
   category?: string;
+  reputation?: number;
   x: number;
   y: number;
   direction: "up" | "down" | "left" | "right";
@@ -48,7 +51,9 @@ export interface NPCState {
 export interface NPCHoverInfo {
   id: string;
   name: string;
-  role: string;
+  profession: string;
+  role?: string;
+  reputation: number;
   x: number;
   y: number;
   sentiment: "happy" | "neutral" | "worried" | "angry";

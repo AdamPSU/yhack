@@ -152,7 +152,15 @@ export class NPCManager {
     }
 
     const charType = roleToCharacter(bn.role, this.npcs.size);
-    const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
+    const npc = new NPC(
+      this.scene,
+      bn.id,
+      bn.name,
+      charType,
+      this.npcs.size,
+      tileX,
+      tileY,
+    );
     npc.role = bn.role;
     npc.category = bn.category ?? "";
     npc.sentiment = moodToSentiment(bn.mood);
@@ -348,7 +356,7 @@ export class NPCManager {
         }
 
         const charType = roleToCharacter(bn.role, i);
-        const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
+        const npc = new NPC(this.scene, bn.id, bn.name, charType, i, tileX, tileY);
         npc.role = bn.role;
         npc.category = bn.category ?? "";
         npc.sentiment = moodToSentiment(bn.mood);

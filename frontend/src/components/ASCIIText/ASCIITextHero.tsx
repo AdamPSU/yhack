@@ -1,64 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  SiReact,
-  SiNextdotjs,
-  SiTypescript,
-  SiTailwindcss,
-  SiFastapi,
-  SiPython,
-  SiBun,
-  SiLangchain,
-  SiOpenai,
-} from "react-icons/si";
+import { simulacraTechLogos } from "@/lib/simulacraTechLogos";
 import LogoLoop from "../LogoLoop/LogoLoop";
 
 const ASCIIText = dynamic(() => import("./ASCIIText"), { ssr: false });
-
-const techLogos = [
-  {
-    node: <SiNextdotjs title="Next.js" />,
-    title: "Next.js",
-    href: "https://nextjs.org",
-  },
-  {
-    node: <SiReact title="React" />,
-    title: "React",
-    href: "https://react.dev",
-  },
-  {
-    node: <SiTypescript title="TypeScript" />,
-    title: "TypeScript",
-    href: "https://www.typescriptlang.org",
-  },
-  {
-    node: <SiTailwindcss title="Tailwind CSS" />,
-    title: "Tailwind CSS",
-    href: "https://tailwindcss.com",
-  },
-  {
-    node: <SiFastapi title="FastAPI" />,
-    title: "FastAPI",
-    href: "https://fastapi.tiangolo.com",
-  },
-  {
-    node: <SiPython title="Python" />,
-    title: "Python",
-    href: "https://www.python.org",
-  },
-  { node: <SiBun title="Bun" />, title: "Bun", href: "https://bun.sh" },
-  {
-    node: <SiLangchain title="LangChain" />,
-    title: "LangChain",
-    href: "https://www.langchain.com",
-  },
-  {
-    node: <SiOpenai title="OpenAI" />,
-    title: "OpenAI",
-    href: "https://openai.com",
-  },
-];
 
 export default function ASCIITextHero() {
   return (
@@ -87,7 +33,7 @@ export default function ASCIITextHero() {
         style={{ filter: "drop-shadow(0 0 20px rgba(255,255,255,0.4))" }}
       >
         <LogoLoop
-          logos={techLogos}
+          logos={simulacraTechLogos}
           speed={30}
           direction="left"
           logoHeight={24}

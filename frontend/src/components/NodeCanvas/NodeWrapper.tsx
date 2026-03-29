@@ -33,6 +33,7 @@ export default function NodeWrapper({
         <Handle type="target" position={Position.Left} style={handleStyle} />
       )}
       <div
+        className="cursor-grab active:cursor-grabbing"
         style={{
           background: "#FDF5E6",
           border: "3px solid #6B4226",
@@ -52,7 +53,7 @@ export default function NodeWrapper({
         >
           <div className="flex items-center gap-2">
             <span
-              className="text-[7px] font-pixel px-1.5 py-0.5 rounded leading-none"
+              className="text-[12px] font-pixel px-1.5 py-0.5 rounded leading-none"
               style={{
                 color: "#6B4C2A",
                 background: "rgba(212,165,32,0.2)",
@@ -62,7 +63,7 @@ export default function NodeWrapper({
               {badge}
             </span>
             <span
-              className="text-[9px] font-pixel tracking-tight"
+              className="text-[15px] font-pixel tracking-tight"
               style={{ color: "#3D2510" }}
             >
               {"\u2605"} {title}
@@ -70,7 +71,7 @@ export default function NodeWrapper({
           </div>
           {description && (
             <p
-              className="mt-1 text-[9px] font-mono leading-tight uppercase tracking-widest"
+              className="mt-1 text-[13px] font-mono leading-tight uppercase tracking-widest"
               style={{
                 color: "#8B7355",
                 borderLeft: "2px solid #C4A46C",

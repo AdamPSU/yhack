@@ -1,10 +1,12 @@
-"""File ingestion endpoints for policy PDFs and trend CSV sources."""
+"""File ingestion endpoints for policy narratives (PDF, text, books, video) and trend CSV sources."""
 
 from __future__ import annotations
 
 import csv
 import io
 import logging
+import re
+import zipfile
 from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile
@@ -15,6 +17,10 @@ from services.context_store import create_source_record
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_TEXT_EXTENSIONS = frozenset({".md", ".markdown", ".txt", ".text"})
+_VIDEO_EXTENSIONS = frozenset({".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"})
+_BOOK_EXTENSIONS = frozenset({".epub"})
 
 async def _extract_pdf(data: bytes) -> str:
     from pypdf import PdfReader
@@ -110,6 +116,44 @@ def _extract_csv(data: bytes, source_id: str) -> tuple[str, dict[str, Any]]:
     return "\n".join(summary_lines), metadata
 
 
+def _strip_html_like(text: str) -> str:
+    text = re.sub(r"(?is)<script.*?>.*?</script>", "", text)
+    text = re.sub(r"(?is)<style.*?>.*?</style>", "", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _extract_plain_text(data: bytes) -> str:
+    return data.decode("utf-8", errors="replace").strip()
+
+
+def _extract_epub(data: bytes) -> str:
+    chunks: list[str] = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
+            for name in zf.namelist():
+                lower = name.lower()
+                if not lower.endswith((".html", ".xhtml", ".htm")):
+                    continue
+                raw = zf.read(name)
+                text = _strip_html_like(raw.decode("utf-8", errors="replace"))
+                if text:
+                    chunks.append(text)
+    except zipfile.BadZipFile as e:
+        raise HTTPException(status_code=415, detail="Invalid EPUB (not a ZIP archive).") from e
+
+    return "\n\n".join(chunks).strip()
+
+
+def _video_placeholder(filename: str) -> str:
+    return (
+        f"[Video attachment: {filename}]\n"
+        "Automatic transcription is not available server-side. "
+        "The simulation combines this marker with your other uploads and the notes field "
+        "— summarize speeches, scenes, or claims from the video in notes if they matter."
+    )
+
+
 def _pdf_summary(text: str) -> str:
     paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
     if not paragraphs:
@@ -174,6 +218,53 @@ async def upload_context_source(
             indicator["source_id"] = record["id"]
         return _source_response(record)
 
+    ext = "" if "." not in filename else filename[filename.rindex(".") :]
+    if ext in _TEXT_EXTENSIONS:
+        text = _extract_plain_text(data)
+        if not text:
+            raise HTTPException(status_code=422, detail="Text file is empty.")
+        summary = _pdf_summary(text) or text[:600]
+        record = create_source_record(
+            kind="text",
+            filename=file.filename or "notes.txt",
+            label=source_label,
+            preview_text=summary[:500],
+            summary=summary or "Text document ready.",
+            metadata={"extension": ext},
+            content_text=text,
+        )
+        return _source_response(record)
+
+    if ext in _BOOK_EXTENSIONS:
+        text = _extract_epub(data)
+        if not text:
+            raise HTTPException(status_code=422, detail="No readable text found in EPUB.")
+        summary = _pdf_summary(text) or text[:600]
+        record = create_source_record(
+            kind="book",
+            filename=file.filename or "book.epub",
+            label=source_label,
+            preview_text=summary[:500],
+            summary=summary or "Book text extracted.",
+            metadata={"format": "epub"},
+            content_text=text,
+        )
+        return _source_response(record)
+
+    if ext in _VIDEO_EXTENSIONS:
+        display_name = file.filename or f"clip{ext}"
+        placeholder = _video_placeholder(display_name)
+        record = create_source_record(
+            kind="video",
+            filename=display_name,
+            label=source_label,
+            preview_text=placeholder[:500],
+            summary="Video attached (see notes for semantic content).",
+            metadata={"format": ext.lstrip(".")},
+            content_text=placeholder,
+        )
+        return _source_response(record)
+
     raise HTTPException(status_code=415, detail=f"Unsupported source type: {filename}")
 
 
@@ -189,7 +280,15 @@ async def extract_file(file: UploadFile) -> dict[str, str]:
         elif filename.endswith(".csv"):
             text, _ = _extract_csv(data, "extract_preview")
         else:
-            raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename}")
+            ext = "" if "." not in filename else filename[filename.rindex(".") :]
+            if ext in _TEXT_EXTENSIONS:
+                text = _extract_plain_text(data)
+            elif ext in _BOOK_EXTENSIONS:
+                text = _extract_epub(data)
+            elif ext in _VIDEO_EXTENSIONS:
+                text = _video_placeholder(file.filename or f"video{ext}")
+            else:
+                raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename}")
     except HTTPException:
         raise
     except Exception as e:

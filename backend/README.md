@@ -15,9 +15,16 @@ uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 | Variable | Description |
 |----------|-------------|
-| `XAI_API_KEY` | xAI API key (for Grok models) |
-| `K2_API_KEY` | K2 Think API key |
-| `MODEL_NAME` | Model to use: `grok-4.20-non-reasoning` or `k2-think-v2` |
+| `PROVIDER` | Active provider: `xai`, `k2`, or `gemini` |
+| `XAI_API_KEY` | xAI API key (used when `PROVIDER=xai`) |
+| `K2_API_KEY` | K2 Think API key (used when `PROVIDER=k2`) |
+| `GEMINI_API_KEY` | Gemini API key (used when `PROVIDER=gemini`) |
+
+Provider model mappings are fixed in `config.py`:
+
+- `xai` -> `grok-4.20-non-reasoning` (default), `grok-4-1-fast-non-reasoning` (fast), `grok-4-1-fast-reasoning` (reasoning)
+- `k2` -> `MBZUAI-IFM/K2-Think-v2`
+- `gemini` -> `gemini-3.0-flash`
 
 ## API Endpoints
 

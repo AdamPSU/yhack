@@ -38,7 +38,12 @@ app.include_router(extract_router)
 sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
 app = sio_asgi  # type: ignore[assignment]
 
-logger.info("PolicySim ready — model=%s, base_url=%s", settings.model_name, settings.llm_base_url)
+logger.info(
+    "PolicySim ready — provider=%s model=%s base_url=%s",
+    settings.provider.value,
+    settings.get_model("default"),
+    settings.base_url,
+)
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,3 +1,8 @@
+"""Application configuration with modular LLM provider support."""
+
+from enum import Enum
+from typing import Any
+
 from pydantic_settings import BaseSettings
 
 # Grid dimensions used across the simulation (pixel-art world size).
@@ -20,35 +25,111 @@ REFLECTION_THRESHOLD = 25  # Sum of recent importance scores that triggers refle
 REFLECTION_MAX_PER_ROUND = 5  # Cap concurrent reflection LLM calls per round.
 
 
+class Provider(str, Enum):
+    """Supported LLM providers."""
+
+    XAI = "xai"
+    K2 = "k2"
+    GEMINI = "gemini"
+
+
+# Provider configuration registry
+# Each provider defines: base_url, api_key_env, models per tier, and feature support
+PROVIDER_CONFIG: dict[Provider, dict[str, Any]] = {
+    Provider.XAI: {
+        "base_url": "https://api.x.ai/v1",
+        "api_key_env": "xai_api_key",
+        "default_model": "grok-4.20-non-reasoning",
+        "fast_model": "grok-4-1-fast-non-reasoning",
+        "reasoning_model": "grok-4-1-fast-reasoning",
+        "supports_structured_output": True,
+        "supports_reasoning_effort": False,
+    },
+    Provider.K2: {
+        "base_url": "https://api.k2think.ai/v1",
+        "api_key_env": "k2_api_key",
+        "default_model": "MBZUAI-IFM/K2-Think-v2",
+        "fast_model": "MBZUAI-IFM/K2-Think-v2",
+        "reasoning_model": "MBZUAI-IFM/K2-Think-v2",
+        "supports_structured_output": False,  # Falls back to JSON parsing
+        "supports_reasoning_effort": False,
+    },
+    Provider.GEMINI: {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "api_key_env": "gemini_api_key",
+        "default_model": "gemini-3.0-flash",
+        "fast_model": "gemini-3.0-flash",
+        "reasoning_model": "gemini-3.0-flash",
+        "supports_structured_output": True,
+        "supports_reasoning_effort": False,
+    },
+}
+
+
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    # API Keys (only the active provider's key is required)
     xai_api_key: str = ""
     k2_api_key: str = ""
-    model_name: str = "grok-4.20"
-    fast_model_name: str = "grok-4-1-fast-non-reasoning"
-    reasoning_model_name: str = "grok-4-1-fast-reasoning"
+    gemini_api_key: str = ""
 
-    model_config: dict[str, tuple[str, str]] = {"env_file": (".env", ".env.local")}  # pyright: ignore[reportIncompatibleVariableOverride]
+    # Active provider (set via PROVIDER env var)
+    provider: Provider = Provider.XAI
 
-    def is_k2_model(self, model_name: str | None = None) -> bool:
-        return (model_name or self.model_name).startswith("k2")
-
-    def llm_api_key_for(self, model_name: str | None = None) -> str:
-        """Return the API key for the currently selected model."""
-        return self.k2_api_key if self.is_k2_model(model_name) else self.xai_api_key
-
-    def llm_base_url_for(self, model_name: str | None = None) -> str:
-        """Return the base URL for the currently selected model."""
-        if self.is_k2_model(model_name):
-            return "https://api.k2think.ai/v1"
-        return "https://api.x.ai/v1"
+    model_config: dict[str, Any] = {
+        "env_file": (".env", ".env.local"),
+    }  # pyright: ignore[reportIncompatibleVariableOverride]
 
     @property
+    def provider_config(self) -> dict[str, Any]:
+        """Get configuration for the active provider."""
+        return PROVIDER_CONFIG[self.provider]
+
+    @property
+    def base_url(self) -> str:
+        """Get the API base URL for the active provider."""
+        return self.provider_config["base_url"]
+
+    @property
+    def api_key(self) -> str:
+        """Get the API key for the active provider."""
+        env_var = self.provider_config["api_key_env"]
+        return getattr(self, env_var)
+
+    def get_model(self, tier: str = "default") -> str:
+        """Get model name for the specified tier.
+
+        Args:
+            tier: One of "default", "fast", or "reasoning"
+
+        Returns:
+            Provider-default model for the requested tier
+        """
+        if tier not in {"default", "fast", "reasoning"}:
+            raise ValueError(f"Unsupported model tier: {tier}")
+        return self.provider_config[f"{tier}_model"]
+
+    @property
+    def supports_structured_output(self) -> bool:
+        """Check if the active provider supports native structured output."""
+        return self.provider_config["supports_structured_output"]
+
+    @property
+    def supports_reasoning_effort(self) -> bool:
+        """Check if the active provider supports reasoning_effort parameter."""
+        return self.provider_config["supports_reasoning_effort"]
+
+    # Backwards compatibility properties
+    @property
     def llm_api_key(self) -> str:
-        return self.llm_api_key_for()
+        """Backwards compatible alias for api_key."""
+        return self.api_key
 
     @property
     def llm_base_url(self) -> str:
-        return self.llm_base_url_for()
+        """Backwards compatible alias for base_url."""
+        return self.base_url
 
 
 settings = Settings()

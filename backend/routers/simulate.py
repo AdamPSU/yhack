@@ -44,12 +44,27 @@ class SimulationRecord:
 
 simulations: dict[str, SimulationRecord] = {}
 
+_POLICY_SOURCE_KINDS = frozenset({"pdf", "text", "book", "video"})
+
+
+def _resolved_policy_source_ids(policy: PolicyInput) -> list[str]:
+    if policy.policy_source_ids:
+        return list(policy.policy_source_ids)
+    if policy.primary_policy_source_id:
+        return [policy.primary_policy_source_id]
+    return []
+
 
 @router.post("/simulate")
 async def start_simulation(policy: PolicyInput):
-    primary_source = get_source(policy.primary_policy_source_id)
-    if primary_source is None or primary_source.get("kind") != "pdf":
-        raise HTTPException(status_code=404, detail="Primary policy PDF not found.")
+    policy_ids = _resolved_policy_source_ids(policy)
+    for source_id in policy_ids:
+        src = get_source(source_id)
+        if src is None or src.get("kind") not in _POLICY_SOURCE_KINDS:
+            raise HTTPException(
+                status_code=404,
+                detail="One or more policy sources were not found or are not a narrative type (pdf/text/book/video).",
+            )
 
     trend_sources = [get_source(source_id) for source_id in policy.trend_source_ids]
     if any(source is None or source.get("kind") != "csv" for source in trend_sources):
@@ -60,10 +75,10 @@ async def start_simulation(policy: PolicyInput):
     simulation_id = str(uuid.uuid4())
     simulations[simulation_id] = SimulationRecord(policy=policy)
     logger.info(
-        "POST /simulate → id=%s  rounds=%d  pdf=%s  trends=%d",
+        "POST /simulate → id=%s  rounds=%d  policy_sources=%d  trends=%d",
         simulation_id,
         policy.num_rounds,
-        primary_source.get("filename", "?"),
+        len(policy_ids),
         len(policy.trend_source_ids),
     )
     return {"simulation_id": simulation_id}
@@ -116,7 +131,7 @@ async def start_sim(sid: str, data: dict) -> None:
         "context_summary": "",
         "indicator_snapshots": [],
         "source_summaries": [],
-        "primary_policy_source": policy.primary_policy_source_id,
+        "policy_sources": _resolved_policy_source_ids(policy),
         "trend_sources": policy.trend_source_ids,
         "objective": policy.objective,
         "max_rounds": policy.num_rounds,

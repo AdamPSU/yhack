@@ -9,7 +9,7 @@ import random
 
 from langchain_openai import ChatOpenAI
 
-from config import GRID_HEIGHT, GRID_WIDTH, MAX_NPCS, MAX_X, MAX_Y, settings
+from config import GRID_HEIGHT, GRID_WIDTH, MAX_NPCS, MAX_X, MAX_Y
 from graph.llm import get_llm
 from graph.names import FIRST_NAMES_F, FIRST_NAMES_M, LAST_NAMES
 from graph.prompts import (
@@ -211,7 +211,7 @@ def _initial_reputation(npc: dict) -> float:
 async def generate_npcs(state: SimState) -> dict:
     num_npcs = state.get("num_npcs", MAX_NPCS)
     logger.info("generate_npcs: starting for %d NPCs …", num_npcs)
-    llm = get_llm(max_tokens=1024, model=settings.fast_model_name)
+    llm = get_llm(max_tokens=1024, tier="fast")
     entities_json = json.dumps(state["entities"])
     callback = state.get("npc_added_callback")
 
@@ -220,7 +220,7 @@ async def generate_npcs(state: SimState) -> dict:
     logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
 
     used_names: set[str] = {c.get("name", "") for c in extracted if c.get("name")}
-    
+
     # Process extracted NPCs to have base attributes for personality generation
     npc_bases: list[dict] = []
     for i, char in enumerate(extracted):
@@ -239,14 +239,16 @@ async def generate_npcs(state: SimState) -> dict:
     needed = num_npcs - len(npc_bases)
     if needed > 0:
         logger.info("generate_npcs: generating %d random NPC bases …", needed)
-        npc_bases.extend([_random_base(len(npc_bases) + i, used_names) for i in range(needed)])
+        npc_bases.extend(
+            [_random_base(len(npc_bases) + i, used_names) for i in range(needed)]
+        )
 
     logger.info("generate_npcs: generating personalities for %d NPCs …", len(npc_bases))
     tasks = [
         asyncio.ensure_future(_generate_personality(b, entities_json, llm))
         for b in npc_bases
     ]
-    
+
     npcs: list[dict] = []
     # Using enumerate with as_completed results in unordered IDs, which is fine, but we should make sure they are unique
     for i, future in enumerate(asyncio.as_completed(tasks)):
@@ -268,7 +270,7 @@ async def generate_npcs(state: SimState) -> dict:
             await callback(npc)
 
     logger.info("generate_npcs: generating relationships …")
-    rel_llm = get_llm(max_tokens=2048, model=settings.fast_model_name)
+    rel_llm = get_llm(max_tokens=2048, tier="fast")
     relationships = await _generate_relationships(npcs, entities_json, rel_llm)
 
     # Ensure all relationships have affinity and trust

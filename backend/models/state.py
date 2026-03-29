@@ -12,7 +12,7 @@ class SimState(TypedDict):
     context_summary: str
     indicator_snapshots: list[dict[str, Any]]
     source_summaries: list[str]
-    primary_policy_source: str
+    policy_sources: list[str]
     trend_sources: list[str]
     objective: str
     entities: list[dict[str, Any]]

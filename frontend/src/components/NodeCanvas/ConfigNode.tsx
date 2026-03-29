@@ -19,19 +19,22 @@ export default function ConfigNode() {
       title="CONFIG"
       description="Adjust agents, rounds, and focus."
     >
-      <div className="nodrag nopan space-y-4" style={{ width: 360 }}>
+      <div
+        className="nodrag nopan cursor-default space-y-4"
+        style={{ width: 528 }}
+      >
         {/* NPCs */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-end">
             <div className="flex flex-col">
               <span
-                className="text-[8px] font-mono uppercase tracking-tight"
+                className="text-[11px] font-mono uppercase tracking-tight"
                 style={{ color: "#A0824A" }}
               >
                 Scale
               </span>
               <label
-                className="text-[10px] font-mono font-bold"
+                className="text-[13px] font-mono font-bold"
                 style={{ color: "#3D2510" }}
               >
                 NPCS
@@ -39,13 +42,13 @@ export default function ConfigNode() {
             </div>
             <div className="flex items-baseline gap-1">
               <span
-                className="text-sm font-mono font-bold"
+                className="text-[18px] font-mono font-bold"
                 style={{ color: "#D4A520" }}
               >
                 {numNpcs}
               </span>
               <span
-                className="text-[8px] font-mono"
+                className="text-[11px] font-mono"
                 style={{ color: "#8B7355" }}
               >
                 units
@@ -69,13 +72,13 @@ export default function ConfigNode() {
           <div className="flex justify-between items-end">
             <div className="flex flex-col">
               <span
-                className="text-[8px] font-mono uppercase tracking-tight"
+                className="text-[11px] font-mono uppercase tracking-tight"
                 style={{ color: "#A0824A" }}
               >
                 Depth
               </span>
               <label
-                className="text-[10px] font-mono font-bold"
+                className="text-[13px] font-mono font-bold"
                 style={{ color: "#3D2510" }}
               >
                 ROUNDS
@@ -83,13 +86,13 @@ export default function ConfigNode() {
             </div>
             <div className="flex items-baseline gap-1">
               <span
-                className="text-sm font-mono font-bold"
+                className="text-[18px] font-mono font-bold"
                 style={{ color: "#D4A520" }}
               >
                 {numRounds}
               </span>
               <span
-                className="text-[8px] font-mono"
+                className="text-[11px] font-mono"
                 style={{ color: "#8B7355" }}
               >
                 steps
@@ -112,13 +115,13 @@ export default function ConfigNode() {
         <div className="space-y-1.5">
           <div className="flex flex-col">
             <span
-              className="text-[8px] font-mono uppercase tracking-tight"
+              className="text-[11px] font-mono uppercase tracking-tight"
               style={{ color: "#A0824A" }}
             >
               Focus
             </span>
             <label
-              className="text-[10px] font-mono font-bold uppercase"
+              className="text-[13px] font-mono font-bold uppercase"
               style={{ color: "#3D2510" }}
             >
               Objective
@@ -132,9 +135,9 @@ export default function ConfigNode() {
               placeholder={
                 "What are you curious about?\ne.g. 'How does this affect low-income workers?'"
               }
-              rows={4}
+              rows={8}
               maxLength={500}
-              className="rpg-panel w-full resize-none p-2 text-xs leading-relaxed font-mono outline-none transition-colors"
+              className="rpg-panel w-full resize-none p-2 text-[15px] leading-relaxed font-mono outline-none transition-colors"
               style={{
                 color: "#3D2510",
                 background: "#FFF8DC",
@@ -142,7 +145,7 @@ export default function ConfigNode() {
               }}
             />
             <span
-              className="absolute right-2 bottom-2 text-[9px] font-mono"
+              className="absolute right-2 bottom-2 text-[12px] font-mono"
               style={{ color: "#A0824A" }}
             >
               {objective.length}/500

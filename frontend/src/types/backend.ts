@@ -100,9 +100,16 @@ export interface IndicatorSnapshot {
   unit?: string | null;
 }
 
+export type ContextSourceKind =
+  | "pdf"
+  | "csv"
+  | "text"
+  | "book"
+  | "video";
+
 export interface UploadedContextSource {
   id: string;
-  kind: "pdf" | "csv";
+  kind: ContextSourceKind;
   filename: string;
   label: string;
   status: "ready";
@@ -117,8 +124,12 @@ export interface UploadedContextSource {
   };
 }
 
+/** Minimum length for notes-only runs (must match backend PolicyInput validator). */
+export const MIN_NOTES_CHARS_FOR_TEXT_ONLY = 40;
+
 export interface StartSimulationRequest {
-  primary_policy_source_id: string;
+  primary_policy_source_id?: string | null;
+  policy_source_ids?: string[];
   notes_text?: string;
   trend_source_ids?: string[];
   num_rounds?: number;

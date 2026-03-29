@@ -15,14 +15,15 @@ export interface FormState {
   setObjective: (v: string) => void;
   mapId: MapType;
   setMapId: (v: MapType) => void;
-  primaryPolicy: UploadedContextSource | null;
+  policySources: UploadedContextSource[];
   trendSources: UploadedContextSource[];
-  uploadingPrimary: boolean;
+  uploadingPolicySources: boolean;
   uploadingTrends: boolean;
   isSimulating: boolean;
   record: boolean;
   setRecord: (v: boolean) => void;
-  handlePrimaryPolicyFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handlePolicyNarrativeFiles: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  removePolicySource: (sourceId: string) => void;
   handleTrendFiles: (e: React.ChangeEvent<HTMLInputElement>) => void;
   removeTrendSource: (sourceId: string) => void;
   handleSimulate: () => void;

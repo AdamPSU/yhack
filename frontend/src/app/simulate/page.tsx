@@ -447,7 +447,7 @@ function SimulateContent() {
 
         {/* Center: Game canvas with chat bubble overlays */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
-          <div ref={canvasContainerRef} className="relative shrink-0">
+          <div ref={canvasContainerRef} className="relative shrink-0 overflow-hidden">
             <GameCanvas />
 
             {/* Fullscreen toggle + Zoom controls */}
@@ -491,16 +491,21 @@ function SimulateContent() {
             </div>
 
             {/* Chat bubbles anchored to NPCs */}
-            {bubbleList.map((b) => (
-              <ChatBubble
-                key={b.npcId}
-                agentName={b.agentName}
-                message={b.message}
-                x={b.x * SCALE_FACTOR + BORDER_WIDTH}
-                y={b.y * SCALE_FACTOR + BORDER_WIDTH}
-                color={roleToBubbleColor(b.role)}
-              />
-            ))}
+            {bubbleList.map((b) => {
+              const cx = b.x * SCALE_FACTOR + BORDER_WIDTH;
+              const cy = b.y * SCALE_FACTOR + BORDER_WIDTH;
+              if (cx < 0 || cy < 0 || cx > GAME_WIDTH * SCALE_FACTOR || cy > GAME_HEIGHT * SCALE_FACTOR) return null;
+              return (
+                <ChatBubble
+                  key={b.npcId}
+                  agentName={b.agentName}
+                  message={b.message}
+                  x={cx}
+                  y={cy}
+                  color={roleToBubbleColor(b.role)}
+                />
+              );
+            })}
 
             {/* NPC hover tooltip */}
             {hoverInfo && <NPCTooltip info={hoverInfo} />}

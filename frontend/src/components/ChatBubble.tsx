@@ -25,7 +25,7 @@ export function ChatBubble({ agentName, message, x, y, color = "orange" }: ChatB
       data-testid="chat-bubble"
     >
       <div className="rpg-panel px-2.5 py-1.5" style={{ borderColor: p.border }}>
-        <div className="text-[9px] font-mono font-bold" style={{ color: p.name }}>
+        <div className="text-[9px] font-mono font-bold truncate" style={{ color: p.name }}>
           {agentName}
         </div>
         <p className="mt-0.5 text-[10px] font-mono leading-snug" style={{ color: p.body }}>

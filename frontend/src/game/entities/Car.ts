@@ -20,6 +20,10 @@ export class Car extends Phaser.GameObjects.Container {
 
   private children_tiles: Phaser.GameObjects.Image[] = [];
 
+  private getMainCamera(): Phaser.Cameras.Scene2D.Camera | null {
+    return this.scene?.cameras?.main ?? null;
+  }
+
   constructor(
     scene: Phaser.Scene,
     id: string,
@@ -125,8 +129,9 @@ export class Car extends Phaser.GameObjects.Container {
     });
   }
 
-  toState(): NPCState {
-    const cam = this.scene.cameras.main;
+  toState(): NPCState | null {
+    const cam = this.getMainCamera();
+    if (!cam) return null;
     const halfHeight = (this.template.rows * TILE_SIZE) / 2;
     return {
       id: this.npcId,
@@ -141,13 +146,15 @@ export class Car extends Phaser.GameObjects.Container {
   }
 
   private emitHoverEvent() {
-    const cam = this.scene.cameras.main;
+    const cam = this.getMainCamera();
+    if (!cam) return;
+    const halfHeight = (this.template.rows * TILE_SIZE) / 2;
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
       role: this.role,
       x: (this.x - cam.scrollX) * cam.zoom,
-      y: (this.y - cam.scrollY) * cam.zoom,
+      y: (this.y - halfHeight - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,
       state: this.npcState,
     });

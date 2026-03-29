@@ -8,35 +8,49 @@ interface ChatBubbleProps {
   y: number;
 }
 
-export function ChatBubble({ agentName, agentCategory, message, x, y }: ChatBubbleProps) {
+const BUBBLE_ANCHOR_LENGTH = 18;
+
+export function ChatBubble({
+  agentName,
+  agentCategory,
+  message,
+  x,
+  y,
+}: ChatBubbleProps) {
   return (
     <div
-      className="pointer-events-none absolute z-30 max-w-[180px] -translate-x-1/2 -translate-y-full animate-[fadeInUp_0.3s_ease-out] transition-[left,top] duration-100 ease-linear"
-      style={{ left: x, top: y - 8 }}
+      className="pointer-events-none absolute z-30 animate-[fadeInUp_0.3s_ease-out] transition-[left,top] duration-100 ease-linear"
+      style={{ left: x, top: y }}
       data-testid="chat-bubble"
     >
-      <div className="rpg-panel px-2.5 py-1.5 bg-black/80 border-white/10 backdrop-blur-md">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[8px] font-pixel text-purple-400 neon-text-purple">
-            {agentName}
-          </span>
-          {agentCategory && (
-            <span className="text-[7px] font-mono text-white/30">
-              {agentCategory}
+      <div
+        className="absolute left-0 w-max max-w-[180px]"
+        style={{
+          top: -BUBBLE_ANCHOR_LENGTH,
+          transform: "translate(-50%, -100%)",
+        }}
+      >
+        <div className="rpg-panel bg-black/80 px-2.5 py-1.5 border-white/10 backdrop-blur-md">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[8px] font-pixel text-purple-400 neon-text-purple">
+              {agentName}
             </span>
-          )}
+            {agentCategory && (
+              <span className="text-[7px] font-mono text-white/30">
+                {agentCategory}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[10px] font-mono leading-snug text-white/80">
+            {message.length > 80 ? `${message.slice(0, 80)}...` : message}
+          </p>
         </div>
-        <p className="mt-1 text-[10px] font-mono leading-snug text-white/80">
-          {message.length > 80 ? `${message.slice(0, 80)}...` : message}
-        </p>
       </div>
-      {/* Speech bubble tail pointing down to NPC */}
-      <div className="flex flex-col items-center">
-        <div className="h-0 w-0 border-x-[8px] border-t-[10px] border-x-transparent border-t-white/10" />
-        <div className="-mt-[11px] h-0 w-0 border-x-[6px] border-t-[8px] border-x-transparent border-t-black/80" />
-        <div className="h-3 w-[2px] bg-white/10" />
-        <div className="h-[4px] w-[4px] rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
-      </div>
+      <div
+        className="absolute left-0 w-px -translate-x-1/2 bg-white/20 shadow-[0_0_8px_rgba(255,255,255,0.15)]"
+        style={{ top: -BUBBLE_ANCHOR_LENGTH, height: BUBBLE_ANCHOR_LENGTH }}
+      />
+      <div className="absolute left-0 top-0 h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.8)]" />
     </div>
   );
 }

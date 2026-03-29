@@ -9,8 +9,8 @@ import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
+import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
-import { type MapType, GAME_WIDTH, GAME_HEIGHT, SCALE_FACTOR, setSelectedMap } from "@/game/constants";
 
 const SocialGraph = dynamic(
   () =>
@@ -29,6 +29,9 @@ const SocialGraph = dynamic(
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
+const GAME_WIDTH = 1280;
+const GAME_HEIGHT = 960;
+const SCALE_FACTOR = 2;
 const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only
@@ -102,13 +105,20 @@ interface BubbleState {
 }
 
 export default function SimulatePage() {
-  const [policyText, setPolicyText] = useState<string>("");
-  const [numNpcs, setNumNpcs] = useState<number>(25);
-  const [numRounds, setNumRounds] = useState<number>(5);
-  const [objective, setObjective] = useState<string>("");
-  const [mapId, setMapId] = useState<string>("ccity");
-  
-  const sim = useSimulation(policyText, numNpcs, numRounds, objective, mapId);
+  return (
+    <Suspense fallback={<GameCanvasPlaceholder />}>
+      <SimulateContent />
+    </Suspense>
+  );
+}
+
+function SimulateContent() {
+  const searchParams = useSearchParams();
+  const isMock = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
+  const simulationId = searchParams.get("id") || "";
+  const isReplay = searchParams.get("mode") === "replay";
+  const isRecording = searchParams.get("record") === "true";
+  const sim = useSimulation(simulationId || undefined, isRecording);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
@@ -123,30 +133,25 @@ export default function SimulatePage() {
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
 
-  // Auto-start simulation once we have a simulation ID (or immediately in mock mode)
+  // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
+  const hasStartedRef = useRef(false);
   useEffect(() => {
-    const storedPolicy = sessionStorage.getItem("agora-policy");
-    const storedNumNpcs = sessionStorage.getItem("agora-num-npcs");
-    const storedNumRounds = sessionStorage.getItem("agora-num-rounds");
-    const storedObjective = sessionStorage.getItem("agora-objective");
-    const storedMapId = sessionStorage.getItem("agora-map-id");
-
-    if (storedPolicy) setPolicyText(storedPolicy);
-    if (storedNumNpcs) setNumNpcs(Number.parseInt(storedNumNpcs, 10));
-    if (storedNumRounds) setNumRounds(Number.parseInt(storedNumRounds, 10));
-    if (storedObjective) setObjective(storedObjective);
-    if (storedMapId) {
-      setMapId(storedMapId);
-      setSelectedMap(storedMapId as MapType);
-    }
-  }, []);
-
-  // Trigger simulation start once policy text is loaded
-  useEffect(() => {
-    if (policyText && !sim.isRunning && !sim.isComplete) {
+    if (hasStartedRef.current) return;
+    if (isReplay) {
+      const data = getReplayData();
+      if (data) {
+        hasStartedRef.current = true;
+        clearReplayData();
+        sim.startFromRecording(data);
+      }
+    } else if (simulationId || isMock) {
+      hasStartedRef.current = true;
       sim.start();
     }
-  }, [policyText, sim.start, sim.isRunning, sim.isComplete]);
+    return () => {
+      hasStartedRef.current = false;
+    };
+  }, [simulationId, isReplay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
@@ -285,9 +290,7 @@ export default function SimulatePage() {
 
   const bubbleList = Array.from(bubbles.values());
 
-  const hasPolicy = policyText && policyText.length > 0;
-
-  if (!hasPolicy) {
+  if (!simulationId && !isMock && !isReplay) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
         <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
@@ -324,7 +327,7 @@ export default function SimulatePage() {
       >
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
-            SIMULACRA
+            AGORA
           </span>
           <span className="text-[10px] font-mono text-[#4a3c2a]">|</span>
           <div className="flex gap-1">
@@ -343,12 +346,41 @@ export default function SimulatePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {sim.isComplete && (
-            <span className="text-[10px] font-mono font-bold text-[#5ab85a]">
-              COMPLETE
+          {sim.isRunning && isRecording && (
+            <span className="text-[10px] font-mono font-bold text-[#d45050] animate-pulse">
+              REC
             </span>
           )}
-          {sim.isRunning && (
+          {sim.isComplete && (
+            <>
+              <span className="text-[10px] font-mono font-bold text-[#5ab85a]">
+                COMPLETE
+              </span>
+              {sim.getRecording() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recording = sim.getRecording();
+                    if (!recording) return;
+                    const blob = new Blob(
+                      [JSON.stringify(recording, null, 2)],
+                      { type: "application/json" },
+                    );
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `agora-sim-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                >
+                  [Save JSON]
+                </button>
+              )}
+            </>
+          )}
+          {sim.isRunning && !isRecording && (
             <span className="text-[10px] font-mono text-[#8a7a62]">
               Simulating...
             </span>

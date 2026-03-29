@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Socket.IO server (async mode for FastAPI/uvicorn).
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=[])
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
 simulations: dict[str, PolicyInput] = {}
 

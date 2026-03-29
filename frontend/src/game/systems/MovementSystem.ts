@@ -151,12 +151,14 @@ export class MovementSystem {
       // Drivers can only move to road tiles
       if (isDriver && !this.isRoad(nx, ny)) continue;
 
-      // Check BOTH tiles of car width are road
+      // Check full car footprint is on road at the new position
       if (isDriver && carOrientation === "portrait") {
-        if (!this.isRoad(nx + 1, ny)) continue; // right lane must also be road
+        // Check both columns for the new row
+        if (!this.isRoad(nx, ny) || !this.isRoad(nx + 1, ny)) continue;
       }
       if (isDriver && carOrientation === "landscape") {
-        if (!this.isRoad(nx, ny + 1)) continue; // bottom lane must also be road
+        // Check both rows for the new column
+        if (!this.isRoad(nx, ny) || !this.isRoad(nx, ny + 1)) continue;
       }
 
       // Reject tiles outside center bounds

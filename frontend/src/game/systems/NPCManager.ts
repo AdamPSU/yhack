@@ -36,6 +36,7 @@ export class NPCManager {
   private buildingPositions: BuildingPositions;
   private isWalkable: (col: number, row: number) => boolean;
   private isRoad: (col: number, row: number) => boolean;
+  private getRoadType: (col: number, row: number) => "v" | "h" | "none";
   private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
@@ -45,11 +46,13 @@ export class NPCManager {
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
     isRoad: (col: number, row: number) => boolean,
+    getRoadType: (col: number, row: number) => "v" | "h" | "none" = () => "none",
   ) {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
     this.isWalkable = isWalkable;
     this.isRoad = isRoad;
+    this.getRoadType = getRoadType;
     this.occupancy = new OccupancyGrid();
     this.movement = new MovementSystem(
       scene,
@@ -102,11 +105,23 @@ export class NPCManager {
 
     const canFitCar = (col: number, row: number, template: CarTemplate): boolean => {
       if (template.orientation === "portrait") {
-        // Car is 2 wide — need col+1 also to be road
-        return this.isRoad(col, row) && this.isRoad(col + 1, row) && this.isWalkable(col, row) && this.isWalkable(col + 1, row);
+        // 2 wide × 3 tall — check left and right column of vertical road pair
+        return this.getRoadType(col, row) === "v"
+          && this.getRoadType(col + 1, row) === "v"
+          && this.isWalkable(col, row)
+          && this.isWalkable(col + 1, row)
+          && !this.occupancy.isOccupied(col, row)
+          && !this.occupancy.isOccupied(col + 1, row);
       }
-      // Car is 2 tall — need row+1 also to be road
-      return this.isRoad(col, row) && this.isRoad(col, row + 1) && this.isWalkable(col, row) && this.isWalkable(col, row + 1);
+      // 3 wide × 2 tall — ALL 6 tiles must be horizontal road and walkable
+      for (let dc = 0; dc < template.cols; dc++) {
+        for (let dr = 0; dr < template.rows; dr++) {
+          if (this.getRoadType(col + dc, row + dr) !== "h") return false;
+          if (!this.isWalkable(col + dc, row + dr)) return false;
+          if (this.occupancy.isOccupied(col + dc, row + dr)) return false;
+        }
+      }
+      return true;
     };
 
     for (let i = 0; i < npcs.length; i++) {
@@ -133,12 +148,11 @@ export class NPCManager {
         car.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, car as unknown as NPC);
 
-        // Mark both tiles as occupied
-        this.occupancy.occupy(bn.id + "_a", tileX, tileY);
-        if (template.orientation === "portrait") {
-          this.occupancy.occupy(bn.id + "_b", tileX + 1, tileY);
-        } else {
-          this.occupancy.occupy(bn.id + "_b", tileX, tileY + 1);
+        // Mark all tiles of the car footprint as occupied
+        for (let dc = 0; dc < template.cols; dc++) {
+          for (let dr = 0; dr < template.rows; dr++) {
+            this.occupancy.occupy(`${bn.id}_${dc}_${dr}`, tileX + dc, tileY + dr);
+          }
         }
 
         const zone = roleToZone(bn.role);

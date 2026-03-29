@@ -13,8 +13,16 @@ import {
 import { SimEventHandler } from "../events/SimEventHandler";
 import { ChunkManager } from "../map/ChunkManager";
 import { CitypackChunkManager } from "../map/CitypackChunkManager";
-import { isRoad as citypackIsRoad } from "../map/CitypackProceduralCity";
-import { isRoad as ccityIsRoad } from "../map/ProceduralCity";
+import {
+  isRoad as citypackIsRoad,
+  isVRoadCol as citypackIsVRoadCol,
+  isHRoadRow as citypackIsHRoadRow,
+} from "../map/CitypackProceduralCity";
+import {
+  isRoad as ccityIsRoad,
+  isVRoadCol as ccityIsVRoadCol,
+  isHRoadRow as ccityIsHRoadRow,
+} from "../map/ProceduralCity";
 import { ROAD_TILES as CITYPACK_ROAD_TILES } from "../map/CitypackRegistry";
 import { NPCManager } from "../systems/NPCManager";
 
@@ -118,6 +126,7 @@ export class WorldScene extends Phaser.Scene {
       this.getBuildingPositions(),
       this.isWalkable.bind(this),
       this.getIsRoad(),
+      this.getRoadTypeFn(),
     );
     this.simEventHandler = new SimEventHandler(this, this.npcManager);
 
@@ -259,6 +268,42 @@ export class WorldScene extends Phaser.Scene {
     }
 
     return positions;
+  }
+
+  /** Returns road orientation at a tile: "v"=vertical, "h"=horizontal, "none"=not a road */
+  private getRoadTypeFn(): (col: number, row: number) => "v" | "h" | "none" {
+    const ROAD_V_GID = 2440; // ROAD_DASH_V + 1
+    const ROAD_H_GID = 2438; // ROAD_DASH_H + 1
+    const ROAD_INT_GID = 2436; // ROAD_BLANK + 1
+
+    if (this.useCitypackChunks) {
+      return (col, row) => {
+        if (citypackIsVRoadCol(col) && citypackIsHRoadRow(row)) return "none"; // intersection
+        if (citypackIsVRoadCol(col)) return "v";
+        if (citypackIsHRoadRow(row)) return "h";
+        return "none";
+      };
+    }
+    if (this.useChunks) {
+      return (col, row) => {
+        if (ccityIsVRoadCol(col) && ccityIsHRoadRow(row)) return "none"; // intersection
+        if (ccityIsVRoadCol(col)) return "v";
+        if (ccityIsHRoadRow(row)) return "h";
+        return "none";
+      };
+    }
+    // Static citypack: read tile GID
+    if (selectedMap === "citypack" && this.staticGroundLayer) {
+      return (col, row) => {
+        const tile = this.staticGroundLayer!.getTileAt(col, row);
+        if (!tile) return "none";
+        if (tile.index === ROAD_V_GID) return "v";
+        if (tile.index === ROAD_H_GID) return "h";
+        // ROAD_INT (intersection) falls through to "none" — cars should not spawn at crossroads
+        return "none";
+      };
+    }
+    return () => "none";
   }
 
   /** Returns a road-check function based on the active map type */

@@ -607,7 +607,6 @@ function SimulateContent() {
                     message={b.message}
                     x={cx}
                     y={cy}
-                    color={roleToBubbleColor(b.role)}
                   />
                 );
               })}

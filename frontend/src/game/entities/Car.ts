@@ -10,6 +10,7 @@ export class Car extends Phaser.GameObjects.Container {
   readonly template: CarTemplate;
   profession = "";
   role = "driver";
+  category = "";
   reputation = 0.5;
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
   tileX: number;

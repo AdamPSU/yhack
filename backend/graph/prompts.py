@@ -70,6 +70,7 @@ Omit any field you cannot reasonably infer — only include fields with real sig
     {{
       "name": "First and Last Name (a real individual, never a group or category)",
       "category": "short label for their social/economic role, e.g. 'factory worker', 'small business owner', 'retiree'",
+      "role": "worker|business_owner|politician|student|retiree|activist|farmer|shopkeeper|driver",
       "gender": "male|female|nonbinary (if determinable)",
       "bio": "what the text tells us about their history",
       "persona": "how they present themselves based on the text",
@@ -108,6 +109,7 @@ BE SPECIFIC. Avoid generic traits. Give them unique, potentially polarizing beli
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
   "category": "short social/economic role label, e.g. 'factory worker', 'small business owner', 'retiree'",
+  "role": "worker|business_owner|politician|student|retiree|activist|farmer|shopkeeper|driver",
   "profession": "specific job title",
   "bio": "2-3 sentences of life history grounded in this town and the policy context",
   "persona": "how they come across to others — speech style, mannerisms, reputation. Mention how their MBTI affects their communication.",

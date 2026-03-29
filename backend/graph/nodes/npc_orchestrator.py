@@ -51,6 +51,17 @@ _MOODS = [
     "determined",
 ]
 _INCOME_LEVELS = ["low", "medium", "high"]
+_ROLE_VALUES = [
+    "worker",
+    "business_owner",
+    "politician",
+    "student",
+    "retiree",
+    "activist",
+    "farmer",
+    "shopkeeper",
+    "driver",
+]
 
 
 def _random_name(gender: str) -> str:
@@ -74,12 +85,45 @@ def _random_base(index: int, used_names: set[str]) -> dict:
         "gender": gender,
         "mbti": random.choice(_MBTI_TYPES),
         "country": "USA",
+        "role": random.choice(_ROLE_VALUES),
         "income_level": random.choice(_INCOME_LEVELS),
         "political_leaning": round(random.uniform(-1.0, 1.0), 2),
         "x": random.randint(0, MAX_X),
         "y": random.randint(0, MAX_Y),
         "mood": random.choice(_MOODS),
     }
+
+
+def _infer_role(npc: dict) -> str:
+    role = str(npc.get("role", "")).strip().lower()
+    if role in _ROLE_VALUES:
+        return role
+
+    text = " ".join(
+        str(npc.get(key, ""))
+        for key in ("category", "profession", "bio", "persona")
+    ).lower()
+
+    if any(k in text for k in ["driver", "taxi", "truck", "delivery", "courier", "rideshare", "uber", "lyft"]):
+        return "driver"
+    if any(k in text for k in ["shopkeeper", "shop owner", "store owner", "merchant", "grocer", "clerk"]):
+        return "shopkeeper"
+    if any(k in text for k in ["business owner", "entrepreneur", "founder", "proprietor", "owner"]):
+        return "business_owner"
+    if any(k in text for k in ["politician", "mayor", "council", "senator", "representative", "governor"]):
+        return "politician"
+    if any(k in text for k in ["student", "undergrad", "college", "high school"]):
+        return "student"
+    if any(k in text for k in ["retiree", "retired", "pensioner"]):
+        return "retiree"
+    if any(k in text for k in ["activist", "organizer", "protester", "union organizer"]):
+        return "activist"
+    if any(k in text for k in ["farmer", "rancher", "grower", "agriculture"]):
+        return "farmer"
+    if any(k in text for k in ["worker", "laborer", "technician", "operator", "staff", "employee", "factory"]):
+        return "worker"
+
+    return "worker"
 
 
 def _clamp_positions(npcs: list[dict]) -> list[dict]:
@@ -180,6 +224,7 @@ async def generate_npcs(state: SimState) -> dict:
     # Process extracted NPCs to have base attributes for personality generation
     npc_bases: list[dict] = []
     for i, char in enumerate(extracted):
+        char.setdefault("role", _infer_role(char))
         char.setdefault("gender", random.choice(["male", "female", "nonbinary"]))
         char.setdefault("mbti", random.choice(_MBTI_TYPES))
         char.setdefault("country", "USA")
@@ -208,6 +253,7 @@ async def generate_npcs(state: SimState) -> dict:
         npc = await future
         npc["id"] = f"npc_{i + 1:02d}"
         npc.setdefault("country", "USA")
+        npc["role"] = _infer_role(npc)
         npc.setdefault("profession", "local resident")
         npc.setdefault("interested_topics", ["local economy"])
         # Ensure LLM-provided beliefs and controversial ideas are captured, fallback only if missing

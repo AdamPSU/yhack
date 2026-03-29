@@ -168,26 +168,11 @@ export class NPCManager {
       );
     }
 
-    const charType = roleToCharacter(bn.role, this.npcs.size);
-    const npc = new NPC(
-      this.scene,
-      bn.id,
-      bn.name,
-      charType,
-      this.npcs.size,
-      tileX,
-      tileY,
-    );
-    npc.role = bn.role;
-    npc.profession = bn.profession;
-    npc.category = bn.category ?? "";
-    npc.reputation = bn.reputation;
-    npc.sentiment = moodToSentiment(bn.mood);
-    this.npcs.set(bn.id, npc);
-    this.occupancy.occupy(bn.id, tileX, tileY);
+    const entity = this.spawnEntity(bn, tileX, tileY, this.npcs.size, this.roadTilesCache);
+    this.npcs.set(bn.id, entity);
     const zone = roleToZone(bn.role);
     this.npcZones.set(bn.id, zone);
-    this.movement.startRoaming(npc, zone);
+    this.movement.startRoaming(entity, zone);
   }
 
   private onInitNPCs(backendNPCs: unknown[]) {
@@ -240,158 +225,60 @@ export class NPCManager {
       [roadTiles[i], roadTiles[j]] = [roadTiles[j], roadTiles[i]];
     }
 
-    const canFitCar = (
-      col: number,
-      row: number,
-      template: CarTemplate,
-    ): boolean => {
-      if (template.orientation === "portrait") {
-        // 2 wide × 3 tall — check left and right column of vertical road pair
-        return (
-          this.getRoadType(col, row) === "v" &&
-          this.getRoadType(col + 1, row) === "v" &&
-          this.isWalkable(col, row) &&
-          this.isWalkable(col + 1, row) &&
-          !this.occupancy.isOccupied(col, row) &&
-          !this.occupancy.isOccupied(col + 1, row)
-        );
-      }
-      // 3 wide × 2 tall — ALL 6 tiles must be horizontal road and walkable
-      for (let dc = 0; dc < template.cols; dc++) {
-        for (let dr = 0; dr < template.rows; dr++) {
-          if (this.getRoadType(col + dc, row + dr) !== "h") return false;
-          if (!this.isWalkable(col + dc, row + dr)) return false;
-          if (this.occupancy.isOccupied(col + dc, row + dr)) return false;
-        }
-      }
-      return true;
-    };
-
     for (let i = 0; i < npcs.length; i++) {
       const bn = npcs[i];
 
-      if (bn.role === "driver") {
-        // Spawn a Car entity aligned to its road pair
-        const template = CAR_TEMPLATES[i % CAR_TEMPLATES.length];
+      // Find a road tile with adequate spacing from other NPCs
+      let tileX = -1;
+      let tileY = -1;
 
-        let tileX = -1;
-        let tileY = -1;
-        for (const candidate of roadTiles) {
-          if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
-          if (canFitCar(candidate.x, candidate.y, template)) {
-            tileX = candidate.x;
-            tileY = candidate.y;
-            break;
-          }
+      for (const candidate of roadTiles) {
+        if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+        if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
+          tileX = candidate.x;
+          tileY = candidate.y;
+          break;
         }
-
-        // Last resort: use backend coords + snap to nearest road
-        if (tileX === -1) {
-          tileX = Math.max(
-            CENTER_BOUNDS.minCol,
-            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
-          );
-          tileY = Math.max(
-            CENTER_BOUNDS.minRow,
-            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
-          );
-          const snapped = this.findNearestTile(
-            tileX,
-            tileY,
-            (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
-            10,
-          );
-          if (snapped) {
-            tileX = snapped.x;
-            tileY = snapped.y;
-          }
-        }
-
-        if (tileX === -1) continue; // skip if no valid spawn found
-
-        const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
-        car.profession = bn.profession;
-        car.role = bn.role;
-        car.reputation = bn.reputation;
-        car.sentiment = moodToSentiment(bn.mood);
-        this.npcs.set(bn.id, car as unknown as NPC);
-
-        // Mark all tiles of the car footprint as occupied
-        for (let dc = 0; dc < template.cols; dc++) {
-          for (let dr = 0; dr < template.rows; dr++) {
-            this.occupancy.occupy(
-              `${bn.id}_${dc}_${dr}`,
-              tileX + dc,
-              tileY + dr,
-            );
-          }
-        }
-
-        const zone = roleToZone(bn.role);
-        this.npcZones.set(bn.id, zone);
-        this.movement.startRoaming(car as unknown as NPC, zone);
-      } else {
-        // Find a road tile with adequate spacing from other NPCs
-        let tileX = -1;
-        let tileY = -1;
-
-        // Try with spacing constraint first
-        for (const candidate of roadTiles) {
-          if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
-          if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
-            tileX = candidate.x;
-            tileY = candidate.y;
-            break;
-          }
-        }
-
-        // Fallback: relax spacing, just find any unoccupied road tile
-        if (tileX === -1) {
-          for (const candidate of roadTiles) {
-            if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
-              tileX = candidate.x;
-              tileY = candidate.y;
-              break;
-            }
-          }
-        }
-
-        // Last resort: use backend coords + snap to nearest road
-        if (tileX === -1) {
-          tileX = Math.max(
-            CENTER_BOUNDS.minCol,
-            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
-          );
-          tileY = Math.max(
-            CENTER_BOUNDS.minRow,
-            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
-          );
-          const snapped = this.findNearestTile(
-            tileX,
-            tileY,
-            (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
-            10,
-          );
-          if (snapped) {
-            tileX = snapped.x;
-            tileY = snapped.y;
-          }
-        }
-
-        const charType = roleToCharacter(bn.role, i);
-        const npc = new NPC(this.scene, bn.id, bn.name, charType, i, tileX, tileY);
-        npc.role = bn.role;
-        npc.profession = bn.profession;
-        npc.category = bn.category ?? "";
-        npc.reputation = bn.reputation;
-        npc.sentiment = moodToSentiment(bn.mood);
-        this.npcs.set(bn.id, npc);
-        this.occupancy.occupy(bn.id, tileX, tileY);
-
-        const zone = roleToZone(bn.role);
-        this.npcZones.set(bn.id, zone);
-        this.movement.startRoaming(npc, zone);
       }
+
+      if (tileX === -1) {
+        for (const candidate of roadTiles) {
+          if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
+            tileX = candidate.x;
+            tileY = candidate.y;
+            break;
+          }
+        }
+      }
+
+      if (tileX === -1) {
+        tileX = Math.max(
+          CENTER_BOUNDS.minCol,
+          Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
+        );
+        tileY = Math.max(
+          CENTER_BOUNDS.minRow,
+          Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
+        );
+        const snapped = this.findNearestTile(
+          tileX,
+          tileY,
+          (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+          10,
+        );
+        if (snapped) {
+          tileX = snapped.x;
+          tileY = snapped.y;
+        }
+      }
+
+      if (tileX === -1) continue;
+
+      const entity = this.spawnEntity(bn, tileX, tileY, i, roadTiles);
+      this.npcs.set(bn.id, entity);
+      const zone = roleToZone(bn.role);
+      this.npcZones.set(bn.id, zone);
+      this.movement.startRoaming(entity, zone);
     }
 
     // Center camera on NPC cluster
@@ -422,6 +309,106 @@ export class NPCManager {
       });
     };
     scheduleEmotionBubble();
+  }
+
+  /** Check whether a car template fits at the given tile position. */
+  private canFitCar(
+    col: number,
+    row: number,
+    template: CarTemplate,
+  ): boolean {
+    if (template.orientation === "portrait") {
+      return (
+        this.getRoadType(col, row) === "v" &&
+        this.getRoadType(col + 1, row) === "v" &&
+        this.isWalkable(col, row) &&
+        this.isWalkable(col + 1, row) &&
+        !this.occupancy.isOccupied(col, row) &&
+        !this.occupancy.isOccupied(col + 1, row)
+      );
+    }
+    for (let dc = 0; dc < template.cols; dc++) {
+      for (let dr = 0; dr < template.rows; dr++) {
+        if (this.getRoadType(col + dc, row + dr) !== "h") return false;
+        if (!this.isWalkable(col + dc, row + dr)) return false;
+        if (this.occupancy.isOccupied(col + dc, row + dr)) return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Spawn a single NPC or Car entity depending on role.
+   * Shared by both onAddNPC (streaming) and onInitNPCs (batch).
+   */
+  private spawnEntity(
+    bn: BackendNPC,
+    tileX: number,
+    tileY: number,
+    index: number,
+    roadTiles: { x: number; y: number }[],
+  ): NPC {
+    if (bn.role === "driver") {
+      const template = CAR_TEMPLATES[index % CAR_TEMPLATES.length];
+
+      // Try to find a road tile where the car template fits
+      let carX = -1;
+      let carY = -1;
+      for (const candidate of roadTiles) {
+        if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+        if (this.canFitCar(candidate.x, candidate.y, template)) {
+          carX = candidate.x;
+          carY = candidate.y;
+          break;
+        }
+      }
+
+      // Fallback: snap backend coords to nearest road
+      if (carX === -1) {
+        carX = tileX;
+        carY = tileY;
+        const snapped = this.findNearestTile(
+          carX,
+          carY,
+          (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+          10,
+        );
+        if (snapped) {
+          carX = snapped.x;
+          carY = snapped.y;
+        }
+      }
+
+      const car = new Car(this.scene, bn.id, bn.name, template, carX, carY);
+      car.profession = bn.profession;
+      car.role = bn.role;
+      car.category = bn.category ?? "";
+      car.reputation = bn.reputation;
+      car.sentiment = moodToSentiment(bn.mood);
+
+      for (let dc = 0; dc < template.cols; dc++) {
+        for (let dr = 0; dr < template.rows; dr++) {
+          this.occupancy.occupy(
+            `${bn.id}_${dc}_${dr}`,
+            carX + dc,
+            carY + dr,
+          );
+        }
+      }
+
+      return car as unknown as NPC;
+    }
+
+    // Regular NPC
+    const charType = roleToCharacter(bn.role, index);
+    const npc = new NPC(this.scene, bn.id, bn.name, charType, index, tileX, tileY);
+    npc.role = bn.role;
+    npc.profession = bn.profession;
+    npc.category = bn.category ?? "";
+    npc.reputation = bn.reputation;
+    npc.sentiment = moodToSentiment(bn.mood);
+    this.occupancy.occupy(bn.id, tileX, tileY);
+    return npc;
   }
 
   /** Check if position has minimum Manhattan distance from all placed NPCs */

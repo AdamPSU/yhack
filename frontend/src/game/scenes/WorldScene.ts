@@ -43,6 +43,7 @@ export class WorldScene extends Phaser.Scene {
   private phaseOverlay?: Phaser.GameObjects.Rectangle;
   private npcManager?: NPCManager;
   private simEventHandler?: SimEventHandler;
+  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private sceneReady = false;
   private cleanedUp = false;
 
@@ -135,6 +136,7 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.on("sim:phase-change", this.onPhaseChange, this);
     eventBridge.on("sim:camera-pan", this.onCameraPan, this);
     eventBridge.on("sim:camera-zoom", this.onCameraZoom, this);
+
     eventBridge.on("sim:camera-snap-npc", this.onCameraSnapNPC, this);
 
     // ─── NPC Animations & System ───
@@ -147,6 +149,11 @@ export class WorldScene extends Phaser.Scene {
       this.getRoadTypeFn(),
     );
     this.simEventHandler = new SimEventHandler(this, this.npcManager);
+
+    // Keyboard controls
+    if (this.input?.keyboard) {
+      this.cursors = this.input.keyboard.createCursorKeys();
+    }
 
     // Emit ready state
     this.sceneReady = true;
@@ -161,6 +168,16 @@ export class WorldScene extends Phaser.Scene {
     }
     if (this.useCitypackChunks && this.citypackChunkManager) {
       this.citypackChunkManager.update(this.cameras.main);
+    }
+
+    // Keyboard panning
+    if (this.cursors) {
+      const cam = this.cameras.main;
+      const speed = 10 / cam.zoom;
+      if (this.cursors.left.isDown) cam.scrollX -= speed;
+      if (this.cursors.right.isDown) cam.scrollX += speed;
+      if (this.cursors.up.isDown) cam.scrollY -= speed;
+      if (this.cursors.down.isDown) cam.scrollY += speed;
     }
   }
 
@@ -393,13 +410,41 @@ export class WorldScene extends Phaser.Scene {
     cam.scrollY = Math.round(cam.scrollY + data.dy);
   }
 
-  private onCameraZoom(data: { delta: number }) {
+  private onCameraZoom(data: { delta: number; x?: number; y?: number }) {
     const cam = this.getMainCamera();
     if (!cam) return;
 
-    const newZoom = Phaser.Math.Clamp(cam.zoom + data.delta * 0.1, 0.5, 3.0);
-    cam.zoom = newZoom;
+    const zoomStep = 0.2;
+    const minZoom = 0.5;
+    const maxZoom = 5.0;
+    
+    const oldZoom = cam.zoom;
+    const nextZoom = Phaser.Math.Clamp(
+      oldZoom + data.delta * zoomStep,
+      minZoom,
+      maxZoom,
+    );
+
+    if (oldZoom === nextZoom) return;
+
+    if (data.x !== undefined && data.y !== undefined) {
+      // Zoom to mouse: adjust scroll so the point under the mouse stays fixed
+      // pointWorld = (pointScreen / zoom) + scroll
+      // We want pointWorldBefore == pointWorldAfter
+      // (mouseX / oldZoom) + oldScrollX == (mouseX / nextZoom) + nextScrollX
+      // nextScrollX = oldScrollX + mouseX * (1/oldZoom - 1/nextZoom)
+      
+      const mouseX = data.x;
+      const mouseY = data.y;
+      
+      cam.setZoom(nextZoom);
+      cam.scrollX += mouseX * (1 / oldZoom - 1 / nextZoom);
+      cam.scrollY += mouseY * (1 / oldZoom - 1 / nextZoom);
+    } else {
+      cam.setZoom(nextZoom);
+    }
   }
+
 
   private onCameraSnapNPC(data: { npcId: string }) {
     const npc = this.npcManager?.getNPC(data.npcId);
@@ -407,7 +452,6 @@ export class WorldScene extends Phaser.Scene {
     const targetX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
     const targetY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
     this.cameras.main.pan(targetX, targetY, 400, "Power2");
-    this.cameras.main.zoomTo(2.5, 400, "Power2");
   }
 
   private onPhaseChange(data: { phase: number; month: number }) {
@@ -437,9 +481,11 @@ export class WorldScene extends Phaser.Scene {
     eventBridge.off("sim:phase-change", this.onPhaseChange, this);
     eventBridge.off("sim:camera-pan", this.onCameraPan, this);
     eventBridge.off("sim:camera-zoom", this.onCameraZoom, this);
+
     eventBridge.off("sim:camera-snap-npc", this.onCameraSnapNPC, this);
     this.simEventHandler?.destroy();
     this.simEventHandler = undefined;
+    this.cursors = undefined;
     this.npcManager?.destroy();
     this.npcManager = undefined;
     this.chunkManager?.destroy();

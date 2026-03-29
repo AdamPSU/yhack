@@ -99,6 +99,12 @@ async def start_sim(sid: str, data: dict) -> None:
         except Exception:
             pass
 
+    async def stream_npc_added(npc: dict) -> None:
+        try:
+            await sio.emit("npc_added", {"npc": npc}, to=sid)
+        except Exception:
+            pass
+
     initial_state: SimState = {
         "policy_text": "",
         "notes_text": policy.notes_text,
@@ -119,6 +125,7 @@ async def start_sim(sid: str, data: dict) -> None:
         "current_round": 0,
         "memory_streams": {},
         "npc_stream_callback": stream_npc_events,
+        "npc_added_callback": stream_npc_added,
     }
 
     try:

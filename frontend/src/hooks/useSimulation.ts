@@ -164,8 +164,6 @@ export function useSimulation(simulationId?: string, record = false) {
   /** Process streamed NPC events that arrive before the full round completes. */
   const processNPCEvents = useCallback(
     (msg: WSNPCEventsMsg) => {
-      const lookup = npcLookupRef.current;
-
       getBridge().then(({ eventBridge }) => {
         for (const be of msg.events) {
           if (
@@ -184,25 +182,17 @@ export function useSimulation(simulationId?: string, record = false) {
           }
         }
       });
-
-      for (const be of msg.events) {
-        const round = be.round ?? 0;
-        const adapted = adaptEvent(be, lookup, round, maxRoundsRef.current);
-        if (adapted) {
-          eventQueueRef.current.push(adapted);
-        }
-      }
-
-      if (!timerRef.current && eventQueueRef.current.length > 0) {
-        timerRef.current = setTimeout(drainQueue, 300);
-      }
     },
-    [drainQueue],
+    [],
   );
 
   /** Feed a single WSRoundMsg through the same pipeline as the real backend. */
   const processRound = useCallback(
     (msg: WSRoundMsg) => {
+      if (typeof msg.max_rounds === "number" && msg.max_rounds > 0) {
+        maxRoundsRef.current = msg.max_rounds;
+      }
+
       const round = msg.round;
       const lookup = npcLookupRef.current;
       for (const npc of msg.npcs) {
@@ -275,6 +265,7 @@ export function useSimulation(simulationId?: string, record = false) {
           ...prev,
           metrics: merged,
           metricsHistory: [...prev.metricsHistory, merged].slice(-MAX_HISTORY),
+          maxRounds: maxRoundsRef.current,
         };
       });
 
@@ -397,8 +388,19 @@ export function useSimulation(simulationId?: string, record = false) {
             msg.npcs.length,
             msg.relationships.length,
           );
+          const initMaxRounds =
+            typeof msg.max_rounds === "number" && msg.max_rounds > 0
+              ? msg.max_rounds
+              : null;
+          if (initMaxRounds !== null) {
+            maxRoundsRef.current = initMaxRounds;
+            setState((prev) => ({ ...prev, maxRounds: initMaxRounds }));
+          }
           if (recordingRef.current) {
             recordingRef.current.initMsg = msg;
+            if (initMaxRounds !== null) {
+              recordingRef.current.maxRounds = initMaxRounds;
+            }
           }
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {
@@ -428,10 +430,10 @@ export function useSimulation(simulationId?: string, record = false) {
           );
           if (recordingRef.current) {
             recordingRef.current.rounds.push(msg);
-            recordingRef.current.maxRounds = Math.max(
-              recordingRef.current.maxRounds,
-              msg.round + 1,
-            );
+            recordingRef.current.maxRounds =
+              typeof msg.max_rounds === "number" && msg.max_rounds > 0
+                ? msg.max_rounds
+                : Math.max(recordingRef.current.maxRounds, msg.round + 1);
           }
           processRound(msg);
         },

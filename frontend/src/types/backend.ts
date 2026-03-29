@@ -145,6 +145,7 @@ export interface WSInitMsg {
   type: "init";
   npcs: BackendNPC[];
   relationships: BackendRelationship[];
+  max_rounds?: number;
 }
 
 export interface BackendInfluenceEvent {
@@ -162,6 +163,7 @@ export interface WSRoundMsg {
   events: BackendSimEvent[];
   npcs: BackendNPC[];
   influence_events?: BackendInfluenceEvent[];
+  max_rounds?: number;
 }
 
 export interface WSNPCAddedMsg {

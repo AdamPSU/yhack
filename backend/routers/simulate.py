@@ -149,7 +149,15 @@ async def start_sim(sid: str, data: dict) -> None:
                 record.final_npcs = update.get("npcs", [])
                 record.relationships = update.get("relationships", [])
                 logger.info("sim=%s  generate_npcs  npcs=%d  rels=%d", simulation_id, len(update["npcs"]), len(update["relationships"]))
-                await sio.emit("init", {"npcs": update["npcs"], "relationships": update["relationships"]}, to=sid)
+                await sio.emit(
+                    "init",
+                    {
+                        "npcs": update["npcs"],
+                        "relationships": update["relationships"],
+                        "max_rounds": policy.num_rounds,
+                    },
+                    to=sid,
+                )
 
             elif "run_round" in chunk:
                 update = chunk["run_round"]
@@ -163,6 +171,7 @@ async def start_sim(sid: str, data: dict) -> None:
                     "events": update["events"],
                     "npcs": update["npcs"],
                     "influence_events": update.get("influence_events", []),
+                    "max_rounds": policy.num_rounds,
                 }, to=sid)
 
         record.status = "complete"

@@ -19,8 +19,6 @@ import { NPCManager } from "../systems/NPCManager";
 
 export class WorldScene extends Phaser.Scene {
   // Static map (fallback)
-  private staticMap?: Phaser.Tilemaps.Tilemap;
-  private staticGroundLayer?: Phaser.Tilemaps.TilemapLayer;
   private staticBuildingLayer?: Phaser.Tilemaps.TilemapLayer;
 
   // Infinite procedural map
@@ -31,15 +29,31 @@ export class WorldScene extends Phaser.Scene {
   private citypackChunkManager?: CitypackChunkManager;
   private useCitypackChunks = false;
 
-  private phaseOverlay!: Phaser.GameObjects.Rectangle;
-  private npcManager!: NPCManager;
-  private simEventHandler!: SimEventHandler;
+  private phaseOverlay?: Phaser.GameObjects.Rectangle;
+  private npcManager?: NPCManager;
+  private simEventHandler?: SimEventHandler;
+  private sceneReady = false;
+  private cleanedUp = false;
 
   constructor() {
     super({ key: "WorldScene" });
   }
 
   create() {
+    this.sceneReady = false;
+    this.cleanedUp = false;
+    this.staticBuildingLayer = undefined;
+    this.chunkManager = undefined;
+    this.citypackChunkManager = undefined;
+    this.phaseOverlay = undefined;
+    this.npcManager = undefined;
+    this.simEventHandler = undefined;
+    this.useChunks = false;
+    this.useCitypackChunks = false;
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupScene, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.cleanupScene, this);
+
     if (selectedMap === "citypack") {
       if (proceduralMap) {
         try {
@@ -120,10 +134,13 @@ export class WorldScene extends Phaser.Scene {
     this.simEventHandler = new SimEventHandler(this, this.npcManager);
 
     // Emit ready state
+    this.sceneReady = true;
     this.events.emit("world-ready");
   }
 
   update() {
+    if (!this.sceneReady || this.cleanedUp) return;
+
     if (this.useChunks && this.chunkManager) {
       this.chunkManager.update(this.cameras.main);
     }
@@ -163,7 +180,6 @@ export class WorldScene extends Phaser.Scene {
 
     const mc = getMapConfig();
     const map = this.make.tilemap({ key: mapKey });
-    this.staticMap = map;
 
     const tileset = map.addTilesetImage(
       tilesetName,
@@ -183,7 +199,6 @@ export class WorldScene extends Phaser.Scene {
       console.error("Failed to create ground layer");
       return;
     }
-    this.staticGroundLayer = groundLayer;
 
     const buildingLayer = map.createLayer(buildingLayerName, tileset);
     if (!buildingLayer) {
@@ -289,42 +304,75 @@ export class WorldScene extends Phaser.Scene {
       return this.chunkManager.isWalkable(col, row);
     }
 
-    // Static map — use actual map dimensions
+    // Static JSON map — fail closed until the tile layer exists.
     const mc = getMapConfig();
     if (col < 0 || col >= mc.cols || row < 0 || row >= mc.rows) return false;
-    return !this.staticBuildingLayer?.getTileAt(col, row);
+    const layer = this.staticBuildingLayer;
+    if (!layer) return false;
+    return !layer.getTileAt(col, row);
   }
 
   // ─── Internal event handlers ───
 
   private onCameraPan(data: { dx: number; dy: number }) {
-    this.cameras.main.scrollX = Math.round(this.cameras.main.scrollX + data.dx);
-    this.cameras.main.scrollY = Math.round(this.cameras.main.scrollY + data.dy);
+    const cam = this.getMainCamera();
+    if (!cam) return;
+
+    cam.scrollX = Math.round(cam.scrollX + data.dx);
+    cam.scrollY = Math.round(cam.scrollY + data.dy);
   }
 
   private onCameraZoom(data: { delta: number }) {
-    const cam = this.cameras.main;
+    const cam = this.getMainCamera();
+    if (!cam) return;
+
     const newZoom = Phaser.Math.Clamp(cam.zoom + data.delta * 0.1, 0.5, 3.0);
     cam.zoom = newZoom;
   }
 
   private onPhaseChange(data: { phase: number; month: number }) {
+    const overlay = this.phaseOverlay;
+    if (!this.sceneReady || this.cleanedUp || !overlay) return;
+
     const overlays: Record<number, { color: number; alpha: number }> = {
       1: { color: 0x000000, alpha: 0 },
       2: { color: 0xff8800, alpha: 0.08 },
       3: { color: 0xff2200, alpha: 0.15 },
     };
     const { color, alpha } = overlays[data.phase] ?? overlays[1];
-    this.phaseOverlay.setFillStyle(color, alpha);
+    overlay.setFillStyle(color, alpha);
   }
 
-  shutdown() {
+  private getMainCamera(): Phaser.Cameras.Scene2D.Camera | null {
+    if (!this.sceneReady || this.cleanedUp) return null;
+    return this.cameras?.main ?? null;
+  }
+
+  private cleanupScene() {
+    if (this.cleanedUp) return;
+
+    this.cleanedUp = true;
+    this.sceneReady = false;
+
     eventBridge.off("sim:phase-change", this.onPhaseChange, this);
     eventBridge.off("sim:camera-pan", this.onCameraPan, this);
     eventBridge.off("sim:camera-zoom", this.onCameraZoom, this);
+
     this.simEventHandler?.destroy();
+    this.simEventHandler = undefined;
     this.npcManager?.destroy();
+    this.npcManager = undefined;
     this.chunkManager?.destroy();
+    this.chunkManager = undefined;
     this.citypackChunkManager?.destroy();
+    this.citypackChunkManager = undefined;
+    this.staticBuildingLayer = undefined;
+    this.phaseOverlay = undefined;
+    this.useChunks = false;
+    this.useCitypackChunks = false;
+  }
+
+  shutdown() {
+    this.cleanupScene();
   }
 }

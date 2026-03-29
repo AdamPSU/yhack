@@ -69,6 +69,11 @@ export class SimEventHandler {
       case "price_change":
         this.handlePriceChange(event.message);
         break;
+      case "layoff":
+        this.handleLayoff(event.agentId);
+        break;
+      case "policy_response":
+      case "reaction":
       case "mood_shift":
         // No additional visual effect — chat bubble already shown above
         break;
@@ -126,29 +131,60 @@ export class SimEventHandler {
     });
   }
 
+  private handleLayoff(npcId: string) {
+    const allNPCs = this.npcManager.getAllNPCs();
+    const npc = allNPCs.find((n) => n.npcId === npcId);
+    if (!npc) return;
+    const worldX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
+    const worldY = npc.tileY * TILE_SIZE;
+    spawnBankruptcy(this.scene, worldX, worldY);
+  }
+
   private handleClosure() {
-    // Close a random shop
     const shops = this.npcManager.getBuildings().shops;
-    if (shops.length === 0) return;
-    const shop = shops[Math.floor(Math.random() * shops.length)];
-    this.closureEffect.trigger(shop.x, shop.y);
-    spawnBankruptcy(
-      this.scene,
-      shop.x * TILE_SIZE + TILE_SIZE,
-      shop.y * TILE_SIZE,
-    );
+    if (shops.length > 0) {
+      const shop = shops[Math.floor(Math.random() * shops.length)];
+      this.closureEffect.trigger(shop.x, shop.y);
+      spawnBankruptcy(
+        this.scene,
+        shop.x * TILE_SIZE + TILE_SIZE,
+        shop.y * TILE_SIZE,
+      );
+    } else {
+      const allNPCs = this.npcManager.getAllNPCs();
+      const bizNPC =
+        allNPCs.find(
+          (n) => n.role === "business_owner" || n.role === "shopkeeper",
+        ) ?? allNPCs[0];
+      if (!bizNPC) return;
+      spawnBankruptcy(
+        this.scene,
+        bizNPC.tileX * TILE_SIZE + TILE_SIZE / 2,
+        bizNPC.tileY * TILE_SIZE,
+      );
+    }
   }
 
   private handlePriceChange(message: string) {
-    // Show floating price at a random shop
+    const allNPCs = this.npcManager.getAllNPCs();
     const shops = this.npcManager.getBuildings().shops;
-    if (shops.length === 0) return;
-    const shop = shops[Math.floor(Math.random() * shops.length)];
-    this.priceSpikeEffect.trigger(shop.x, shop.y, message);
 
-    // Detect positive/negative from message text
-    const worldX = shop.x * TILE_SIZE + TILE_SIZE;
-    const worldY = shop.y * TILE_SIZE;
+    let worldX: number;
+    let worldY: number;
+
+    if (shops.length > 0) {
+      const shop = shops[Math.floor(Math.random() * shops.length)];
+      worldX = shop.x * TILE_SIZE + TILE_SIZE;
+      worldY = shop.y * TILE_SIZE;
+      this.priceSpikeEffect.trigger(shop.x, shop.y, message);
+    } else if (allNPCs.length > 0) {
+      const npc = allNPCs[Math.floor(Math.random() * allNPCs.length)];
+      worldX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
+      worldY = npc.tileY * TILE_SIZE;
+    } else {
+      return;
+    }
+
     const isNegative =
       /decrease|drop|lower|cut|reduc|down|fell|decline/i.test(message);
     if (isNegative) {

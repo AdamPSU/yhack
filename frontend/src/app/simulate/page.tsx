@@ -201,6 +201,20 @@ function SimulateContent() {
     return () => cleanup?.();
   }, []);
 
+  // Open NPC profile when clicked on canvas
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+      const handler = (data: { npcId: string }) => {
+        setSelectedNpcId(data.npcId);
+        eventBridge.emitCameraSnapToNPC(data.npcId);
+      };
+      eventBridge.on("sim:npc-click", handler);
+      cleanup = () => eventBridge.off("sim:npc-click", handler);
+    });
+    return () => cleanup?.();
+  }, []);
+
   // Fullscreen toggle
   const toggleFullscreen = useCallback(() => {
     const el = canvasContainerRef.current;

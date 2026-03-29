@@ -316,6 +316,7 @@ export class WorldScene extends Phaser.Scene {
     const targetX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
     const targetY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
     this.cameras.main.pan(targetX, targetY, 400, "Power2");
+    this.cameras.main.zoomTo(2.5, 400, "Power2");
   }
 
   private onPhaseChange(data: { phase: number; month: number }) {

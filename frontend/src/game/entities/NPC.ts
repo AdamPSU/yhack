@@ -55,10 +55,11 @@ export class NPC extends Phaser.GameObjects.Sprite {
     // NPCs render above everything: ground=0, buildings=1, phase overlay=5
     this.setDepth(10);
 
-    // Interactive for hover tooltips
+    // Interactive for hover + click
     this.setInteractive({ useHandCursor: true });
     this.on("pointerover", this.onHover, this);
     this.on("pointerout", this.onHoverOut, this);
+    this.on("pointerdown", this.onClick, this);
 
     scene.add.existing(this);
   }
@@ -150,6 +151,10 @@ export class NPC extends Phaser.GameObjects.Sprite {
   private onHoverOut() {
     this.isHovered = false;
     eventBridge.emitNPCHoverOut();
+  }
+
+  private onClick() {
+    eventBridge.emitNPCClick(this.npcId);
   }
 
   /** Snapshot for EventBridge → React chat bubbles (camera-relative screen coords) */

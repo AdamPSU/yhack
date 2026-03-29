@@ -100,6 +100,11 @@ class EventBridge {
     this.emit("sim:camera-snap-npc", { npcId });
   }
 
+  // Phaser → React: NPC was clicked on canvas
+  emitNPCClick(npcId: string) {
+    this.emit("sim:npc-click", { npcId });
+  }
+
   // Phaser → React
   emitNPCPosition(npc: NPCState) {
     this.emit("sim:npc-position", npc);

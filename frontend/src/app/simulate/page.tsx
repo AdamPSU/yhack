@@ -9,6 +9,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCProfileModal } from "@/components/NPCProfileModal";
+import { StatsLegend } from "@/components/StatsLegend";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
@@ -512,7 +513,7 @@ function SimulateContent() {
   return (
     <div
       className="relative flex h-screen flex-col overflow-hidden"
-      style={{ background: "#4a7a3b" }}
+      style={{ background: "transparent" }}
       data-testid="simulate-page"
     >
       {/* Phase indicator bar */}
@@ -654,11 +655,11 @@ function SimulateContent() {
           </div>
         </div>
 
-        {/* Center: Game canvas with chat bubble overlays */}
+        {/* Center: Game canvas with chat bubble overlays - now full width */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
           <div
             ref={canvasContainerRef}
-            className="relative shrink-0 canvas-glow"
+            className="relative w-full h-full"
             style={{ border: "3px solid #6B4226", borderRadius: 4 }}
           >
             <GameCanvas />
@@ -706,6 +707,16 @@ function SimulateContent() {
               </button>
             </div>
 
+            {/* Dashboard overlay - positioned on bottom right */}
+            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
+              <Dashboard
+                metrics={sim.metrics}
+                metricsHistory={sim.metricsHistory}
+                phase={sim.phase}
+                month={sim.month}
+              />
+            </div>
+
             {/* Chat bubbles anchored to NPCs */}
             <div
               className="pointer-events-none absolute z-30 overflow-hidden"
@@ -749,16 +760,6 @@ function SimulateContent() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* Right: Dashboard */}
-        <div className="shrink-0">
-          <Dashboard
-            metrics={sim.metrics}
-            metricsHistory={sim.metricsHistory}
-            phase={sim.phase}
-            month={sim.month}
-          />
         </div>
       </div>
 

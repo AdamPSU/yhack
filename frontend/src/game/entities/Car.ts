@@ -150,7 +150,9 @@ export class Car extends Phaser.GameObjects.Container {
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
+      profession: "Commuter",
       role: this.role,
+      reputation: 0.5,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,

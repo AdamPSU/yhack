@@ -197,12 +197,12 @@ export function SparklineCard({
   return (
     <div className="border-b border-[#3a2e1e] px-2 py-1.5 last:border-b-0">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-mono uppercase text-[#8a7a62]">
+        <span className="text-[9px] font-mono uppercase tracking-wider text-[#6a5a42]">
           {label}
         </span>
         <span
           className="text-[11px] font-mono font-bold tabular-nums"
-          style={{ color: severityColor }}
+          style={{ color: severityColor, textShadow: `0 0 6px ${severityColor}33` }}
         >
           {formatValue(currentValue)}
         </span>

@@ -355,40 +355,44 @@ function SimulateContent() {
       className="relative flex h-screen flex-col overflow-hidden bg-[#1a1510]"
       data-testid="simulate-page"
     >
-      {/* Phase indicator bar */}
+      {/* Phase indicator bar — scanline overlay + grid dots */}
       <div
-        className="rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4"
+        className="rpg-panel scanline-overlay grid-dot-bg flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4"
         data-testid="phase-bar"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
+        <div className="relative z-[2] flex items-center gap-3">
+          <span className="text-[11px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a43a] logo-glow">
             AGORA
           </span>
-          <span className="text-[10px] font-mono text-[#4a3c2a]">|</span>
+          <span className="text-[10px] font-mono text-[#3a2e1e]">///</span>
           <div className="flex gap-1">
-            {[1, 2, 3].map((p) => (
-              <div
-                key={p}
-                className={`h-2 w-12 border border-[#3a2e1e] transition-colors duration-500 ${sim.phase >= p ? (p === 3 ? "bg-[#d45050]" : p === 2 ? "bg-[#e8a43a]" : "bg-[#5ab85a]") : "bg-[#251e15]"}`}
-              />
-            ))}
+            {[1, 2, 3].map((p) => {
+              const isActive = sim.phase >= p;
+              const bgColor = isActive ? (p === 3 ? "bg-[#d45050]" : p === 2 ? "bg-[#e8a43a]" : "bg-[#5ab85a]") : "bg-[#251e15]";
+              return (
+                <div
+                  key={p}
+                  className={`h-2 w-14 border border-[#3a2e1e] transition-all duration-500 ${bgColor} ${isActive && sim.phase === p ? "phase-segment-active" : ""}`}
+                />
+              );
+            })}
           </div>
           {sim.phase > 0 && (
-            <span className="text-[10px] font-mono text-[#8a7a62]">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-[#6a5a42]">
               {PHASE_LABELS[sim.phase]}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="relative z-[2] flex items-center gap-3">
           {sim.isRunning && isRecording && (
             <span className="text-[10px] font-mono font-bold text-[#d45050] animate-pulse">
-              REC
+              [REC]
             </span>
           )}
           {sim.isComplete && (
             <>
-              <span className="text-[10px] font-mono font-bold text-[#5ab85a]">
+              <span className="text-[10px] font-mono font-bold tracking-wider text-[#5ab85a]">
                 COMPLETE
               </span>
               {sim.getRecording() && (
@@ -408,16 +412,16 @@ function SimulateContent() {
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                  className="terminal-btn"
                 >
-                  [Save JSON]
+                  SAVE JSON
                 </button>
               )}
             </>
           )}
           {sim.isRunning && !isRecording && (
-            <span className="text-[10px] font-mono text-[#8a7a62]">
-              Simulating...
+            <span className="text-[10px] font-mono tracking-wider text-[#6a5a42] terminal-cursor">
+              SIMULATING
             </span>
           )}
         </div>
@@ -426,18 +430,18 @@ function SimulateContent() {
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
-        <div className="rpg-panel flex h-full w-64 shrink-0 flex-col">
-          <div className="flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
-            <h2 className="text-[10px] font-mono font-bold uppercase text-[#e8a43a]">
+        <div className="rpg-panel grid-dot-bg flex h-full w-64 shrink-0 flex-col">
+          <div className="scanline-overlay flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
+            <h2 className="relative z-[2] text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-[#e8a43a]">
               Event Log
             </h2>
             <button
               type="button"
               onClick={() => setShowGraph(true)}
-              className="text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+              className="relative z-[2] terminal-btn"
               title="Open Social Graph"
             >
-              [Graph]
+              GRAPH
             </button>
           </div>
           <div className="flex-1 overflow-hidden">
@@ -447,10 +451,10 @@ function SimulateContent() {
 
         {/* Center: Game canvas with chat bubble overlays */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
-          <div ref={canvasContainerRef} className="relative shrink-0">
+          <div ref={canvasContainerRef} className="relative shrink-0 canvas-glow" style={{ border: "2px solid #4a3c2a", borderRadius: 2 }}>
             <GameCanvas />
 
-            {/* Fullscreen toggle + Zoom controls */}
+            {/* Fullscreen toggle + Zoom controls — terminal buttons */}
             <div className="absolute top-2 right-2 z-40 flex gap-1">
               <button
                 type="button"
@@ -461,10 +465,10 @@ function SimulateContent() {
                     },
                   );
                 }}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                className="terminal-btn"
                 title="Zoom in"
               >
-                [+]
+                ZOOM+
               </button>
               <button
                 type="button"
@@ -475,18 +479,18 @@ function SimulateContent() {
                     },
                   );
                 }}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                className="terminal-btn"
                 title="Zoom out"
               >
-                [-]
+                ZOOM-
               </button>
               <button
                 type="button"
                 onClick={toggleFullscreen}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
+                className="terminal-btn"
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? "[X]" : "[ ]"}
+                {isFullscreen ? "EXIT" : "FULL"}
               </button>
             </div>
 

@@ -54,6 +54,27 @@ function eventAccent(type: SimEvent["type"]): string {
   }
 }
 
+function eventBorderClass(type: SimEvent["type"]): string {
+  switch (type) {
+    case "protest":
+      return "event-border-protest";
+    case "strike":
+      return "event-border-strike";
+    case "closure":
+      return "event-border-closure";
+    case "layoff":
+      return "event-border-layoff";
+    case "price_change":
+      return "event-border-price";
+    case "reaction":
+      return "event-border-reaction";
+    case "policy_response":
+      return "event-border-policy";
+    default:
+      return "event-border-default";
+  }
+}
+
 export function EventFeed({ events, onEventClick }: EventFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +97,8 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
             return (
               <div
                 key={event.id}
-                className="my-2 border-y border-[#4a3c2a] py-1.5 text-center text-[10px] font-mono font-bold text-[#e8a43a]"
+                className="my-2 border-y border-[#4a3c2a] bg-[#1e1812] py-2 text-center text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-[#e8a43a]"
+                style={{ textShadow: "0 0 8px rgba(232,164,58,0.3)" }}
                 data-testid="phase-marker"
               >
                 {event.message}
@@ -87,7 +109,7 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
           return (
             <div
               key={event.id}
-              className={`mb-1 px-2 py-1.5 rounded ${onEventClick ? "cursor-pointer hover:bg-[#251e15] transition-colors" : ""}`}
+              className={`mb-1 pl-2.5 pr-2 py-1.5 ${eventBorderClass(event.type)} transition-all duration-150 ${onEventClick ? "cursor-pointer hover:bg-[#1e1812] hover:pl-3" : ""}`}
               data-testid="event-item"
               onClick={onEventClick ? () => onEventClick(event) : undefined}
             >
@@ -100,7 +122,7 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
                 <span className="text-[10px] font-mono font-bold text-[#c4b490]">
                   {event.agentName}
                 </span>
-                <span className="ml-auto text-[9px] font-mono tabular-nums text-[#5a4a32]">
+                <span className="ml-auto text-[8px] font-mono uppercase tracking-wider tabular-nums text-[#4a3c2a]">
                   M{event.month}
                 </span>
               </div>

@@ -41,7 +41,7 @@ export function ArcGauge({
 
   return (
     <div className="border-b border-[#3a2e1e] px-2 py-2 last:border-b-0">
-      <span className="text-[10px] font-mono uppercase text-[#8a7a62] block mb-1">
+      <span className="text-[9px] font-mono uppercase tracking-wider text-[#6a5a42] block mb-1">
         {label}
       </span>
 

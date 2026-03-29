@@ -32,7 +32,6 @@ const SocialGraph = dynamic(
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 960;
 const SCALE_FACTOR = 1; // must match constants.ts — 1:1, Phaser Scale.FIT handles display
-const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only
 const GameCanvas = dynamic(
@@ -71,14 +70,31 @@ const SENTIMENT_LABEL: Record<
   angry: { symbol: "!", color: "text-[#d45050]" },
 };
 
-function NPCTooltip({ info }: { info: NPCHoverInfo }) {
+interface OverlayMetrics {
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+function NPCTooltip({
+  info,
+  scaleX,
+  scaleY,
+}: {
+  info: NPCHoverInfo;
+  scaleX: number;
+  scaleY: number;
+}) {
   const sent = SENTIMENT_LABEL[info.sentiment];
   return (
     <div
       className="pointer-events-none absolute z-50"
       style={{
-        left: info.x * SCALE_FACTOR + BORDER_WIDTH + 16,
-        top: info.y * SCALE_FACTOR + BORDER_WIDTH - 4,
+        left: info.x * scaleX + 16,
+        top: info.y * scaleY - 4,
       }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
@@ -104,6 +120,15 @@ interface BubbleState {
   x: number;
   y: number;
 }
+
+const DEFAULT_OVERLAY_METRICS: OverlayMetrics = {
+  offsetX: 0,
+  offsetY: 0,
+  width: GAME_WIDTH * SCALE_FACTOR,
+  height: GAME_HEIGHT * SCALE_FACTOR,
+  scaleX: SCALE_FACTOR,
+  scaleY: SCALE_FACTOR,
+};
 
 function roleToBubbleColor(role: string): "orange" | "blue" | "yellow" {
   switch (role) {
@@ -137,21 +162,21 @@ function SimulateContent() {
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
-  const handleEventClick = useCallback(
-    (event: SimEvent) => {
-      setSelectedNpcId(event.agentId);
-      import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-        eventBridge.emitCameraSnapToNPC(event.agentId);
-      });
-    },
-    [],
-  );
+  const handleEventClick = useCallback((event: SimEvent) => {
+    setSelectedNpcId(event.agentId);
+    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+      eventBridge.emitCameraSnapToNPC(event.agentId);
+    });
+  }, []);
 
   const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
+  const [overlayMetrics, setOverlayMetrics] = useState<OverlayMetrics>(
+    DEFAULT_OVERLAY_METRICS,
+  );
 
   // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
@@ -247,6 +272,64 @@ function SimulateContent() {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  // Measure the real Phaser canvas box so DOM overlays stay locked to sprite positions.
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+
+    let observedTarget: Element | null = null;
+    const updateMetrics = () => {
+      const canvas =
+        container.querySelector("canvas") ??
+        container.querySelector("[data-testid='game-canvas']");
+      const target = canvas instanceof HTMLElement ? canvas : null;
+      if (!target) return;
+
+      if (observedTarget !== target) {
+        if (observedTarget) resizeObserver.unobserve(observedTarget);
+        observedTarget = target;
+        resizeObserver.observe(target);
+      }
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const next: OverlayMetrics = {
+        offsetX: targetRect.left - containerRect.left,
+        offsetY: targetRect.top - containerRect.top,
+        width: targetRect.width,
+        height: targetRect.height,
+        scaleX: targetRect.width / GAME_WIDTH,
+        scaleY: targetRect.height / GAME_HEIGHT,
+      };
+
+      setOverlayMetrics((prev) => {
+        const changed =
+          Math.abs(prev.offsetX - next.offsetX) > 0.5 ||
+          Math.abs(prev.offsetY - next.offsetY) > 0.5 ||
+          Math.abs(prev.width - next.width) > 0.5 ||
+          Math.abs(prev.height - next.height) > 0.5;
+        return changed ? next : prev;
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(() => updateMetrics());
+    resizeObserver.observe(container);
+
+    const mutationObserver = new MutationObserver(() => updateMetrics());
+    mutationObserver.observe(container, { childList: true, subtree: true });
+
+    window.addEventListener("resize", updateMetrics);
+    document.addEventListener("fullscreenchange", updateMetrics);
+    updateMetrics();
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener("resize", updateMetrics);
+      document.removeEventListener("fullscreenchange", updateMetrics);
+    };
   }, []);
 
   // Camera panning via click+drag
@@ -368,7 +451,13 @@ function SimulateContent() {
           <div className="flex gap-1">
             {[1, 2, 3].map((p) => {
               const isActive = sim.phase >= p;
-              const bgColor = isActive ? (p === 3 ? "bg-[#d45050]" : p === 2 ? "bg-[#e8a43a]" : "bg-[#5ab85a]") : "bg-[#251e15]";
+              const bgColor = isActive
+                ? p === 3
+                  ? "bg-[#d45050]"
+                  : p === 2
+                    ? "bg-[#e8a43a]"
+                    : "bg-[#5ab85a]"
+                : "bg-[#251e15]";
               return (
                 <div
                   key={p}
@@ -451,7 +540,11 @@ function SimulateContent() {
 
         {/* Center: Game canvas with chat bubble overlays */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
-          <div ref={canvasContainerRef} className="relative shrink-0 canvas-glow" style={{ border: "2px solid #4a3c2a", borderRadius: 2 }}>
+          <div
+            ref={canvasContainerRef}
+            className="relative shrink-0 canvas-glow"
+            style={{ border: "2px solid #4a3c2a", borderRadius: 2 }}
+          >
             <GameCanvas />
 
             {/* Fullscreen toggle + Zoom controls — terminal buttons */}
@@ -495,24 +588,47 @@ function SimulateContent() {
             </div>
 
             {/* Chat bubbles anchored to NPCs */}
-            {bubbleList.map((b) => {
-              const cx = b.x * SCALE_FACTOR + BORDER_WIDTH;
-              const cy = b.y * SCALE_FACTOR + BORDER_WIDTH;
-              if (cx < 0 || cy < 0 || cx > GAME_WIDTH * SCALE_FACTOR || cy > GAME_HEIGHT * SCALE_FACTOR) return null;
-              return (
-                <ChatBubble
-                  key={b.npcId}
-                  agentName={b.agentName}
-                  message={b.message}
-                  x={cx}
-                  y={cy}
-                  color={roleToBubbleColor(b.role)}
-                />
-              );
-            })}
+            <div
+              className="pointer-events-none absolute z-30 overflow-hidden"
+              style={{
+                left: overlayMetrics.offsetX,
+                top: overlayMetrics.offsetY,
+                width: overlayMetrics.width,
+                height: overlayMetrics.height,
+              }}
+            >
+              {bubbleList.map((b) => {
+                const cx = b.x * overlayMetrics.scaleX;
+                const cy = b.y * overlayMetrics.scaleY;
+                if (
+                  cx < 0 ||
+                  cy < 0 ||
+                  cx > overlayMetrics.width ||
+                  cy > overlayMetrics.height
+                ) {
+                  return null;
+                }
+                return (
+                  <ChatBubble
+                    key={b.npcId}
+                    agentName={b.agentName}
+                    message={b.message}
+                    x={cx}
+                    y={cy}
+                    color={roleToBubbleColor(b.role)}
+                  />
+                );
+              })}
 
-            {/* NPC hover tooltip */}
-            {hoverInfo && <NPCTooltip info={hoverInfo} />}
+              {/* NPC hover tooltip */}
+              {hoverInfo && (
+                <NPCTooltip
+                  info={hoverInfo}
+                  scaleX={overlayMetrics.scaleX}
+                  scaleY={overlayMetrics.scaleY}
+                />
+              )}
+            </div>
           </div>
         </div>
 

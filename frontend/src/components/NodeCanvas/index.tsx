@@ -1,104 +1,163 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useMemo } from 'react';
 import {
-  ReactFlow,
-  useNodesState,
-  useEdgesState,
-  type Node,
   type Edge,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { useRouter } from 'next/navigation';
-import { startSimulation, uploadContextSource } from '@/services/wsClient';
-import { type MapType, setSelectedMap } from '@/game/constants';
-import type { UploadedContextSource } from '@/types/backend';
-import { FormContext } from './FormContext';
-import PolicyNode from './PolicyNode';
-import ConfigNode from './ConfigNode';
-import ObjectiveNode from './ObjectiveNode';
-import RunNode from './RunNode';
+  type Node,
+  ReactFlow,
+  useEdgesState,
+  useNodesState,
+} from "@xyflow/react";
+import { useCallback, useMemo, useState } from "react";
+import "@xyflow/react/dist/style.css";
+import { useRouter } from "next/navigation";
+import { type MapType, setSelectedMap } from "@/game/constants";
+import { setReplayData } from "@/lib/replayStore";
+import { startSimulation, uploadContextSource } from "@/services/wsClient";
+import type { SavedSimulation, UploadedContextSource } from "@/types/backend";
+import ConfigNode from "./ConfigNode";
+import { FormContext } from "./FormContext";
+import PolicyNode from "./PolicyNode";
+import RunNode from "./RunNode";
+
+function isSavedSimulation(data: unknown): data is SavedSimulation {
+  if (!data || typeof data !== "object") return false;
+  const candidate = data as Partial<SavedSimulation>;
+  return (
+    candidate.initMsg?.type === "init" &&
+    Array.isArray(candidate.initMsg.npcs) &&
+    Array.isArray(candidate.rounds)
+  );
+}
 
 const nodeTypes = {
   policyNode: PolicyNode,
   configNode: ConfigNode,
-  objectiveNode: ObjectiveNode,
   runNode: RunNode,
 };
 
 const initialNodes: Node[] = [
-  { id: 'policy',    type: 'policyNode',    position: { x: 0,    y: 0  }, data: {} },
-  { id: 'config',    type: 'configNode',    position: { x: 450,  y: 40 }, data: {} },
-  { id: 'objective', type: 'objectiveNode', position: { x: 760,  y: 40 }, data: {} },
-  { id: 'run',       type: 'runNode',       position: { x: 1070, y: 80 }, data: {} },
+  {
+    id: "policy",
+    type: "policyNode",
+    position: { x: 0, y: 0 },
+    data: {},
+    draggable: false,
+  },
+  {
+    id: "config",
+    type: "configNode",
+    position: { x: 500, y: 30 },
+    data: {},
+    draggable: false,
+  },
+  {
+    id: "run",
+    type: "runNode",
+    position: { x: 860, y: 60 },
+    data: {},
+    draggable: false,
+  },
 ];
 
-const edgeStyle = { stroke: 'rgba(168,85,247,0.5)', strokeWidth: 2 };
+const edgeStyle = {
+  stroke: "#D4A520",
+  strokeWidth: 2.5,
+};
 
 const initialEdges: Edge[] = [
-  { id: 'e1-2', source: 'policy',    target: 'config',    type: 'smoothstep', style: edgeStyle },
-  { id: 'e2-3', source: 'config',    target: 'objective', type: 'smoothstep', style: edgeStyle },
-  { id: 'e3-4', source: 'objective', target: 'run',       type: 'smoothstep', style: edgeStyle },
+  {
+    id: "e1-2",
+    source: "policy",
+    target: "config",
+    type: "smoothstep",
+    style: edgeStyle,
+    animated: true,
+  },
+  {
+    id: "e2-3",
+    source: "config",
+    target: "run",
+    type: "smoothstep",
+    style: edgeStyle,
+    animated: true,
+  },
 ];
 
-export default function NodeCanvas() {
+interface NodeCanvasProps {
+  onSimulateStart?: () => void;
+}
+
+export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const router = useRouter();
-  const [notesText, setNotesText] = useState('');
+  const [notesText, setNotesText] = useState("");
   const [numNpcs, setNumNpcs] = useState(25);
   const [numRounds, setNumRounds] = useState(5);
-  const [objective, setObjective] = useState('');
-  const [mapId, setMapId] = useState<MapType>('ccity');
+  const [objective, setObjective] = useState("");
+  const [mapId, setMapId] = useState<MapType>("ccity");
   const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [uploadingTrends, setUploadingTrends] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [primaryPolicy, setPrimaryPolicy] = useState<UploadedContextSource | null>(null);
+  const [primaryPolicy, setPrimaryPolicy] =
+    useState<UploadedContextSource | null>(null);
   const [trendSources, setTrendSources] = useState<UploadedContextSource[]>([]);
+  const [record, setRecord] = useState(false);
+  const [loadingCustomRun, setLoadingCustomRun] = useState(false);
 
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  const handlePrimaryPolicyFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPrimary(true);
-    try {
-      const uploaded = await uploadContextSource(file, 'Primary Policy PDF');
-      setPrimaryPolicy(uploaded);
-    } catch {
-      alert('Could not upload the policy PDF.');
-    } finally {
-      setUploadingPrimary(false);
-      e.target.value = '';
-    }
-  }, []);
+  const handlePrimaryPolicyFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploadingPrimary(true);
+      try {
+        const uploaded = await uploadContextSource(file, "Primary Policy PDF");
+        setPrimaryPolicy(uploaded);
+      } catch {
+        alert("Could not upload the policy PDF.");
+      } finally {
+        setUploadingPrimary(false);
+        e.target.value = "";
+      }
+    },
+    [],
+  );
 
-  const handleTrendFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
+  const handleTrendFiles = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length) return;
 
-    setUploadingTrends(true);
-    try {
-      const uploaded = await Promise.all(
-        files.map((file) => uploadContextSource(file, file.name)),
-      );
-      setTrendSources((prev) => [...prev, ...uploaded]);
-    } catch {
-      alert('Could not upload one or more CSV trend files.');
-    } finally {
-      setUploadingTrends(false);
-      e.target.value = '';
-    }
-  }, []);
+      setUploadingTrends(true);
+      try {
+        const uploaded = await Promise.all(
+          files.map((file) => uploadContextSource(file, file.name)),
+        );
+        setTrendSources((prev) => [...prev, ...uploaded]);
+      } catch {
+        alert("Could not upload one or more CSV trend files.");
+      } finally {
+        setUploadingTrends(false);
+        e.target.value = "";
+      }
+    },
+    [],
+  );
 
   const removeTrendSource = useCallback((sourceId: string) => {
     setTrendSources((prev) => prev.filter((source) => source.id !== sourceId));
   }, []);
 
   const handleSimulate = useCallback(async () => {
-    if (!primaryPolicy || isSimulating || uploadingPrimary || uploadingTrends) return;
+    if (!primaryPolicy || isSimulating || uploadingPrimary || uploadingTrends)
+      return;
 
+    onSimulateStart?.();
     setIsSimulating(true);
     setSelectedMap(mapId);
+
+    const recordParam = record ? "&record=true" : "";
 
     try {
       const simId = await startSimulation({
@@ -111,22 +170,10 @@ export default function NodeCanvas() {
         map_id: mapId,
       });
 
-      sessionStorage.setItem('agora-policy', primaryPolicy.filename);
-      sessionStorage.setItem('agora-policy-source-id', primaryPolicy.id);
-      sessionStorage.setItem('agora-notes', notesText);
-      sessionStorage.setItem('agora-num-npcs', numNpcs.toString());
-      sessionStorage.setItem('agora-num-rounds', numRounds.toString());
-      sessionStorage.setItem('agora-objective', objective);
-      sessionStorage.setItem('agora-map-id', mapId);
-      sessionStorage.setItem(
-        'agora-trend-sources',
-        JSON.stringify(trendSources.map((source) => source.filename)),
-      );
-
-      router.push(`/simulate?id=${simId}`);
+      router.push(`/simulate?id=${simId}${recordParam}`);
     } catch (err) {
-      console.error('Failed to start simulation:', err);
-      alert('Failed to start simulation. Is the backend running?');
+      console.error("Failed to start simulation:", err);
+      alert("Failed to start simulation. Is the backend running?");
       setIsSimulating(false);
     }
   }, [
@@ -137,49 +184,112 @@ export default function NodeCanvas() {
     numRounds,
     objective,
     mapId,
+    record,
     router,
     isSimulating,
     uploadingPrimary,
     uploadingTrends,
+    onSimulateStart,
   ]);
 
-  const formValue = useMemo(() => ({
-    notesText, setNotesText,
-    numNpcs, setNumNpcs,
-    numRounds, setNumRounds,
-    objective, setObjective,
-    mapId, setMapId,
-    primaryPolicy,
-    trendSources,
-    uploadingPrimary,
-    uploadingTrends,
-    isSimulating,
-    handlePrimaryPolicyFile,
-    handleTrendFiles,
-    removeTrendSource,
-    handleSimulate,
-  }), [
-    notesText,
-    numNpcs,
-    numRounds,
-    objective,
-    mapId,
-    primaryPolicy,
-    trendSources,
-    uploadingPrimary,
-    uploadingTrends,
-    isSimulating,
-    handlePrimaryPolicyFile,
-    handleTrendFiles,
-    removeTrendSource,
-    handleSimulate,
-  ]);
+  const handleLoadCustomRun = useCallback(async () => {
+    if (loadingCustomRun) return;
+    setLoadingCustomRun(true);
+    try {
+      const module = await import("@/custom_run.json");
+      const bundledReplay = module.default as unknown;
+      if (!isSavedSimulation(bundledReplay)) {
+        console.error("Bundled custom run is invalid");
+        setLoadingCustomRun(false);
+        return;
+      }
+      setReplayData(bundledReplay);
+      router.push("/simulate?mode=replay&map=citypack");
+    } catch (err) {
+      console.error("Failed to load bundled custom run:", err);
+      setLoadingCustomRun(false);
+    }
+  }, [loadingCustomRun, router]);
+
+  const handleLoadFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result as string) as SavedSimulation;
+          if (!isSavedSimulation(parsed)) {
+            console.error("Invalid simulation file: missing initMsg or rounds");
+            return;
+          }
+          setReplayData(parsed);
+          router.push(`/simulate?mode=replay&map=${mapId}`);
+        } catch (err) {
+          console.error("Failed to parse simulation file:", err);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    },
+    [mapId, router],
+  );
+
+  const formValue = useMemo(
+    () => ({
+      notesText,
+      setNotesText,
+      numNpcs,
+      setNumNpcs,
+      numRounds,
+      setNumRounds,
+      objective,
+      setObjective,
+      mapId,
+      setMapId,
+      primaryPolicy,
+      trendSources,
+      uploadingPrimary,
+      uploadingTrends,
+      isSimulating,
+      record,
+      setRecord,
+      handlePrimaryPolicyFile,
+      handleTrendFiles,
+      removeTrendSource,
+      handleSimulate,
+      handleLoadCustomRun,
+      handleLoadFile,
+      loadingCustomRun,
+    }),
+    [
+      notesText,
+      numNpcs,
+      numRounds,
+      objective,
+      mapId,
+      primaryPolicy,
+      trendSources,
+      uploadingPrimary,
+      uploadingTrends,
+      isSimulating,
+      record,
+      handlePrimaryPolicyFile,
+      handleTrendFiles,
+      removeTrendSource,
+      handleSimulate,
+      handleLoadCustomRun,
+      handleLoadFile,
+      loadingCustomRun,
+    ],
+  );
 
   return (
     <FormContext.Provider value={formValue}>
       <style>{`
         .react-flow, .react-flow__pane, .react-flow__renderer, .react-flow__background { background: transparent !important; }
         .react-flow__edge-path { stroke-linecap: round; }
+        .react-flow__edge.animated path { animation-duration: 1.5s; }
       `}</style>
       <ReactFlow
         nodes={nodes}
@@ -190,6 +300,8 @@ export default function NodeCanvas() {
         proOptions={{ hideAttribution: true }}
         fitView
         fitViewOptions={{ padding: 0.15 }}
+        nodesDraggable={false}
+        nodesConnectable={false}
         panOnDrag
         zoomOnScroll={false}
         zoomOnPinch={false}

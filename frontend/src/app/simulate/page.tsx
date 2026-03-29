@@ -112,6 +112,7 @@ export default function SimulatePage() {
 
 function SimulateContent() {
   const searchParams = useSearchParams();
+  const isMock = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
   const simulationId = searchParams.get("id") || "";
   const sim = useSimulation(simulationId || undefined);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
@@ -128,9 +129,12 @@ function SimulateContent() {
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
 
-  // Auto-start simulation once we have a simulation ID
+  // Auto-start simulation once we have a simulation ID (or immediately in mock mode)
+  const hasStartedRef = useRef(false);
   useEffect(() => {
-    if (simulationId && !sim.isRunning && !sim.isComplete) {
+    if (hasStartedRef.current) return;
+    if (simulationId || isMock) {
+      hasStartedRef.current = true;
       sim.start();
     }
   }, [simulationId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -272,7 +276,7 @@ function SimulateContent() {
 
   const bubbleList = Array.from(bubbles.values());
 
-  if (!simulationId) {
+  if (!simulationId && !isMock) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
         <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">

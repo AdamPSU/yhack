@@ -1,8 +1,8 @@
 import * as Phaser from "phaser";
-import { 
-  type MapType, 
-  MAP_CONFIGS, 
-  GAME_WIDTH, 
+import {
+  type MapType,
+  MAP_CONFIGS,
+  GAME_WIDTH,
   GAME_HEIGHT,
   SCALE_FACTOR,
   CENTER_BOUNDS,
@@ -13,13 +13,13 @@ import {
   getMapConfig,
   TILE_SIZE,
   MAP_COLS,
-  MAP_ROWS
+  MAP_ROWS,
 } from "./constants";
 
-export { 
-  type MapType, 
-  MAP_CONFIGS, 
-  GAME_WIDTH, 
+export {
+  type MapType,
+  MAP_CONFIGS,
+  GAME_WIDTH,
   GAME_HEIGHT,
   SCALE_FACTOR,
   CENTER_BOUNDS,
@@ -30,7 +30,7 @@ export {
   getMapConfig,
   TILE_SIZE,
   MAP_COLS,
-  MAP_ROWS
+  MAP_ROWS,
 };
 
 export function createGameConfig(

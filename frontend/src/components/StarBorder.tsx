@@ -1,27 +1,28 @@
-import React from 'react';
-import './StarBorder.css';
+import React from "react";
+import "./StarBorder.css";
 
-type StarBorderProps<T extends React.ElementType> = React.ComponentPropsWithoutRef<T> & {
-  as?: T;
-  className?: string;
-  children?: React.ReactNode;
-  color?: string;
-  speed?: React.CSSProperties['animationDuration'];
-  thickness?: number;
-  contentStyle?: React.CSSProperties;
-};
+type StarBorderProps<T extends React.ElementType> =
+  React.ComponentPropsWithoutRef<T> & {
+    as?: T;
+    className?: string;
+    children?: React.ReactNode;
+    color?: string;
+    speed?: React.CSSProperties["animationDuration"];
+    thickness?: number;
+    contentStyle?: React.CSSProperties;
+  };
 
-const StarBorder = <T extends React.ElementType = 'button'>({
+const StarBorder = <T extends React.ElementType = "button">({
   as,
-  className = '',
-  color = 'white',
-  speed = '6s',
+  className = "",
+  color = "white",
+  speed = "6s",
   thickness = 1,
   contentStyle,
   children,
   ...rest
 }: StarBorderProps<T>) => {
-  const Component = as || 'button';
+  const Component = as || "button";
 
   return (
     <Component
@@ -46,7 +47,9 @@ const StarBorder = <T extends React.ElementType = 'button'>({
           animationDuration: speed,
         }}
       />
-      <div className="inner-content" style={contentStyle}>{children}</div>
+      <div className="inner-content" style={contentStyle}>
+        {children}
+      </div>
     </Component>
   );
 };

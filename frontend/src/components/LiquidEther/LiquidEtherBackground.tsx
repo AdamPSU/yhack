@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
+import dynamic from "next/dynamic";
 
-const LiquidEther = dynamic(() => import('./LiquidEther'), { ssr: false });
+const LiquidEther = dynamic(() => import("./LiquidEther"), { ssr: false });
 
 export default function LiquidEtherBackground() {
   return (
@@ -12,7 +12,7 @@ export default function LiquidEtherBackground() {
         cursorSize={100}
         isViscous
         viscous={30}
-        colors={['#694ed4', '#FF9FFC', '#B19EEF']}
+        colors={["#694ed4", "#FF9FFC", "#B19EEF"]}
         autoDemo
         autoSpeed={0.5}
         autoIntensity={2.2}

@@ -159,6 +159,20 @@ body {
   animation: gaugeGlow 2s ease-in-out infinite;
 }
 
+.pixel-bar-segment-bad {
+  animation: segmentPulse 2s ease-in-out infinite;
+}
+
+@keyframes segmentPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
 /* Warm shadow utilities — Stardew style (replaces neon glows) */
 .neon-purple {
   filter: drop-shadow(0 0 4px rgba(123, 104, 238, 0.4));

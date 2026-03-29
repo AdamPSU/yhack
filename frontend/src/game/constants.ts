@@ -20,7 +20,9 @@ export function setSelectedMap(m: MapType) {
 }
 
 export let proceduralMap = false;
-export function setProceduralMap(v: boolean) { proceduralMap = v; }
+export function setProceduralMap(v: boolean) {
+  proceduralMap = v;
+}
 
 export function getMapConfig() {
   return MAP_CONFIGS[selectedMap];

@@ -1,7 +1,14 @@
 "use client";
 
-import { ArcGauge } from "@/components/dashboard/ArcGauge";
-import { SparklineCard } from "@/components/dashboard/SparklineCard";
+import {
+  BankIcon,
+  CoinIcon,
+  CrownIcon,
+  FistIcon,
+  PixelStatBar,
+  ShopIcon,
+  WorkerIcon,
+} from "@/components/dashboard/PixelStatBar";
 import type { SimMetrics } from "@/types";
 
 interface DashboardProps {
@@ -10,6 +17,8 @@ interface DashboardProps {
   phase: number;
   month: number;
 }
+
+/* ─── Severity helpers ─── */
 
 function priceSeverity(v: number) {
   const abs = Math.abs(v);
@@ -29,6 +38,34 @@ function zeroOneSeverity(v: number, invert = false) {
   if (effective > 0.7) return "good" as const;
   if (effective > 0.4) return "warn" as const;
   return "bad" as const;
+}
+
+/* ─── Fill ratio normalization ─── */
+
+function normalizePrices(v: number): number {
+  return Math.min(1, Math.abs(v) / 10);
+}
+
+function normalizeUnemployment(v: number): number {
+  return Math.max(0, Math.min(1, (v - 3) / 7));
+}
+
+function normalizeInterestRate(v: number): number {
+  return Math.max(0, Math.min(1, (v - 3) / 5));
+}
+
+/* ─── Trend computation ─── */
+
+function computeTrend(
+  history: SimMetrics[],
+  getter: (m: SimMetrics) => number,
+): "up" | "down" | null {
+  if (history.length < 2) return null;
+  const prev = getter(history[history.length - 2]);
+  const curr = getter(history[history.length - 1]);
+  const diff = curr - prev;
+  if (Math.abs(diff) < 0.001) return null;
+  return diff > 0 ? "up" : "down";
 }
 
 export function Dashboard({
@@ -61,55 +98,61 @@ export function Dashboard({
         </span>
       </div>
 
-      {/* Charts */}
+      {/* Stats */}
       <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin px-1 py-1">
-        {/* Sparkline time-series metrics */}
-        <SparklineCard
+        <PixelStatBar
+          icon={<CoinIcon />}
           label="Prices"
-          values={metricsHistory.map((m) => m.priceIndex)}
-          currentValue={metrics.priceIndex}
+          value={metrics.priceIndex}
           formatValue={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`}
           severity={priceSeverity(metrics.priceIndex)}
-          baseline={0}
-          domain={[-10, 15]}
+          fillRatio={normalizePrices(metrics.priceIndex)}
+          trend={computeTrend(metricsHistory, (m) => m.priceIndex)}
         />
-        <SparklineCard
+        <PixelStatBar
+          icon={<WorkerIcon />}
           label="Unemployment"
-          values={metricsHistory.map((m) => m.unemploymentRate)}
-          currentValue={metrics.unemploymentRate}
+          value={metrics.unemploymentRate}
           formatValue={(v) => `${v.toFixed(1)}%`}
           severity={unempSeverity(metrics.unemploymentRate)}
-          baseline={4.2}
-          domain={[3, 10]}
+          fillRatio={normalizeUnemployment(metrics.unemploymentRate)}
+          trend={computeTrend(metricsHistory, (m) => m.unemploymentRate)}
         />
-        <SparklineCard
+        <PixelStatBar
+          icon={<BankIcon />}
           label="Interest Rate"
-          values={metricsHistory.map((m) => m.interestRate)}
-          currentValue={metrics.interestRate}
+          value={metrics.interestRate}
           formatValue={(v) => `${v.toFixed(2)}%`}
-          severity="neutral"
-          baseline={5.25}
-          domain={[3, 8]}
+          severity={"neutral"}
+          fillRatio={normalizeInterestRate(metrics.interestRate)}
+          trend={computeTrend(metricsHistory, (m) => m.interestRate)}
         />
-
-        {/* Arc gauge ratio metrics */}
-        <ArcGauge
+        <PixelStatBar
+          icon={<FistIcon />}
           label="Social Unrest"
           value={metrics.socialUnrest}
           formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.socialUnrest, true)}
+          fillRatio={metrics.socialUnrest}
+          trend={computeTrend(metricsHistory, (m) => m.socialUnrest)}
         />
-        <ArcGauge
+        <PixelStatBar
+          icon={<ShopIcon />}
           label="Businesses Open"
           value={metrics.businessSurvival}
           formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.businessSurvival)}
+          fillRatio={metrics.businessSurvival}
+          trend={computeTrend(metricsHistory, (m) => m.businessSurvival)}
         />
-        <ArcGauge
+        <PixelStatBar
+          icon={<CrownIcon />}
           label="Gov. Approval"
           value={metrics.govApproval}
           formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.govApproval)}
+          fillRatio={metrics.govApproval}
+          trend={computeTrend(metricsHistory, (m) => m.govApproval)}
         />
       </div>
     </div>

@@ -28,7 +28,7 @@ export default function RunNode() {
     <NodeWrapper badge="03" title="OUTPUT" description="Go." hasSource={false}>
       <div
         className="nodrag nopan flex flex-col items-center gap-3 py-2"
-        style={{ width: 200 }}
+        style={{ width: 300 }}
       >
         {/* Run button */}
         <button

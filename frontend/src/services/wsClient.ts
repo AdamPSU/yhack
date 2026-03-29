@@ -46,7 +46,10 @@ export async function uploadContextSource(
 export async function extractFile(file: File): Promise<string> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/extract`, { method: "POST", body: form });
+  const res = await fetch(`${API_BASE}/extract`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) throw new Error(`Extraction failed: ${res.status}`);
   const data = await res.json();
   return data.text as string;
@@ -55,7 +58,9 @@ export async function extractFile(file: File): Promise<string> {
 export async function fetchEconomicReport(
   simulationId: string,
 ): Promise<EconomicReport> {
-  const res = await fetch(`${API_BASE}/simulate/${simulationId}/economic-report`);
+  const res = await fetch(
+    `${API_BASE}/simulate/${simulationId}/economic-report`,
+  );
   if (!res.ok) {
     throw new Error(`Economic report failed: ${res.status}`);
   }
@@ -80,7 +85,9 @@ export async function startSimulation(
   mapId?: string,
 ): Promise<string> {
   if (typeof requestOrText === "string") {
-    throw new Error("Text-only simulations are no longer supported. Upload a policy PDF first.");
+    throw new Error(
+      "Text-only simulations are no longer supported. Upload a policy PDF first.",
+    );
   }
 
   const res = await fetch(`${API_BASE}/simulate`, {

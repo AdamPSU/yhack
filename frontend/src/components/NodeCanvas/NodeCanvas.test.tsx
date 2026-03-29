@@ -33,8 +33,10 @@ describe("NodeCanvas PDF Policy Flow", () => {
           filename: file.name,
           label: "Primary Policy PDF",
           status: "ready",
-          preview_text: "National industrial policy focused on strategic manufacturing.",
-          summary: "National industrial policy focused on strategic manufacturing.",
+          preview_text:
+            "National industrial policy focused on strategic manufacturing.",
+          summary:
+            "National industrial policy focused on strategic manufacturing.",
           metadata: { page_count_estimate: 4 },
         };
       }
@@ -59,7 +61,9 @@ describe("NodeCanvas PDF Policy Flow", () => {
     render(<NodeCanvas />);
 
     const pdfInput = screen.getByTestId("policy-pdf-input");
-    const pdfFile = new File(["pdf"], "policy.pdf", { type: "application/pdf" });
+    const pdfFile = new File(["pdf"], "policy.pdf", {
+      type: "application/pdf",
+    });
     fireEvent.change(pdfInput, { target: { files: [pdfFile] } });
 
     await waitFor(() => {
@@ -68,7 +72,9 @@ describe("NodeCanvas PDF Policy Flow", () => {
 
     const notesTextarea = screen.getByTestId("policy-textarea");
     fireEvent.change(notesTextarea, {
-      target: { value: "Focus on inflation pass-through and lower-income households." },
+      target: {
+        value: "Focus on inflation pass-through and lower-income households.",
+      },
     });
 
     const npcsSlider = screen.getByTestId("npcs-slider");
@@ -83,9 +89,13 @@ describe("NodeCanvas PDF Policy Flow", () => {
     });
 
     const csvInput = screen.getByTestId("trend-csv-input");
-    const csvFile = new File(["month,inflation_rate\n2024-01,3.1"], "inflation.csv", {
-      type: "text/csv",
-    });
+    const csvFile = new File(
+      ["month,inflation_rate\n2024-01,3.1"],
+      "inflation.csv",
+      {
+        type: "text/csv",
+      },
+    );
     fireEvent.change(csvInput, { target: { files: [csvFile] } });
 
     await waitFor(() => {
@@ -99,7 +109,8 @@ describe("NodeCanvas PDF Policy Flow", () => {
     await waitFor(() => {
       expect(startSimulation).toHaveBeenCalledWith({
         primary_policy_source_id: "src_policy",
-        notes_text: "Focus on inflation pass-through and lower-income households.",
+        notes_text:
+          "Focus on inflation pass-through and lower-income households.",
         trend_source_ids: ["src_trend"],
         num_rounds: 10,
         num_npcs: 40,

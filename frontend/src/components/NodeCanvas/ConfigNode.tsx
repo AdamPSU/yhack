@@ -19,7 +19,7 @@ export default function ConfigNode() {
       title="CONFIG"
       description="Adjust agents, rounds, and focus."
     >
-      <div className="nodrag nopan space-y-4" style={{ width: 240 }}>
+      <div className="nodrag nopan space-y-4" style={{ width: 360 }}>
         {/* NPCs */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-end">

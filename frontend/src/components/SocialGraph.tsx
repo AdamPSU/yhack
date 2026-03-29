@@ -12,8 +12,8 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#a855f7",  // Purple
-  friend: "#2dd4bf",  // Teal
+  family: "#a855f7", // Purple
+  friend: "#2dd4bf", // Teal
   employer: "#ffffff",
   colleague: "#818cf8", // Indigo
   neighbor: "#475569",
@@ -108,7 +108,10 @@ export function SocialGraph({
   const dragRef = useRef<GraphNode | null>(null);
   const spritesheetRef = useRef<HTMLImageElement | null>(null);
   const zoomRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
-  const zoomBehaviorRef = useRef<d3.ZoomBehavior<HTMLCanvasElement, unknown> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<
+    HTMLCanvasElement,
+    unknown
+  > | null>(null);
   const [hovered, setHovered] = useState<GraphNode | null>(null);
   const [dims, setDims] = useState({ w: 680, h: 500 });
 
@@ -145,7 +148,8 @@ export function SocialGraph({
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.scale(dpr, dpr);
 
-    const zoom = d3.zoom<HTMLCanvasElement, unknown>()
+    const zoom = d3
+      .zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.3, 4])
       .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
         zoomRef.current = event.transform;
@@ -544,10 +548,14 @@ export function SocialGraph({
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(
           sheet,
-          srcX, srcY, 16, 16,
+          srcX,
+          srcY,
+          16,
+          16,
           x - drawSize / 2,
           y - drawSize / 2,
-          drawSize, drawSize,
+          drawSize,
+          drawSize,
         );
         ctx.restore();
       }
@@ -558,7 +566,9 @@ export function SocialGraph({
       ctx.stroke();
 
       // Label
-      ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)";
+      ctx.fillStyle = isDimmed
+        ? "rgba(255,255,255,0.1)"
+        : "rgba(255,255,255,0.4)";
       ctx.font = `${isHov ? "bold 9px" : "8px"} monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
@@ -710,7 +720,10 @@ export function SocialGraph({
         <div
           className="pointer-events-none absolute z-50"
           style={{
-            left: Math.min(zoomRef.current.applyX(hovNode.x ?? 0) + 18, dims.w - 180),
+            left: Math.min(
+              zoomRef.current.applyX(hovNode.x ?? 0) + 18,
+              dims.w - 180,
+            ),
             top: Math.max(zoomRef.current.applyY(hovNode.y ?? 0) - 20, 4),
           }}
         >
@@ -730,18 +743,31 @@ export function SocialGraph({
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ background: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
                 />
-                <span 
-                  className={hovNode.mood === 'angry' ? 'neon-text-pink' : 
-                             (hovNode.mood === 'anxious' || hovNode.mood === 'worried') ? 'neon-text-yellow' :
-                             hovNode.mood === 'hopeful' ? 'neon-text-teal' :
-                             hovNode.mood === 'excited' ? 'neon-text-purple' : 'neon-text-indigo'}
+                <span
+                  className={
+                    hovNode.mood === "angry"
+                      ? "neon-text-pink"
+                      : hovNode.mood === "anxious" || hovNode.mood === "worried"
+                        ? "neon-text-yellow"
+                        : hovNode.mood === "hopeful"
+                          ? "neon-text-teal"
+                          : hovNode.mood === "excited"
+                            ? "neon-text-purple"
+                            : "neon-text-indigo"
+                  }
                   style={{ color: MOOD_COLORS[hovNode.mood] || "#818cf8" }}
                 >
                   {hovNode.mood}
                 </span>
               </span>
               <span
-                className={hovNode.political_leaning > 0.3 ? "neon-text-pink" : hovNode.political_leaning < -0.3 ? "neon-text-teal" : "neon-text-indigo"}
+                className={
+                  hovNode.political_leaning > 0.3
+                    ? "neon-text-pink"
+                    : hovNode.political_leaning < -0.3
+                      ? "neon-text-teal"
+                      : "neon-text-indigo"
+                }
                 style={{ color: politicalColor(hovNode.political_leaning) }}
               >
                 {hovNode.political_leaning > 0.3
@@ -774,7 +800,9 @@ export function SocialGraph({
                       <span className="text-white/60">
                         {other?.name.split(" ")[0] ?? "?"}
                       </span>
-                      <span className="text-white/20 uppercase tracking-tighter">{l.rel_type}</span>
+                      <span className="text-white/20 uppercase tracking-tighter">
+                        {l.rel_type}
+                      </span>
                     </div>
                   );
                 })}

@@ -28,9 +28,10 @@ const SocialGraph = dynamic(
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
-const GAME_WIDTH = 640;
-const GAME_HEIGHT = 480;
+const GAME_WIDTH = 1280;
+const GAME_HEIGHT = 960;
 const SCALE_FACTOR = 2;
+const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only
 const GameCanvas = dynamic(
@@ -75,8 +76,8 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
     <div
       className="pointer-events-none absolute z-50"
       style={{
-        left: info.x + 16,
-        top: info.y - 4,
+        left: info.x * SCALE_FACTOR + BORDER_WIDTH + 16,
+        top: info.y * SCALE_FACTOR + BORDER_WIDTH - 4,
       }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
@@ -414,8 +415,8 @@ function SimulateContent() {
                 key={b.npcId}
                 agentName={b.agentName}
                 message={b.message}
-                x={b.x + 8}
-                y={b.y}
+                x={b.x * SCALE_FACTOR + BORDER_WIDTH}
+                y={b.y * SCALE_FACTOR + BORDER_WIDTH}
               />
             ))}
 
@@ -428,6 +429,7 @@ function SimulateContent() {
         <div className="shrink-0">
           <Dashboard
             metrics={sim.metrics}
+            metricsHistory={sim.metricsHistory}
             phase={sim.phase}
             month={sim.month}
           />

@@ -83,3 +83,18 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+/* Dashboard gauge glow pulse for danger states */
+@keyframes gaugeGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.gauge-glow {
+  animation: gaugeGlow 2s ease-in-out infinite;
+}

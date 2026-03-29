@@ -1,5 +1,5 @@
 import { MAP_COLS, MAP_ROWS } from "../config";
-import type { BuildingPositions } from "@/lib/types";
+import type { BuildingPositions } from "@/types";
 import * as Tiles from "./TileRegistry";
 
 // Each cell in the grid holds a ground tile and optionally an overlay tile

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { POLICY_PRESETS } from "@/lib/mockData";
+import { POLICY_PRESETS } from "@/mocks/mockData";
 
 export function PolicyInput() {
   const [text, setText] = useState("");

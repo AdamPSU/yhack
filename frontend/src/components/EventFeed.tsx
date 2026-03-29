@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { SimEvent } from "@/lib/types";
+import type { SimEvent } from "@/types";
 
 interface EventFeedProps {
   events: SimEvent[];

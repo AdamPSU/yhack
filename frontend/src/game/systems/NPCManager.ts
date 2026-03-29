@@ -1,11 +1,13 @@
 import type * as Phaser from "phaser";
 import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
-import type { BackendNPC } from "@/lib/backendTypes";
-import type { BuildingPositions } from "@/lib/types";
+import type { BackendNPC } from "@/types/backend";
+import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS } from "../config";
 import { NPC } from "../entities/NPC";
 import { MovementSystem } from "./MovementSystem";
+import { OccupancyGrid } from "./OccupancyGrid";
+import { findPath } from "./Pathfinder";
 
 function roleToZone(role: string): string {
   switch (role) {
@@ -32,6 +34,7 @@ export class NPCManager {
   private groundGrid: number[][];
   private gridRowOffset: number;
   private gridColOffset: number;
+  private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
 
@@ -49,7 +52,8 @@ export class NPCManager {
     this.groundGrid = groundGrid;
     this.gridRowOffset = gridRowOffset;
     this.gridColOffset = gridColOffset;
-    this.movement = new MovementSystem(scene, isWalkable, groundGrid, gridRowOffset, gridColOffset);
+    this.occupancy = new OccupancyGrid();
+    this.movement = new MovementSystem(scene, isWalkable, groundGrid, this.occupancy, gridRowOffset, gridColOffset);
 
     // Listen for dynamic NPC init from backend via EventBridge
     eventBridge.on("sim:init-npcs", this.onInitNPCs, this);
@@ -65,12 +69,14 @@ export class NPCManager {
     }
     this.npcs.clear();
     this.npcZones.clear();
+    this.occupancy.clear();
 
     // Re-create movement system (timers were destroyed)
     this.movement = new MovementSystem(
       this.scene,
       this.isWalkable,
       this.groundGrid,
+      this.occupancy,
       this.gridRowOffset,
       this.gridColOffset,
     );
@@ -101,6 +107,7 @@ export class NPCManager {
       npc.role = bn.role;
       npc.sentiment = moodToSentiment(bn.mood);
       this.npcs.set(bn.id, npc);
+      this.occupancy.occupy(bn.id, tileX, tileY);
 
       const zone = roleToZone(bn.role);
       this.npcZones.set(bn.id, zone);
@@ -129,8 +136,10 @@ export class NPCManager {
     for (let r = 1; r <= 5; r++) {
       for (let dx = -r; dx <= r; dx++) {
         for (let dy = -r; dy <= r; dy++) {
-          if (this.isWalkable(x + dx, y + dy)) {
-            return { x: x + dx, y: y + dy };
+          const nx = x + dx;
+          const ny = y + dy;
+          if (this.isWalkable(nx, ny) && !this.occupancy.isOccupied(nx, ny)) {
+            return { x: nx, y: ny };
           }
         }
       }
@@ -203,8 +212,13 @@ export class NPCManager {
     this.movement.override(npcIdA);
     this.movement.override(npcIdB);
 
+    // Find a walkable tile adjacent to npcB (not B's tile itself)
+    const adj = this.findAdjacentWalkable(npcB.tileX, npcB.tileY, npcA.npcId);
+    const goalX = adj ? adj.x : npcB.tileX;
+    const goalY = adj ? adj.y : npcB.tileY;
+
     // Step-walk npcA toward npcB (max 5 steps to avoid long paths)
-    this.stepToward(npcA, npcB.tileX, npcB.tileY, 5).then(() => {
+    this.stepToward(npcA, goalX, goalY, 5).then(() => {
       // Face each other
       if (npcA.tileX < npcB.tileX) {
         npcA.face("right");
@@ -228,41 +242,62 @@ export class NPCManager {
     });
   }
 
-  /** Walk an NPC step-by-step toward a target, up to maxSteps moves */
+  /** Walk an NPC step-by-step toward a target using A* pathfinding */
   private async stepToward(
     npc: NPC,
     targetX: number,
     targetY: number,
     maxSteps: number,
   ) {
-    for (let i = 0; i < maxSteps; i++) {
-      const dx = targetX - npc.tileX;
-      const dy = targetY - npc.tileY;
-
-      // Close enough (adjacent or same tile)
-      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) break;
-
-      // Pick the best adjacent step toward target
-      const candidates: { col: number; row: number; dist: number }[] = [];
-      for (const [cx, cy] of [
-        [0, -1],
-        [0, 1],
-        [-1, 0],
-        [1, 0],
-      ] as const) {
-        const nx = npc.tileX + cx;
-        const ny = npc.tileY + cy;
-        if (!this.isWalkable(nx, ny)) continue;
-        const dist = Math.abs(targetX - nx) + Math.abs(targetY - ny);
-        candidates.push({ col: nx, row: ny, dist });
-      }
-
-      if (candidates.length === 0) break;
-
-      // Pick closest to target
-      candidates.sort((a, b) => a.dist - b.dist);
-      await npc.walkTo(candidates[0].col, candidates[0].row);
+    // Snap goal to walkable tile if it's inside a building
+    let goalX = targetX;
+    let goalY = targetY;
+    if (!this.isWalkable(goalX, goalY)) {
+      const snapped = this.findNearestWalkable(goalX, goalY);
+      if (!snapped) return;
+      goalX = snapped.x;
+      goalY = snapped.y;
     }
+
+    const path = findPath(
+      { col: npc.tileX, row: npc.tileY },
+      { col: goalX, row: goalY },
+      this.isWalkable,
+    );
+    if (!path || path.length === 0) return;
+
+    for (let i = 0; i < Math.min(maxSteps, path.length); i++) {
+      const next = path[i];
+      // Re-check occupancy at step time — another NPC may have moved here
+      if (this.occupancy.isOccupiedByOther(npc.npcId, next.col, next.row))
+        break;
+      this.occupancy.occupy(npc.npcId, next.col, next.row);
+      await npc.walkTo(next.col, next.row);
+    }
+  }
+
+  /** Find a walkable, unoccupied tile adjacent to (col, row) */
+  private findAdjacentWalkable(
+    col: number,
+    row: number,
+    forNpcId: string,
+  ): { x: number; y: number } | null {
+    for (const [dx, dy] of [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ] as const) {
+      const nx = col + dx;
+      const ny = row + dy;
+      if (
+        this.isWalkable(nx, ny) &&
+        !this.occupancy.isOccupiedByOther(forNpcId, nx, ny)
+      ) {
+        return { x: nx, y: ny };
+      }
+    }
+    return null;
   }
 
   /** Get building positions for effects */
@@ -280,5 +315,6 @@ export class NPCManager {
     }
     this.npcs.clear();
     this.npcZones.clear();
+    this.occupancy.clear();
   }
 }

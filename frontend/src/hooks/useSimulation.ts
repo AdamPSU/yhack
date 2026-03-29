@@ -2,14 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adaptEvent, roundToPhase } from "@/lib/adapter";
-import type { BackendNPC, WSRoundMsg } from "@/lib/backendTypes";
 import {
   createAccumulator,
   type MetricsAccumulator,
   updateMetrics,
 } from "@/lib/metricsEngine";
-import type { SimEvent, SimMetrics } from "@/lib/types";
-import { connectWebSocket, startSimulation } from "@/lib/wsClient";
+import { generateMockSimulation } from "@/mocks/mockBackend";
+import { connectWebSocket, startSimulation } from "@/services/wsClient";
+import type { SimEvent, SimMetrics } from "@/types";
+import type { BackendNPC, WSRoundMsg } from "@/types/backend";
+
+const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
 
 const INITIAL_METRICS: SimMetrics = {
   priceIndex: 0,
@@ -47,6 +50,21 @@ function getBridge() {
     bridgePromise = import("@/game/bridge/EventBridge");
   }
   return bridgePromise;
+}
+
+function waitForQueueDrain(
+  queueRef: React.RefObject<SimEvent[]>,
+  setDone: React.Dispatch<React.SetStateAction<SimulationState>>,
+) {
+  let checks = 0;
+  const tick = () => {
+    if (queueRef.current.length === 0 || ++checks > 300) {
+      setDone((prev) => ({ ...prev, isRunning: false, isComplete: true }));
+    } else {
+      setTimeout(tick, 1000);
+    }
+  };
+  tick();
 }
 
 export function useSimulation(policyText?: string) {
@@ -104,6 +122,73 @@ export function useSimulation(policyText?: string) {
     timerRef.current = setTimeout(drainQueue, delay);
   }, []);
 
+  /** Feed a single WSRoundMsg through the same pipeline as the real backend. */
+  const processRound = useCallback(
+    (msg: WSRoundMsg) => {
+      const round = msg.round;
+      const lookup = npcLookupRef.current;
+      for (const npc of msg.npcs) {
+        lookup.set(npc.id, npc);
+      }
+
+      const { phase, month } = roundToPhase(round, maxRoundsRef.current);
+      if (phase > lastPhaseRef.current) {
+        lastPhaseRef.current = phase;
+        eventQueueRef.current.push({
+          id: `phase-${phase}`,
+          type: "phase_change",
+          agentId: "system",
+          agentName: "System",
+          message: PHASE_LABELS[phase] || `Phase ${phase}`,
+          phase,
+          month,
+          timestamp: Date.now(),
+        });
+      }
+
+      getBridge().then(({ eventBridge }) => {
+        for (const be of msg.events) {
+          if (
+            be.event_type === "move" &&
+            be.data.to_x != null &&
+            be.data.to_y != null
+          ) {
+            eventBridge.emitNPCMove(
+              be.npc_id,
+              Number(be.data.to_x),
+              Number(be.data.to_y),
+            );
+          }
+          if (be.event_type === "mood_shift" && be.data.new_mood) {
+            eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
+          }
+        }
+      });
+
+      for (const be of msg.events) {
+        const adapted = adaptEvent(be, lookup, round, maxRoundsRef.current);
+        if (adapted) {
+          eventQueueRef.current.push(adapted);
+        }
+      }
+
+      const newMetrics = updateMetrics(
+        metricsAccRef.current,
+        msg.npcs,
+        msg.events,
+      );
+      setState((prev) => ({
+        ...prev,
+        metrics: { ...prev.metrics, ...newMetrics },
+      }));
+
+      if (!timerRef.current && eventQueueRef.current.length > 0) {
+        timerRef.current = setTimeout(drainQueue, 800);
+      }
+    },
+    [drainQueue],
+  );
+
   const start = useCallback(async () => {
     setState({
       events: [],
@@ -119,6 +204,37 @@ export function useSimulation(policyText?: string) {
     eventQueueRef.current = [];
     lastPhaseRef.current = 0;
 
+    // ── Mock backend path ──────────────────────────────────
+    if (USE_MOCK) {
+      const mock = generateMockSimulation(maxRoundsRef.current);
+
+      // Init NPCs
+      const lookup = npcLookupRef.current;
+      for (const npc of mock.initMsg.npcs) {
+        lookup.set(npc.id, npc);
+      }
+      getBridge().then(({ eventBridge }) => {
+        eventBridge.emitInitNPCs(mock.initMsg.npcs);
+      });
+
+      // Drip-feed rounds with a small delay so the UI plays back naturally
+      let i = 0;
+      const feedNext = () => {
+        if (i >= mock.rounds.length) {
+          waitForQueueDrain(eventQueueRef, setState);
+          return;
+        }
+        processRound(mock.rounds[i]);
+        i++;
+        const delay = 150 + Math.random() * 100;
+        const t = setTimeout(feedNext, delay);
+        cleanupRef.current = () => clearTimeout(t);
+      };
+      feedNext();
+      return;
+    }
+
+    // ── Real backend path ──────────────────────────────────
     const text = policyText || "";
     if (!text) return;
 
@@ -139,89 +255,9 @@ export function useSimulation(policyText?: string) {
           });
         },
 
-        onRound: (msg: WSRoundMsg) => {
-          const round = msg.round;
-          const lookup = npcLookupRef.current;
-          for (const npc of msg.npcs) {
-            lookup.set(npc.id, npc);
-          }
+        onRound: (msg: WSRoundMsg) => processRound(msg),
 
-          // Inject phase_change event at phase boundaries
-          const { phase, month } = roundToPhase(round, maxRoundsRef.current);
-          if (phase > lastPhaseRef.current) {
-            lastPhaseRef.current = phase;
-            eventQueueRef.current.push({
-              id: `phase-${phase}`,
-              type: "phase_change",
-              agentId: "system",
-              agentName: "System",
-              message: PHASE_LABELS[phase] || `Phase ${phase}`,
-              phase,
-              month,
-              timestamp: Date.now(),
-            });
-          }
-
-          // Forward move/mood events directly to Phaser (not queued for EventFeed)
-          getBridge().then(({ eventBridge }) => {
-            for (const be of msg.events) {
-              if (
-                be.event_type === "move" &&
-                be.data.to_x != null &&
-                be.data.to_y != null
-              ) {
-                eventBridge.emitNPCMove(
-                  be.npc_id,
-                  Number(be.data.to_x),
-                  Number(be.data.to_y),
-                );
-              }
-              if (be.event_type === "mood_shift" && be.data.new_mood) {
-                eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
-              }
-            }
-          });
-
-          // Adapt non-move events for the EventFeed queue
-          for (const be of msg.events) {
-            const adapted = adaptEvent(be, lookup, round, maxRoundsRef.current);
-            if (adapted) {
-              eventQueueRef.current.push(adapted);
-            }
-          }
-
-          // Incremental metrics update (only scans this round's events)
-          const newMetrics = updateMetrics(
-            metricsAccRef.current,
-            msg.npcs,
-            msg.events,
-          );
-          setState((prev) => ({
-            ...prev,
-            metrics: { ...prev.metrics, ...newMetrics },
-          }));
-
-          if (!timerRef.current && eventQueueRef.current.length > 0) {
-            timerRef.current = setTimeout(drainQueue, 800);
-          }
-        },
-
-        onDone: () => {
-          // Wait for event queue to drain, then mark complete (max 5min safety)
-          let checks = 0;
-          const checkDone = () => {
-            if (eventQueueRef.current.length === 0 || ++checks > 300) {
-              setState((prev) => ({
-                ...prev,
-                isRunning: false,
-                isComplete: true,
-              }));
-            } else {
-              setTimeout(checkDone, 1000);
-            }
-          };
-          checkDone();
-        },
+        onDone: () => waitForQueueDrain(eventQueueRef, setState),
 
         onError: (message) => {
           console.error("Simulation error:", message);
@@ -234,7 +270,7 @@ export function useSimulation(policyText?: string) {
       console.error("Failed to start simulation:", err);
       setState((prev) => ({ ...prev, isRunning: false }));
     }
-  }, [policyText, drainQueue]);
+  }, [policyText, processRound]);
 
   useEffect(() => {
     return () => {

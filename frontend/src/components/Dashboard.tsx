@@ -1,6 +1,6 @@
 "use client";
 
-import type { SimMetrics } from "@/lib/types";
+import type { SimMetrics } from "@/types";
 
 interface DashboardProps {
   metrics: SimMetrics;

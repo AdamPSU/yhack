@@ -1,6 +1,7 @@
 import { CENTER_BOUNDS, MAP_COLS, MAP_ROWS } from "../config";
 import type { NPC } from "../entities/NPC";
 import * as Tiles from "../map/TileRegistry";
+import type { OccupancyGrid } from "./OccupancyGrid";
 
 type WalkableCheck = (col: number, row: number) => boolean;
 
@@ -58,17 +59,20 @@ export class MovementSystem {
   private npcZone: Map<string, string> = new Map();
   /** NPCs currently overridden (protesting/striking) — skip random movement */
   private overridden = new Set<string>();
+  private occupancy: OccupancyGrid;
 
   constructor(
     scene: Phaser.Scene,
     isWalkable: WalkableCheck,
     groundGrid: number[][],
+    occupancy: OccupancyGrid,
     gridRowOffset = 0,
     gridColOffset = 0,
   ) {
     this.scene = scene;
     this.isWalkable = isWalkable;
     this.groundGrid = groundGrid;
+    this.occupancy = occupancy;
     this.gridRowOffset = gridRowOffset;
     this.gridColOffset = gridColOffset;
   }
@@ -138,6 +142,7 @@ export class MovementSystem {
     const dir = DIRS[chosen];
     this.lastDir.set(npc.npcId, chosen);
     npc.npcState = "walking";
+    this.occupancy.occupy(npc.npcId, npc.tileX + dir.dx, npc.tileY + dir.dy);
     npc.walkTo(npc.tileX + dir.dx, npc.tileY + dir.dy).then(() => {
       npc.npcState = "idle";
       // Brief pause after each step
@@ -159,6 +164,7 @@ export class MovementSystem {
       const ny = npc.tileY + dy;
 
       if (!this.isWalkable(nx, ny)) continue;
+      if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
 
       // Reject tiles outside center bounds
       if (nx < CENTER_BOUNDS.minCol || nx > CENTER_BOUNDS.maxCol ||

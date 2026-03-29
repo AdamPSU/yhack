@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import type { BuildingPositions } from "@/lib/types";
+import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS, GAME_HEIGHT, GAME_WIDTH, MAP_COLS, MAP_ROWS } from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";

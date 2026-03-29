@@ -39,8 +39,10 @@ async def invoke_llm_structured(
     """
     if llm is None:
         llm = get_llm(max_tokens=max_tokens)
+    logger.info("LLM structured call → %s  (prompt %d chars)", response_model.__name__, len(prompt))
     structured_llm = llm.with_structured_output(response_model)
     result = await structured_llm.ainvoke(prompt)
+    logger.info("LLM structured call ← %s  OK", response_model.__name__)
     return result  # type: ignore[return-value]
 
 

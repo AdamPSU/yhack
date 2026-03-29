@@ -24,14 +24,21 @@ yhack/
 │   │   ├── layout.tsx       # RootLayout (Geist fonts)
 │   │   ├── page.tsx         # Main page (currently scaffold)
 │   │   └── globals.css      # Tailwind CSS + CSS vars
-│   │
-│   │  ── Planned ──────────────────────────────────
-│   ├── src/components/      # GameCanvas, PolicyInput, EventFeed
+│   ├── src/components/      # ChatBubble, Dashboard, EventFeed, GameCanvas, PolicyInput
 │   ├── src/game/
 │   │   ├── config.ts        # Phaser config
 │   │   ├── bridge/          # EventBridge singleton (React ↔ Phaser)
-│   │   └── scenes/          # BootScene, WorldScene
-│   └── src/hooks/           # useSimulation WebSocket hook
+│   │   ├── effects/         # ClosureEffect, PriceSpikeEffect, ProtestEffect
+│   │   ├── entities/        # NPC sprite entity
+│   │   ├── events/          # SimEventHandler
+│   │   ├── map/             # CityGenerator, TileRegistry
+│   │   ├── scenes/          # BootScene, WorldScene
+│   │   └── systems/         # MovementSystem, NPCManager, OccupancyGrid, Pathfinder
+│   ├── src/hooks/           # useSimulation WebSocket hook
+│   ├── src/lib/             # adapter, metricsEngine (utility logic)
+│   ├── src/mocks/           # mockBackend, mockData (test/placeholder data)
+│   ├── src/services/        # wsClient (WebSocket + REST API client)
+│   └── src/types/           # index.ts (frontend types), backend.ts (backend types)
 │
 ├── backend/
 │   ├── main.py              # FastAPI app (CORS, router mount)
@@ -45,9 +52,9 @@ yhack/
 │   │   ├── llm.py           # ChatAnthropic factory
 │   │   ├── utils.py         # parse_llm_json helper
 │   │   └── nodes/
-│   │       ├── parse_policy.py   # Policy analysis node
-│   │       ├── generate_npcs.py  # NPC generation node
-│   │       └── run_round.py      # Simulation round node
+│   │       ├── parse_policy.py       # Policy analysis node
+│   │       ├── npc_orchestrator.py  # NPC generation & relationship node
+│   │       └── run_round.py         # Simulation round node
 │   ├── routers/
 │   │   └── simulate.py      # POST /simulate + WebSocket /simulate/{id}/ws
 │   └── tests/               # pytest + pytest-asyncio

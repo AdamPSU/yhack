@@ -212,6 +212,12 @@ export class NPCManager {
     cam.setZoom(1.5);
   }
 
+  private emitNPCPosition(npc: NPC) {
+    const state = npc.toState();
+    if (!state) return;
+    eventBridge.emitNPCPosition(state);
+  }
+
   private onNPCMove(data: { npcId: string; toX: number; toY: number }) {
     const npc = this.npcs.get(data.npcId);
     if (!npc) return;
@@ -259,7 +265,7 @@ export class NPCManager {
     if (!npc) return;
 
     npc.message = message;
-    eventBridge.emitNPCPosition(npc.toState());
+    this.emitNPCPosition(npc);
 
     // Continuously emit position updates while message is active so React bubble follows NPC
     const posTimer = this.scene.time.addEvent({
@@ -267,10 +273,10 @@ export class NPCManager {
       callback: () => {
         if (!npc.message) {
           posTimer.destroy();
-          eventBridge.emitNPCPosition(npc.toState());
+          this.emitNPCPosition(npc);
           return;
         }
-        eventBridge.emitNPCPosition(npc.toState());
+        this.emitNPCPosition(npc);
       },
       loop: true,
     });

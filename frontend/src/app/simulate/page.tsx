@@ -581,6 +581,19 @@ function SimulateContent() {
               Simulating...
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setFocusMode((f) => !f)}
+            className="rpg-panel px-3 py-1 text-[9px] font-mono font-bold tracking-widest transition-all hover:opacity-80"
+            style={{
+              color: focusMode ? "#D4A520" : "#8B7355",
+              background: focusMode ? "rgba(212,165,32,0.1)" : undefined,
+              borderColor: focusMode ? "#D4A520" : undefined,
+            }}
+            title="Toggle focus mode (hides panels)"
+          >
+            {focusMode ? "[ EXIT FOCUS ]" : "[ FOCUS ]"}
+          </button>
         </div>
       </div>
 
@@ -669,15 +682,6 @@ function SimulateContent() {
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? "EXIT" : "FULL"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setFocusMode((f) => !f)}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono transition-opacity hover:opacity-70"
-                style={{ color: "#5B3A1E", background: "#E8D5A3" }}
-                title={focusMode ? "Exit focus" : "Focus mode"}
-              >
-                {focusMode ? "ESC" : "FOCUS"}
               </button>
             </div>
 

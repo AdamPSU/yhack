@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BackendInfluenceEvent,
   BackendNPC,
@@ -9,14 +9,22 @@ import type {
   BackendRelType,
 } from "@/types/backend";
 
-// ── Color palette (matches RPG theme) ──────────────────────
+// ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
   family: "#e8a43a",
   friend: "#5ab85a",
   employer: "#50a0d4",
-  colleague: "#6a5a42",
-  neighbor: "#3a2e1e",
+  colleague: "#8a7a62",
+  neighbor: "#5a4a32",
+};
+
+const EDGE_LABELS: Record<BackendRelType, string> = {
+  family: "Family",
+  friend: "Friend",
+  employer: "Employer",
+  colleague: "Colleague",
+  neighbor: "Neighbor",
 };
 
 const MOOD_COLORS: Record<string, string> = {
@@ -29,22 +37,17 @@ const MOOD_COLORS: Record<string, string> = {
 };
 
 const BEHAVIOR_COLORS: Record<string, string> = {
-  keep: "#3a2e1e",
+  keep: "#5a4a32",
   compromise: "#e8a43a",
   adopt: "#f0e6d2",
 };
 
 function politicalColor(leaning: number): string {
-  // -1 (progressive/blue) → 0 (neutral) → +1 (conservative/red)
-  const t = (leaning + 1) / 2; // normalize to 0..1
+  const t = (leaning + 1) / 2;
   if (t <= 0.5) {
-    // blue to neutral
-    const s = t / 0.5;
-    return d3.interpolateRgb("#50a0d4", "#c4b490")(s);
+    return d3.interpolateRgb("#4a90c4", "#c4b490")(t / 0.5);
   }
-  // neutral to red
-  const s = (t - 0.5) / 0.5;
-  return d3.interpolateRgb("#c4b490", "#d45050")(s);
+  return d3.interpolateRgb("#c4b490", "#c45050")((t - 0.5) / 0.5);
 }
 
 // ── Types ──────────────────────────────────────────────────
@@ -55,6 +58,9 @@ interface GraphNode extends d3.SimulationNodeDatum {
   role: string;
   political_leaning: number;
   mood: string;
+  // animation state
+  flashUntil: number;
+  connectionCount: number;
 }
 
 interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
@@ -62,13 +68,13 @@ interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   strength: number;
   sourceId: string;
   targetId: string;
+  lastActiveTime: number;
 }
 
 interface Pulse {
   sourceId: string;
   targetId: string;
   behavior: string;
-  progress: number; // 0..1
   startTime: number;
 }
 
@@ -79,8 +85,10 @@ interface Props {
   version: number;
 }
 
-const PULSE_DURATION = 800;
-const NODE_RADIUS = 8;
+const PULSE_DURATION = 1000;
+const NODE_BASE_RADIUS = 7;
+const NODE_MAX_RADIUS = 13;
+const EDGE_ACTIVE_DECAY = 2000; // ms an edge stays "active" after a pulse
 
 export function SocialGraph({
   npcs,
@@ -98,7 +106,7 @@ export function SocialGraph({
   const hoveredRef = useRef<string | null>(null);
   const dragRef = useRef<GraphNode | null>(null);
   const [hovered, setHovered] = useState<GraphNode | null>(null);
-  const [dims, setDims] = useState({ w: 248, h: 600 });
+  const [dims, setDims] = useState({ w: 680, h: 500 });
 
   // Measure container
   useEffect(() => {
@@ -112,7 +120,7 @@ export function SocialGraph({
     return () => ro.disconnect();
   }, []);
 
-  // Resize canvas
+  // Resize canvas with DPR
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -125,7 +133,7 @@ export function SocialGraph({
     if (ctx) ctx.scale(dpr, dpr);
   }, [dims]);
 
-  // Build / update simulation when data changes
+  // Build / update simulation
   useEffect(() => {
     if (npcs.length === 0) return;
 
@@ -136,6 +144,13 @@ export function SocialGraph({
       }
     }
 
+    // Count connections per node
+    const connCount = new Map<string, number>();
+    for (const r of relationships) {
+      connCount.set(r.source_id, (connCount.get(r.source_id) || 0) + 1);
+      connCount.set(r.target_id, (connCount.get(r.target_id) || 0) + 1);
+    }
+
     const nodes: GraphNode[] = npcs.map((npc) => {
       const prev = existingPositions.get(npc.id);
       return {
@@ -144,6 +159,8 @@ export function SocialGraph({
         role: npc.role,
         political_leaning: npc.political_leaning,
         mood: npc.mood,
+        flashUntil: 0,
+        connectionCount: connCount.get(npc.id) || 0,
         ...(prev || {}),
       };
     });
@@ -158,14 +175,13 @@ export function SocialGraph({
         strength: r.strength,
         sourceId: r.source_id,
         targetId: r.target_id,
+        lastActiveTime: 0,
       }));
 
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    if (simRef.current) {
-      simRef.current.stop();
-    }
+    if (simRef.current) simRef.current.stop();
 
     const sim = d3
       .forceSimulation<GraphNode>(nodes)
@@ -174,24 +190,27 @@ export function SocialGraph({
         d3
           .forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance(50)
-          .strength(0.3),
+          .distance((l) => 60 + (1 - l.strength) * 40)
+          .strength((l) => 0.2 + l.strength * 0.3),
       )
-      .force("charge", d3.forceManyBody().strength(-60))
-      .force("center", d3.forceCenter(dims.w / 2, dims.h / 2))
-      .force("collide", d3.forceCollide(NODE_RADIUS + 4))
-      .force("x", d3.forceX(dims.w / 2).strength(0.03))
-      .force("y", d3.forceY(dims.h / 2).strength(0.03))
-      .alphaDecay(0.02);
+      .force("charge", d3.forceManyBody().strength(-80).distanceMax(200))
+      .force("center", d3.forceCenter(dims.w / 2, dims.h / 2).strength(0.05))
+      .force(
+        "collide",
+        d3.forceCollide<GraphNode>((d) => nodeRadius(d) + 6),
+      )
+      .force("x", d3.forceX(dims.w / 2).strength(0.02))
+      .force("y", d3.forceY(dims.h / 2).strength(0.02))
+      .alphaDecay(0.015)
+      .velocityDecay(0.35);
 
     simRef.current = sim;
-
     return () => {
       sim.stop();
     };
   }, [npcs, relationships, dims.w, dims.h]);
 
-  // Update node data (political_leaning, mood) without rebuilding simulation
+  // Update node data without rebuilding simulation
   useEffect(() => {
     if (!simRef.current) return;
     const lookup = new Map(npcs.map((n) => [n.id, n]));
@@ -202,25 +221,42 @@ export function SocialGraph({
         node.mood = npc.mood;
       }
     }
-    // Gently reheat to settle any layout shifts
-    simRef.current.alpha(0.1).restart();
+    simRef.current.alpha(0.08).restart();
   }, [version, npcs]);
 
-  // Spawn influence pulses
+  // Spawn influence pulses + mark edges/nodes active
   useEffect(() => {
     if (influenceEvents.length === 0) return;
     const now = performance.now();
-    const newPulses: Pulse[] = influenceEvents.map((ev, i) => ({
-      sourceId: ev.speaker_id,
-      targetId: ev.target_id,
-      behavior: ev.behavior,
-      progress: 0,
-      startTime: now + i * 120, // stagger slightly
-    }));
+    const linkLookup = new Map<string, GraphLink>();
+    for (const l of linksRef.current) {
+      linkLookup.set(`${l.sourceId}-${l.targetId}`, l);
+      linkLookup.set(`${l.targetId}-${l.sourceId}`, l);
+    }
+    const nodeLookup = new Map<string, GraphNode>();
+    for (const n of nodesRef.current) nodeLookup.set(n.id, n);
+
+    const newPulses: Pulse[] = [];
+    for (let i = 0; i < influenceEvents.length; i++) {
+      const ev = influenceEvents[i];
+      newPulses.push({
+        sourceId: ev.speaker_id,
+        targetId: ev.target_id,
+        behavior: ev.behavior,
+        startTime: now + i * 150,
+      });
+      // Mark edge as recently active
+      const link = linkLookup.get(`${ev.speaker_id}-${ev.target_id}`);
+      if (link) link.lastActiveTime = now + i * 150 + PULSE_DURATION;
+      // Flash target node
+      const target = nodeLookup.get(ev.target_id);
+      if (target) target.flashUntil = now + i * 150 + PULSE_DURATION + 400;
+    }
     pulsesRef.current = [...pulsesRef.current, ...newPulses];
   }, [influenceEvents]);
 
-  // Canvas draw loop
+  // ── Draw loop ────────────────────────────────────────────
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -234,13 +270,36 @@ export function SocialGraph({
 
     ctx.clearRect(0, 0, dims.w, dims.h);
 
-    // Build node position lookup
+    // Subtle radial gradient background
+    const bgGrad = ctx.createRadialGradient(
+      dims.w / 2,
+      dims.h / 2,
+      0,
+      dims.w / 2,
+      dims.h / 2,
+      dims.w * 0.6,
+    );
+    bgGrad.addColorStop(0, "rgba(58, 46, 30, 0.12)");
+    bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, dims.w, dims.h);
+
+    // Node position lookup
     const posMap = new Map<string, { x: number; y: number }>();
-    for (const n of nodes) {
-      posMap.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
+    for (const n of nodes) posMap.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
+
+    // Connected nodes for hovered state
+    const hovConnected = new Set<string>();
+    if (hovId) {
+      hovConnected.add(hovId);
+      for (const l of links) {
+        if (l.sourceId === hovId) hovConnected.add(l.targetId);
+        if (l.targetId === hovId) hovConnected.add(l.sourceId);
+      }
     }
 
-    // Draw edges
+    // ── Edges ──────────────────────────────────────────────
+
     for (const link of links) {
       const s = posMap.get(link.sourceId);
       const t = posMap.get(link.targetId);
@@ -249,100 +308,225 @@ export function SocialGraph({
       const isHighlighted =
         hovId && (link.sourceId === hovId || link.targetId === hovId);
       const isDimmed = hovId && !isHighlighted;
+      const isRecentlyActive = link.lastActiveTime > now;
+      const activeDecay = isRecentlyActive
+        ? Math.min(1, (link.lastActiveTime - now) / EDGE_ACTIVE_DECAY)
+        : 0;
+
+      const baseWidth = 0.5 + link.strength * 2;
+      const baseAlpha = 0.2 + link.strength * 0.4;
 
       ctx.beginPath();
+
+      // Curved edges for visual appeal
+      const mx = (s.x + t.x) / 2;
+      const my = (s.y + t.y) / 2;
+      const dx = t.x - s.x;
+      const dy = t.y - s.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const curvature = 0.08;
+      const cx = mx + dy * curvature;
+      const cy = my - dx * curvature;
+
       ctx.moveTo(s.x, s.y);
-      ctx.lineTo(t.x, t.y);
+      ctx.quadraticCurveTo(cx, cy, t.x, t.y);
 
       if (link.rel_type === "neighbor") {
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([4, 4]);
       } else {
         ctx.setLineDash([]);
       }
 
-      const baseAlpha = 0.3 + link.strength * 0.5;
-      ctx.globalAlpha = isDimmed ? 0.08 : isHighlighted ? 1.0 : baseAlpha;
-      ctx.strokeStyle = EDGE_COLORS[link.rel_type] || "#6a5a42";
+      if (isRecentlyActive) {
+        ctx.shadowColor = EDGE_COLORS[link.rel_type];
+        ctx.shadowBlur = 6 * activeDecay;
+      }
+
+      ctx.globalAlpha = isDimmed
+        ? 0.06
+        : isHighlighted
+          ? 0.95
+          : isRecentlyActive
+            ? baseAlpha + 0.3 * activeDecay
+            : baseAlpha;
+      ctx.strokeStyle = EDGE_COLORS[link.rel_type];
       ctx.lineWidth = isHighlighted
-        ? 2 + link.strength * 3
-        : 0.5 + link.strength * 2;
+        ? baseWidth + 1.5
+        : isRecentlyActive
+          ? baseWidth + activeDecay
+          : baseWidth;
       ctx.stroke();
+
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1.0;
+
+      // Edge label on hover
+      if (isHighlighted && dist > 40) {
+        ctx.globalAlpha = 0.8;
+        ctx.font = "7px monospace";
+        ctx.textAlign = "center";
+        ctx.fillStyle = EDGE_COLORS[link.rel_type];
+        const labelX = cx;
+        const labelY = cy - 5;
+        ctx.fillText(
+          `${EDGE_LABELS[link.rel_type]} (${Math.round(link.strength * 100)}%)`,
+          labelX,
+          labelY,
+        );
+        ctx.globalAlpha = 1.0;
+      }
     }
 
-    // Draw influence pulses
+    // ── Influence pulses ───────────────────────────────────
+
     pulsesRef.current = pulsesRef.current.filter((p) => {
       const elapsed = now - p.startTime;
-      if (elapsed < 0) return true; // not started yet
+      if (elapsed < 0) return true;
       const t = elapsed / PULSE_DURATION;
-      if (t > 1) return false; // done
+      if (t > 1) return false;
 
       const s = posMap.get(p.sourceId);
       const e = posMap.get(p.targetId);
       if (!s || !e) return false;
 
-      const px = s.x + (e.x - s.x) * t;
-      const py = s.y + (e.y - s.y) * t;
+      // Ease-out for deceleration effect
+      const eased = 1 - (1 - t) * (1 - t);
+      const px = s.x + (e.x - s.x) * eased;
+      const py = s.y + (e.y - s.y) * eased;
       const color = BEHAVIOR_COLORS[p.behavior] || "#e8a43a";
+      const fade = t < 0.1 ? t / 0.1 : t > 0.8 ? (1 - t) / 0.2 : 1;
+      const pulseSize =
+        p.behavior === "adopt" ? 5 : p.behavior === "compromise" ? 4 : 2.5;
 
+      // Outer glow
+      ctx.globalAlpha = fade * 0.4;
       ctx.beginPath();
-      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.arc(px, py, pulseSize + 4, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 12;
       ctx.fill();
       ctx.shadowBlur = 0;
 
+      // Inner core
+      ctx.globalAlpha = fade * 0.9;
+      ctx.beginPath();
+      ctx.arc(px, py, pulseSize, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+
+      // Trail particles
+      if (p.behavior !== "keep") {
+        for (let i = 1; i <= 3; i++) {
+          const tt = Math.max(0, eased - i * 0.04);
+          const tpx = s.x + (e.x - s.x) * tt;
+          const tpy = s.y + (e.y - s.y) * tt;
+          ctx.globalAlpha = fade * 0.15 * (1 - i / 4);
+          ctx.beginPath();
+          ctx.arc(tpx, tpy, pulseSize * 0.5, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      ctx.globalAlpha = 1.0;
       return true;
     });
 
-    // Draw nodes
+    // ── Nodes ──────────────────────────────────────────────
+
     for (const node of nodes) {
       const x = node.x ?? 0;
       const y = node.y ?? 0;
       const isHov = hovId === node.id;
-      const isDimmed =
-        hovId &&
-        !isHov &&
-        !links.some(
-          (l) =>
-            (l.sourceId === hovId && l.targetId === node.id) ||
-            (l.targetId === hovId && l.sourceId === node.id),
-        );
+      const isDimmed = hovId && !hovConnected.has(node.id);
+      const isFlashing = node.flashUntil > now;
+      const flashIntensity = isFlashing
+        ? Math.sin(((node.flashUntil - now) / 400) * Math.PI * 3) * 0.5 + 0.5
+        : 0;
 
-      const r = isHov ? NODE_RADIUS + 3 : NODE_RADIUS;
-      ctx.globalAlpha = isDimmed ? 0.25 : 1.0;
+      const r = nodeRadius(node);
+      const hovR = isHov ? r + 3 : r;
 
-      // Mood ring
-      ctx.beginPath();
-      ctx.arc(x, y, r + 2, 0, Math.PI * 2);
-      ctx.fillStyle = MOOD_COLORS[node.mood] || "#8a7a62";
-      ctx.fill();
+      ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
 
-      // Node fill
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = politicalColor(node.political_leaning);
-      ctx.fill();
+      // Ambient glow for hovered / flashing nodes
+      if ((isHov || isFlashing) && !isDimmed) {
+        const glowColor = isHov
+          ? "#e8a43a"
+          : MOOD_COLORS[node.mood] || "#e8a43a";
+        const glowR = hovR + (isFlashing ? 10 + flashIntensity * 6 : 8);
+        const glow = ctx.createRadialGradient(x, y, hovR, x, y, glowR);
+        glow.addColorStop(0, `${glowColor}40`);
+        glow.addColorStop(1, `${glowColor}00`);
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, glowR, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      if (isHov) {
-        ctx.strokeStyle = "#f0e6d2";
-        ctx.lineWidth = 1.5;
+      // Mood ring (outer arc segments instead of solid ring)
+      const moodColor = MOOD_COLORS[node.mood] || "#8a7a62";
+      ctx.strokeStyle = moodColor;
+      ctx.lineWidth = 2;
+      const segments = 6;
+      const gap = 0.15;
+      for (let i = 0; i < segments; i++) {
+        const start = (i / segments) * Math.PI * 2 - Math.PI / 2;
+        const end = ((i + 1) / segments) * Math.PI * 2 - Math.PI / 2 - gap;
+        ctx.beginPath();
+        ctx.arc(x, y, hovR + 3, start, end);
         ctx.stroke();
       }
 
+      // Node fill — gradient sphere effect
+      const grad = ctx.createRadialGradient(
+        x - r * 0.3,
+        y - r * 0.3,
+        r * 0.1,
+        x,
+        y,
+        hovR,
+      );
+      const baseColor = politicalColor(node.political_leaning);
+      const lighterColor = d3.interpolateRgb(baseColor, "#fff")(0.35);
+      grad.addColorStop(0, lighterColor);
+      grad.addColorStop(0.7, baseColor);
+      grad.addColorStop(1, d3.interpolateRgb(baseColor, "#000")(0.25));
+
+      ctx.beginPath();
+      ctx.arc(x, y, hovR, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Thin crisp border
+      ctx.strokeStyle = isHov ? "#f0e6d2" : "rgba(0,0,0,0.3)";
+      ctx.lineWidth = isHov ? 1.5 : 0.5;
+      ctx.stroke();
+
       // Label
-      ctx.fillStyle = isDimmed ? "#3a2e1e" : "#c4b490";
-      ctx.font = "8px monospace";
+      ctx.fillStyle = isDimmed ? "#2a2015" : "#c4b490";
+      ctx.font = `${isHov ? "bold 9px" : "8px"} monospace`;
       ctx.textAlign = "center";
-      ctx.fillText(node.name.split(" ")[0], x, y + r + 11);
+      ctx.textBaseline = "top";
+
+      // Text shadow for readability
+      if (!isDimmed) {
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 1;
+      }
+      ctx.fillText(node.name.split(" ")[0], x, y + hovR + 5);
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
 
       ctx.globalAlpha = 1.0;
     }
 
-    // Legend (top-left)
-    drawLegend(ctx);
+    // ── Legend ──────────────────────────────────────────────
+    drawLegend(ctx, dims.w);
 
     rafRef.current = requestAnimationFrame(draw);
   }, [dims]);
@@ -353,7 +537,8 @@ export function SocialGraph({
     return () => cancelAnimationFrame(rafRef.current);
   }, [draw]);
 
-  // Mouse interaction
+  // ── Mouse interaction ────────────────────────────────────
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -362,7 +547,7 @@ export function SocialGraph({
       for (const n of nodesRef.current) {
         const dx = (n.x ?? 0) - mx;
         const dy = (n.y ?? 0) - my;
-        if (dx * dx + dy * dy < (NODE_RADIUS + 4) ** 2) return n;
+        if (dx * dx + dy * dy < (nodeRadius(n) + 6) ** 2) return n;
       }
       return null;
     }
@@ -374,18 +559,16 @@ export function SocialGraph({
 
     const onMove = (e: MouseEvent) => {
       const { x, y } = getMousePos(e);
-
       if (dragRef.current) {
         dragRef.current.fx = x;
         dragRef.current.fy = y;
         simRef.current?.alpha(0.3).restart();
         return;
       }
-
       const node = getNodeAt(x, y);
       hoveredRef.current = node?.id ?? null;
       setHovered(node ?? null);
-      canvas!.style.cursor = node ? "pointer" : "default";
+      canvas!.style.cursor = node ? "grab" : "default";
     };
 
     const onDown = (e: MouseEvent) => {
@@ -395,6 +578,7 @@ export function SocialGraph({
         dragRef.current = node;
         node.fx = x;
         node.fy = y;
+        canvas!.style.cursor = "grabbing";
         simRef.current?.alphaTarget(0.3).restart();
       }
     };
@@ -404,6 +588,7 @@ export function SocialGraph({
         dragRef.current.fx = null;
         dragRef.current.fy = null;
         dragRef.current = null;
+        canvas!.style.cursor = "default";
         simRef.current?.alphaTarget(0);
       }
     };
@@ -431,40 +616,91 @@ export function SocialGraph({
     };
   }, []);
 
+  // ── Tooltip ──────────────────────────────────────────────
+
+  const hovNode = hovered;
+  const hovLinks = hovNode
+    ? linksRef.current.filter(
+        (l) => l.sourceId === hovNode.id || l.targetId === hovNode.id,
+      )
+    : [];
+
   return (
     <div ref={containerRef} className="relative h-full w-full">
       <canvas ref={canvasRef} className="block h-full w-full" />
 
-      {/* Hover tooltip */}
-      {hovered && (
+      {hovNode && (
         <div
           className="pointer-events-none absolute z-50"
           style={{
-            left: Math.min((hovered.x ?? 0) + 14, dims.w - 130),
-            top: Math.max((hovered.y ?? 0) - 40, 4),
+            left: Math.min((hovNode.x ?? 0) + 18, dims.w - 180),
+            top: Math.max((hovNode.y ?? 0) - 20, 4),
           }}
         >
-          <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1.5 shadow-lg">
-            <div className="text-[10px] font-mono font-bold text-[#e8a43a]">
-              {hovered.name}
+          <div className="rounded-md bg-[#12100c]/95 border border-[#4a3c2a] px-3 py-2 shadow-xl backdrop-blur-sm min-w-[140px]">
+            {/* Name & role */}
+            <div className="text-[11px] font-mono font-bold text-[#e8a43a]">
+              {hovNode.name}
             </div>
-            <div className="text-[9px] font-mono text-[#8a7a62]">
-              {hovered.role}
+            <div className="text-[9px] font-mono text-[#6a5a42] capitalize">
+              {(hovNode.role ?? "").replace("_", " ")}
             </div>
-            <div className="mt-1 flex gap-2 text-[9px] font-mono">
-              <span style={{ color: MOOD_COLORS[hovered.mood] || "#8a7a62" }}>
-                {hovered.mood}
+
+            {/* Stats row */}
+            <div className="mt-1.5 flex items-center gap-3 text-[9px] font-mono">
+              <span className="flex items-center gap-1">
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: MOOD_COLORS[hovNode.mood] || "#8a7a62" }}
+                />
+                <span style={{ color: MOOD_COLORS[hovNode.mood] || "#8a7a62" }}>
+                  {hovNode.mood}
+                </span>
               </span>
               <span
-                style={{ color: politicalColor(hovered.political_leaning) }}
+                style={{ color: politicalColor(hovNode.political_leaning) }}
               >
-                {hovered.political_leaning > 0.3
+                {hovNode.political_leaning > 0.3
                   ? "conservative"
-                  : hovered.political_leaning < -0.3
+                  : hovNode.political_leaning < -0.3
                     ? "progressive"
                     : "moderate"}
               </span>
             </div>
+
+            {/* Connections */}
+            {hovLinks.length > 0 && (
+              <div className="mt-1.5 border-t border-[#3a2e1e] pt-1.5">
+                <div className="text-[8px] font-mono text-[#5a4a32] uppercase mb-0.5">
+                  Connections ({hovLinks.length})
+                </div>
+                {hovLinks.slice(0, 4).map((l) => {
+                  const otherId =
+                    l.sourceId === hovNode.id ? l.targetId : l.sourceId;
+                  const other = nodesRef.current.find((n) => n.id === otherId);
+                  return (
+                    <div
+                      key={`${l.sourceId}-${l.targetId}-${l.rel_type}`}
+                      className="flex items-center gap-1.5 text-[8px] font-mono leading-relaxed"
+                    >
+                      <span
+                        className="inline-block h-1.5 w-3 rounded-sm"
+                        style={{ background: EDGE_COLORS[l.rel_type] }}
+                      />
+                      <span className="text-[#8a7a62]">
+                        {other?.name.split(" ")[0] ?? "?"}
+                      </span>
+                      <span className="text-[#5a4a32]">{l.rel_type}</span>
+                    </div>
+                  );
+                })}
+                {hovLinks.length > 4 && (
+                  <div className="text-[8px] font-mono text-[#5a4a32]">
+                    +{hovLinks.length - 4} more
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -472,25 +708,43 @@ export function SocialGraph({
   );
 }
 
+// ── Helpers ────────────────────────────────────────────────
+
+function nodeRadius(node: GraphNode): number {
+  // Scale radius by connection count
+  const t = Math.min(node.connectionCount / 6, 1);
+  return NODE_BASE_RADIUS + t * (NODE_MAX_RADIUS - NODE_BASE_RADIUS);
+}
+
 // ── Legend ──────────────────────────────────────────────────
 
-function drawLegend(ctx: CanvasRenderingContext2D) {
-  const x = 6;
-  let y = 6;
-  const lh = 11;
+function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
+  const x = canvasW - 112;
+  let y = 8;
+  const lh = 13;
+  const w = 104;
+  const h = 105;
 
-  ctx.globalAlpha = 0.85;
-  ctx.fillStyle = "#1a1510";
-  ctx.fillRect(x, y, 72, 76);
+  // Background
+  ctx.globalAlpha = 0.88;
+  ctx.fillStyle = "#12100c";
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, 4);
+  ctx.fill();
   ctx.strokeStyle = "#3a2e1e";
   ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, 72, 76);
+  ctx.stroke();
   ctx.globalAlpha = 1.0;
 
-  ctx.font = "7px monospace";
+  // Title
+  ctx.font = "bold 7px monospace";
+  ctx.fillStyle = "#5a4a32";
   ctx.textAlign = "left";
+  y += 11;
+  ctx.fillText("RELATIONSHIPS", x + 6, y);
+  y += lh + 1;
 
-  y += lh;
+  ctx.font = "7px monospace";
   const types: [BackendRelType, string][] = [
     ["family", "Family"],
     ["friend", "Friend"],
@@ -501,31 +755,52 @@ function drawLegend(ctx: CanvasRenderingContext2D) {
 
   for (const [type, label] of types) {
     ctx.beginPath();
-    ctx.moveTo(x + 4, y);
-    ctx.lineTo(x + 16, y);
+    ctx.moveTo(x + 6, y);
+    ctx.lineTo(x + 20, y);
     if (type === "neighbor") ctx.setLineDash([2, 2]);
     ctx.strokeStyle = EDGE_COLORS[type];
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.setLineDash([]);
 
     ctx.fillStyle = "#8a7a62";
-    ctx.fillText(label, x + 20, y + 3);
+    ctx.fillText(label, x + 24, y + 3);
     y += lh;
   }
 
-  // Political leaning spectrum
-  y += 2;
-  for (let i = 0; i < 30; i++) {
-    const t = i / 29;
+  // Political spectrum
+  y += 3;
+  const specW = w - 16;
+  for (let i = 0; i < specW; i++) {
+    const t = i / (specW - 1);
     ctx.fillStyle = politicalColor(t * 2 - 1);
-    ctx.fillRect(x + 4 + i * 2, y, 2, 4);
+    ctx.fillRect(x + 8 + i, y, 1, 5);
   }
-  ctx.fillStyle = "#8a7a62";
+  ctx.fillStyle = "#6a5a42";
   ctx.font = "6px monospace";
   ctx.textAlign = "left";
-  ctx.fillText("L", x + 2, y + 12);
+  ctx.fillText("Prog", x + 6, y + 13);
   ctx.textAlign = "right";
-  ctx.fillText("R", x + 66, y + 12);
+  ctx.fillText("Cons", x + w - 6, y + 13);
   ctx.textAlign = "left";
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
 }

@@ -9,15 +9,15 @@
  *
  * Chunks are 20x20 tiles. Distant chunks have their tiles cleared to save memory.
  */
-import * as Phaser from "phaser";
+import type * as Phaser from "phaser";
 import { TILE_SIZE } from "../config";
+import type { ChunkData } from "./ProceduralCity";
 import {
   CHUNK_SIZE,
   generateChunk,
   isRiverRow,
   isRoad,
 } from "./ProceduralCity";
-import type { ChunkData } from "./ProceduralCity";
 
 const LOAD_RADIUS = 3; // chunks around camera to keep loaded
 const UNLOAD_RADIUS = 5; // chunks beyond this are removed
@@ -53,7 +53,15 @@ export class ChunkManager {
       height: MAP_TILES,
     });
 
-    const tileset = this.map.addTilesetImage("urban", "urban", TILE_SIZE, TILE_SIZE, 0, 0, 1);
+    const tileset = this.map.addTilesetImage(
+      "urban",
+      "urban",
+      TILE_SIZE,
+      TILE_SIZE,
+      0,
+      0,
+      1,
+    );
     if (!tileset) {
       console.error("ChunkManager: Failed to load tileset");
       return;
@@ -77,8 +85,14 @@ export class ChunkManager {
 
     // Position the tilemap so that world (0,0) is at tilemap tile (TILE_OFFSET, TILE_OFFSET)
     // Tilemap pixel position = -(TILE_OFFSET * TILE_SIZE) to shift origin
-    this.groundLayer.setPosition(-TILE_OFFSET * TILE_SIZE, -TILE_OFFSET * TILE_SIZE);
-    this.buildingLayer.setPosition(-TILE_OFFSET * TILE_SIZE, -TILE_OFFSET * TILE_SIZE);
+    this.groundLayer.setPosition(
+      -TILE_OFFSET * TILE_SIZE,
+      -TILE_OFFSET * TILE_SIZE,
+    );
+    this.buildingLayer.setPosition(
+      -TILE_OFFSET * TILE_SIZE,
+      -TILE_OFFSET * TILE_SIZE,
+    );
 
     this.initOk = true;
   }
@@ -224,7 +238,12 @@ export class ChunkManager {
   }
 
   /** Get ground grid for the NPC area (used by MovementSystem) */
-  getGroundGrid(minCol: number, minRow: number, maxCol: number, maxRow: number): number[][] {
+  getGroundGrid(
+    minCol: number,
+    minRow: number,
+    maxCol: number,
+    maxRow: number,
+  ): number[][] {
     const grid: number[][] = [];
     for (let r = minRow; r <= maxRow; r++) {
       const row: number[] = [];
@@ -249,7 +268,10 @@ export class ChunkManager {
     houses: { id: string; x: number; y: number }[];
   } {
     const positions = {
-      government: { x: Math.floor((minCol + maxCol) / 2), y: Math.floor((minRow + maxRow) / 2) },
+      government: {
+        x: Math.floor((minCol + maxCol) / 2),
+        y: Math.floor((minRow + maxRow) / 2),
+      },
       shops: [] as { id: string; x: number; y: number }[],
       factories: [] as { id: string; x: number; y: number }[],
       houses: [] as { id: string; x: number; y: number }[],
@@ -276,7 +298,11 @@ export class ChunkManager {
         const g = tile.index;
 
         if (g === FACTORY_TL) {
-          positions.factories.push({ id: `factory-${factoryIdx++}`, x: c, y: r });
+          positions.factories.push({
+            id: `factory-${factoryIdx++}`,
+            x: c,
+            y: r,
+          });
         } else if (g === SHOP1_TL || g === SHOP2_TL || g === LONG_SHOP_TL) {
           positions.shops.push({ id: `shop-${shopIdx++}`, x: c, y: r });
         } else if (g === HOUSE_TL) {

@@ -228,7 +228,11 @@ export class WorldScene extends Phaser.Scene {
         const g = tile.index;
 
         if (g === FACTORY_TL) {
-          positions.factories.push({ id: `factory-${factoryIdx++}`, x: c, y: r });
+          positions.factories.push({
+            id: `factory-${factoryIdx++}`,
+            x: c,
+            y: r,
+          });
         } else if (g === SHOP1_TL || g === SHOP2_TL || g === LONG_SHOP_TL) {
           positions.shops.push({ id: `shop-${shopIdx++}`, x: c, y: r });
         } else if (g === HOUSE_TL) {

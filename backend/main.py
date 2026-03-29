@@ -1,10 +1,11 @@
 import logging
 
+import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers.simulate import router
+from routers.simulate import router, sio
 
 # ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -12,7 +13,6 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
     datefmt="%H:%M:%S",
 )
-# Quiet noisy third-party loggers
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
@@ -31,6 +31,10 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+# Mount Socket.IO as ASGI sub-application
+sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
+app = sio_asgi  # type: ignore[assignment]
 
 logger.info("PolicySim ready — model=%s, base_url=%s", settings.model_name, settings.llm_base_url)
 

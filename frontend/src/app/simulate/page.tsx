@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
@@ -102,8 +103,17 @@ interface BubbleState {
 }
 
 export default function SimulatePage() {
-  const [policyText, setPolicyText] = useState<string>("");
-  const sim = useSimulation(policyText);
+  return (
+    <Suspense fallback={<GameCanvasPlaceholder />}>
+      <SimulateContent />
+    </Suspense>
+  );
+}
+
+function SimulateContent() {
+  const searchParams = useSearchParams();
+  const simulationId = searchParams.get("id") || "";
+  const sim = useSimulation(simulationId || undefined);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
@@ -117,30 +127,13 @@ export default function SimulatePage() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
-  const [noPolicy, setNoPolicy] = useState(false);
 
-  // Load policy text from sessionStorage (one-time flag ensures fresh navigation from home page)
+  // Auto-start simulation once we have a simulation ID
   useEffect(() => {
-    const ready = sessionStorage.getItem("agora-policy-ready");
-    const stored = sessionStorage.getItem("agora-policy");
-    if (ready && stored) {
-      sessionStorage.removeItem("agora-policy-ready");
-      setPolicyText(stored);
-    } else if (process.env.NEXT_PUBLIC_MOCK_BACKEND !== "true") {
-      setNoPolicy(true);
-    }
-  }, []);
-
-  // Start simulation once policyText is loaded (or immediately in mock mode)
-  const hasStartedRef = useRef(false);
-  useEffect(() => {
-    if (hasStartedRef.current) return;
-    const isMock = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
-    if (policyText || isMock) {
-      hasStartedRef.current = true;
+    if (simulationId && !sim.isRunning && !sim.isComplete) {
       sim.start();
     }
-  }, [policyText, sim.start]);
+  }, [simulationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
@@ -279,7 +272,7 @@ export default function SimulatePage() {
 
   const bubbleList = Array.from(bubbles.values());
 
-  if (noPolicy) {
+  if (!simulationId) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
         <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
@@ -290,7 +283,8 @@ export default function SimulatePage() {
             No policy specified.
           </p>
           <p className="text-xs font-mono text-[#8a7a62]">
-            Please describe an economic policy on the home page before running a simulation.
+            Please describe an economic policy on the home page before running a
+            simulation.
           </p>
           <Link
             href="/"
@@ -379,9 +373,11 @@ export default function SimulatePage() {
               <button
                 type="button"
                 onClick={() => {
-                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-                    eventBridge.emitCameraZoom(1);
-                  });
+                  import("@/game/bridge/EventBridge").then(
+                    ({ eventBridge }) => {
+                      eventBridge.emitCameraZoom(1);
+                    },
+                  );
                 }}
                 className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
                 title="Zoom in"
@@ -391,9 +387,11 @@ export default function SimulatePage() {
               <button
                 type="button"
                 onClick={() => {
-                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-                    eventBridge.emitCameraZoom(-1);
-                  });
+                  import("@/game/bridge/EventBridge").then(
+                    ({ eventBridge }) => {
+                      eventBridge.emitCameraZoom(-1);
+                    },
+                  );
                 }}
                 className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-[#8a7a62] hover:text-[#e8a43a] hover:border-[#e8a43a] transition-colors"
                 title="Zoom out"
@@ -452,7 +450,10 @@ export default function SimulatePage() {
             if (e.target === e.currentTarget) setShowGraph(false);
           }}
         >
-          <div className="rpg-panel relative flex flex-col" style={{ width: 700, height: 560 }}>
+          <div
+            className="rpg-panel relative flex flex-col"
+            style={{ width: 700, height: 560 }}
+          >
             <div className="flex items-center justify-between border-b border-[#3a2e1e] px-4 py-2">
               <h2 className="text-[11px] font-mono font-bold uppercase text-[#e8a43a]">
                 Social Graph

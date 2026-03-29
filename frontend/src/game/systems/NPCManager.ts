@@ -1,7 +1,7 @@
 import type * as Phaser from "phaser";
 import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
-import type { BackendNPC } from "@/types/backend";
 import type { BuildingPositions } from "@/types";
+import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS } from "../config";
 import { NPC } from "../entities/NPC";
@@ -53,7 +53,14 @@ export class NPCManager {
     this.gridRowOffset = gridRowOffset;
     this.gridColOffset = gridColOffset;
     this.occupancy = new OccupancyGrid();
-    this.movement = new MovementSystem(scene, isWalkable, groundGrid, this.occupancy, gridRowOffset, gridColOffset);
+    this.movement = new MovementSystem(
+      scene,
+      isWalkable,
+      groundGrid,
+      this.occupancy,
+      gridRowOffset,
+      gridColOffset,
+    );
 
     // Listen for dynamic NPC init from backend via EventBridge
     eventBridge.on("sim:init-npcs", this.onInitNPCs, this);
@@ -90,8 +97,14 @@ export class NPCManager {
       let tileY = bn.y * COORD_SCALE;
 
       // Clamp to center bounds so NPCs stay in the demo-visible area
-      tileX = Math.max(CENTER_BOUNDS.minCol, Math.min(CENTER_BOUNDS.maxCol, tileX));
-      tileY = Math.max(CENTER_BOUNDS.minRow, Math.min(CENTER_BOUNDS.maxRow, tileY));
+      tileX = Math.max(
+        CENTER_BOUNDS.minCol,
+        Math.min(CENTER_BOUNDS.maxCol, tileX),
+      );
+      tileY = Math.max(
+        CENTER_BOUNDS.minRow,
+        Math.min(CENTER_BOUNDS.maxRow, tileY),
+      );
 
       // Snap to nearest walkable tile if landed on a building
       if (!this.isWalkable(tileX, tileY)) {

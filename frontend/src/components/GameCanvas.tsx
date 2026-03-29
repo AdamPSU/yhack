@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { GAME_WIDTH, GAME_HEIGHT, SCALE_FACTOR } from "@/game/config";
+import { GAME_HEIGHT, GAME_WIDTH, SCALE_FACTOR } from "@/game/config";
 
 /**
  * GameCanvas wraps the Phaser game instance.

@@ -169,8 +169,13 @@ export class MovementSystem {
       if (this.occupancy.isOccupiedByOther(npc.npcId, nx, ny)) continue;
 
       // Reject tiles outside center bounds
-      if (nx < CENTER_BOUNDS.minCol || nx > CENTER_BOUNDS.maxCol ||
-          ny < CENTER_BOUNDS.minRow || ny > CENTER_BOUNDS.maxRow) continue;
+      if (
+        nx < CENTER_BOUNDS.minCol ||
+        nx > CENTER_BOUNDS.maxCol ||
+        ny < CENTER_BOUNDS.minRow ||
+        ny > CENTER_BOUNDS.maxRow
+      )
+        continue;
 
       let score = 1;
 

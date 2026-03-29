@@ -41,7 +41,11 @@ function StatRow({
   label,
   value,
   valueColor,
-}: { label: string; value: string; valueColor?: string }) {
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
     <div className="flex items-center justify-between py-[3px]">
       <span className="text-[10px] font-mono uppercase text-[#5a4a32]">
@@ -62,7 +66,12 @@ function SectionBlock({
   symbol,
   content,
   fallback,
-}: { label: string; symbol: string; content?: string; fallback: string }) {
+}: {
+  label: string;
+  symbol: string;
+  content?: string;
+  fallback: string;
+}) {
   const hasContent = content && content.trim().length > 0;
   return (
     <div className="border-t border-[#3a2e1e] px-3 py-2">
@@ -159,10 +168,7 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
             {npc.personality && (
               <StatRow label="Type" value={npc.personality} />
             )}
-            <StatRow
-              label="Position"
-              value={`(${npc.x}, ${npc.y})`}
-            />
+            <StatRow label="Position" value={`(${npc.x}, ${npc.y})`} />
           </div>
         </div>
 

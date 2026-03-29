@@ -137,8 +137,8 @@ export class NPCManager {
       tileY = Math.max(CENTER_BOUNDS.minRow, Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()));
     }
 
-    const charIndex = this.npcs.size % 16;
-    const npc = new NPC(this.scene, bn.id, bn.name, charIndex, tileX, tileY);
+    const charType = roleToCharacter(bn.role, this.npcs.size);
+    const npc = new NPC(this.scene, bn.id, bn.name, charType, tileX, tileY);
     npc.role = bn.role;
     npc.category = bn.category ?? "";
     npc.sentiment = moodToSentiment(bn.mood);

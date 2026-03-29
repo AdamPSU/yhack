@@ -56,16 +56,16 @@ export function getAnimKey(characterType: CharacterType, dir: Direction): string
 /** Map role string to character type */
 export function roleToCharacter(role: string, npcIndex: number): CharacterType {
   switch (role) {
-    case "worker":    return "construction_worker";
-    case "farmer":    return "construction_worker";
-    case "retiree":   return "old_man";
-    case "activist":  return "adult_woman";
-    case "shopkeeper":return "adult_woman";
-    case "student":   return npcIndex % 2 === 0 ? "young_boy" : "young_girl";
-    case "business_owner":
-    case "politician":
-    case "driver":
-    default:          return "adult_man";
+    case "worker":         return "construction_worker";
+    case "farmer":         return "construction_worker";
+    case "retiree":        return "old_man";
+    case "activist":       return npcIndex % 2 === 0 ? "adult_woman" : "young_girl";
+    case "shopkeeper":     return "adult_woman";
+    case "student":        return npcIndex % 2 === 0 ? "young_boy" : "young_girl";
+    case "politician":     return "old_man";
+    case "business_owner": return npcIndex % 2 === 0 ? "adult_man" : "adult_woman";
+    case "driver":         return "adult_man";
+    default:               return ALL_CHARACTERS[npcIndex % ALL_CHARACTERS.length];
   }
 }
 

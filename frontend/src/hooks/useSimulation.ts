@@ -11,10 +11,10 @@ import { generateMockSimulation } from "@/mocks/mockBackend";
 import { connectSimulation, fetchEconomicReport } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
 import type {
-  EconomicReport,
   BackendInfluenceEvent,
   BackendNPC,
   BackendRelationship,
+  EconomicReport,
   SavedSimulation,
   WSNPCEventsMsg,
   WSRoundMsg,
@@ -48,7 +48,10 @@ const MOOD_SCORE: Record<string, number> = {
   angry: 0,
 };
 
-function computePhaseLabel(phase: number, npcs: BackendNPC[]): { label: string; sentiment: number } {
+function computePhaseLabel(
+  phase: number,
+  npcs: BackendNPC[],
+): { label: string; sentiment: number } {
   if (npcs.length === 0) return { label: `Phase ${phase}`, sentiment: 0.5 };
 
   const avgScore =
@@ -172,7 +175,10 @@ export function useSimulation(simulationId?: string, record = false) {
 
     getBridge().then(({ eventBridge }) => {
       if (event.type === "phase_change") {
-        const sentiment = typeof event.data?.sentiment === "number" ? event.data.sentiment : undefined;
+        const sentiment =
+          typeof event.data?.sentiment === "number"
+            ? event.data.sentiment
+            : undefined;
         eventBridge.emitPhaseChange(event.phase, event.round, sentiment);
       }
       eventBridge.emitSimEvent(event);
@@ -188,7 +194,8 @@ export function useSimulation(simulationId?: string, record = false) {
         events,
         latestEvent: event,
         phase: event.phase > prev.phase ? event.phase : prev.phase,
-        phaseLabel: event.type === "phase_change" ? event.message : prev.phaseLabel,
+        phaseLabel:
+          event.type === "phase_change" ? event.message : prev.phaseLabel,
         round: event.round > prev.round ? event.round : prev.round,
         maxRounds: event.maxRounds,
       };
@@ -200,29 +207,26 @@ export function useSimulation(simulationId?: string, record = false) {
   }, []);
 
   /** Process streamed NPC events that arrive before the full round completes. */
-  const processNPCEvents = useCallback(
-    (msg: WSNPCEventsMsg) => {
-      getBridge().then(({ eventBridge }) => {
-        for (const be of msg.events) {
-          if (
-            be.event_type === "move" &&
-            be.data.to_x != null &&
-            be.data.to_y != null
-          ) {
-            eventBridge.emitNPCMove(
-              be.npc_id,
-              Number(be.data.to_x),
-              Number(be.data.to_y),
-            );
-          }
-          if (be.event_type === "mood_shift" && be.data.new_mood) {
-            eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
-          }
+  const processNPCEvents = useCallback((msg: WSNPCEventsMsg) => {
+    getBridge().then(({ eventBridge }) => {
+      for (const be of msg.events) {
+        if (
+          be.event_type === "move" &&
+          be.data.to_x != null &&
+          be.data.to_y != null
+        ) {
+          eventBridge.emitNPCMove(
+            be.npc_id,
+            Number(be.data.to_x),
+            Number(be.data.to_y),
+          );
         }
-      });
-    },
-    [],
-  );
+        if (be.event_type === "mood_shift" && be.data.new_mood) {
+          eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
+        }
+      }
+    });
+  }, []);
 
   /** Feed a single WSRoundMsg through the same pipeline as the real backend. */
   const processRound = useCallback(
@@ -307,9 +311,10 @@ export function useSimulation(simulationId?: string, record = false) {
         if (ind && Object.keys(ind).length > 0) {
           merged = {
             ...merged,
-            priceIndex: ind.price_pressure ?? merged.priceIndex,
-            socialUnrest: (ind.social_unrest_index ?? merged.socialUnrest * 100) / 100,
-            govApproval: (ind.policy_approval ?? merged.govApproval * 100) / 100,
+            socialUnrest:
+              (ind.social_unrest_index ?? merged.socialUnrest * 100) / 100,
+            govApproval:
+              (ind.policy_approval ?? merged.govApproval * 100) / 100,
           };
         }
         return {
@@ -522,7 +527,7 @@ export function useSimulation(simulationId?: string, record = false) {
 
   const startFromRecording = useCallback(
     (recording: SavedSimulation) => {
-    setState({
+      setState({
         events: [],
         metrics: { ...INITIAL_METRICS },
         metricsHistory: [{ ...INITIAL_METRICS }],

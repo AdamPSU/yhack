@@ -12,11 +12,11 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#7B68EE", // sdv-purple
-  friend: "#3E7C34", // sdv-green
-  employer: "#C97D1A", // sdv-orange
-  colleague: "#5A8DB8", // sdv-sky
-  neighbor: "#A0824A", // sdv-wood-light
+  family: "#7A4E5D", // muted mulberry
+  friend: "#4F6F45", // moss green
+  employer: "#8B6133", // saddle brown
+  colleague: "#5E7488", // weathered slate
+  neighbor: "#9B845A", // dry straw
 };
 
 const EDGE_LABELS: Record<BackendRelType, string> = {

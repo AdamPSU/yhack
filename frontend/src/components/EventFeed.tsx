@@ -153,7 +153,7 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
                   className="ml-auto text-[9px] font-mono tabular-nums"
                   style={{ color: "#A0824A" }}
                 >
-                  M{event.month}
+                  R{event.round}
                 </span>
               </div>
               <p

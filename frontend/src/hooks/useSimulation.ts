@@ -56,7 +56,8 @@ interface SimulationState {
   metrics: SimMetrics;
   metricsHistory: SimMetrics[];
   phase: number;
-  month: number;
+  round: number;
+  maxRounds: number;
   isRunning: boolean;
   isComplete: boolean;
   latestEvent: SimEvent | null;
@@ -93,7 +94,8 @@ export function useSimulation(simulationId?: string, record = false) {
     metrics: { ...INITIAL_METRICS },
     metricsHistory: [{ ...INITIAL_METRICS }],
     phase: 0,
-    month: 0,
+    round: 0,
+    maxRounds: 1,
     isRunning: false,
     isComplete: false,
     latestEvent: null,
@@ -134,7 +136,7 @@ export function useSimulation(simulationId?: string, record = false) {
 
     getBridge().then(({ eventBridge }) => {
       if (event.type === "phase_change") {
-        eventBridge.emitPhaseChange(event.phase, event.month);
+        eventBridge.emitPhaseChange(event.phase, event.round);
       }
       eventBridge.emitSimEvent(event);
     });
@@ -149,7 +151,8 @@ export function useSimulation(simulationId?: string, record = false) {
         events,
         latestEvent: event,
         phase: event.phase > prev.phase ? event.phase : prev.phase,
-        month: event.month > prev.month ? event.month : prev.month,
+        round: event.round > prev.round ? event.round : prev.round,
+        maxRounds: event.maxRounds,
       };
     });
 
@@ -206,7 +209,7 @@ export function useSimulation(simulationId?: string, record = false) {
         lookup.set(npc.id, npc);
       }
 
-      const { phase, month } = roundToPhase(round, maxRoundsRef.current);
+      const { phase } = roundToPhase(round, maxRoundsRef.current);
       if (phase > lastPhaseRef.current) {
         lastPhaseRef.current = phase;
         eventQueueRef.current.push({
@@ -216,7 +219,8 @@ export function useSimulation(simulationId?: string, record = false) {
           agentName: "System",
           message: PHASE_LABELS[phase] || `Phase ${phase}`,
           phase,
-          month,
+          round,
+          maxRounds: maxRoundsRef.current,
           timestamp: Date.now(),
         });
       }
@@ -287,7 +291,8 @@ export function useSimulation(simulationId?: string, record = false) {
       metrics: { ...INITIAL_METRICS },
       metricsHistory: [{ ...INITIAL_METRICS }],
       phase: 0,
-      month: 0,
+      round: 0,
+      maxRounds: 1,
       isRunning: true,
       isComplete: false,
       latestEvent: null,
@@ -458,12 +463,13 @@ export function useSimulation(simulationId?: string, record = false) {
 
   const startFromRecording = useCallback(
     (recording: SavedSimulation) => {
-      setState({
+    setState({
         events: [],
         metrics: { ...INITIAL_METRICS },
         metricsHistory: [{ ...INITIAL_METRICS }],
         phase: 0,
-        month: 0,
+        round: 0,
+        maxRounds: 1,
         isRunning: true,
         isComplete: false,
         latestEvent: null,

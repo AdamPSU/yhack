@@ -19,7 +19,8 @@ export interface SimEvent {
   agentCategory?: string;
   message: string;
   phase: number; // 1-3
-  month: number; // 1-9
+  round: number; // 0-N
+  maxRounds: number; // Total rounds
   metrics?: Partial<SimMetrics>;
   timestamp: number;
 }

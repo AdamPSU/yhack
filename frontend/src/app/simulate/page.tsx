@@ -609,7 +609,9 @@ function SimulateContent() {
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
-        <div className={`rpg-panel flex h-full w-64 shrink-0 flex-col panel-slide-left ${focusMode ? "panel-hidden-left" : ""}`}>
+        <div
+          className={`rpg-panel flex h-full w-64 shrink-0 flex-col panel-slide-left ${focusMode ? "panel-hidden-left" : ""}`}
+        >
           <div
             className="flex items-center justify-between px-3 py-2"
             style={{ borderBottom: "2px solid #C4A46C" }}
@@ -635,21 +637,30 @@ function SimulateContent() {
           </div>
         </div>
 
-        {/* Center: Game canvas with chat bubble overlays */}
-        <div className={focusMode ? "fixed inset-0 z-50 flex items-center justify-center overflow-hidden" : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"} style={focusMode ? { background: "#060010" } : undefined}>
+        {/* Center: Game canvas with overlays - now full width */}
+        <div
+          className={
+            focusMode
+              ? "fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
+              : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"
+          }
+          style={focusMode ? { background: "#060010" } : undefined}
+        >
           <div
             ref={canvasContainerRef}
-            className={`relative shrink-0 canvas-glow canvas-expand ${focusMode ? "" : ""}`}
+            className="relative shrink-0 canvas-glow canvas-expand"
             style={{
               border: "3px solid #6B4226",
               borderRadius: 4,
-              ...(focusMode ? {
-                transform: `scale(${focusScale})`,
-                transformOrigin: 'center center',
-                border: 'none',
-                padding: 0,
-                boxShadow: 'none',
-              } : {}),
+              ...(focusMode
+                ? {
+                    transform: `scale(${focusScale})`,
+                    transformOrigin: "center center",
+                    border: "none",
+                    padding: 0,
+                    boxShadow: "none",
+                  }
+                : {}),
             }}
           >
             <GameCanvas />
@@ -697,6 +708,17 @@ function SimulateContent() {
               </button>
             </div>
 
+            {/* Dashboard overlay - positioned on bottom right */}
+            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
+              <Dashboard
+                metrics={sim.metrics}
+                metricsHistory={sim.metricsHistory}
+                phase={sim.phase}
+                round={sim.round}
+                maxRounds={sim.maxRounds}
+              />
+            </div>
+
             {/* NPC hover tooltip */}
             {hoverInfo && (
               <div
@@ -717,16 +739,6 @@ function SimulateContent() {
             )}
           </div>
         </div>
-
-        {/* Right: Dashboard */}
-        <div className={`shrink-0 panel-slide-right ${focusMode ? "panel-hidden-right" : ""}`}>
-          <Dashboard
-            metrics={sim.metrics}
-            metricsHistory={sim.metricsHistory}
-            phase={sim.phase}
-            month={sim.month}
-          />
-        </div>
       </div>
 
       {/* Focus mode exit overlay */}
@@ -734,7 +746,11 @@ function SimulateContent() {
         <button
           type="button"
           className="fixed top-4 right-4 z-[60] rpg-panel px-3 py-1.5 text-[9px] font-mono transition-opacity hover:opacity-70"
-          style={{ color: "#5B3A1E", background: "#E8D5A3", border: "2px solid #6B4226" }}
+          style={{
+            color: "#5B3A1E",
+            background: "#E8D5A3",
+            border: "2px solid #6B4226",
+          }}
           onClick={() => setFocusMode(false)}
         >
           [ESC] exit focus

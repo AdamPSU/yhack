@@ -202,6 +202,30 @@ const CROWN_GRID = [
   "................",
 ];
 
+const EGG_COLORS: Record<string, string> = {
+  "1": "#6B4226",
+  "2": "#F5E6C8",
+  "3": "#E8D5A3",
+};
+const EGG_GRID = [
+  "................",
+  "................",
+  "......1111......",
+  ".....122221.....",
+  "....12222221....",
+  "...1222222221...",
+  "...1222222221...",
+  "..122222222221..",
+  "..122233332221..",
+  "..122222222221..",
+  "..122222222221..",
+  "...1222222221...",
+  "...1222222221...",
+  "....12222221....",
+  ".....122221.....",
+  "......1111......",
+];
+
 /* ─── Exported icon components ─── */
 
 export function CoinIcon() {
@@ -221,6 +245,9 @@ export function ShopIcon() {
 }
 export function CrownIcon() {
   return <PixelIcon grid={CROWN_GRID} colors={CROWN_COLORS} />;
+}
+export function EggIcon() {
+  return <PixelIcon grid={EGG_GRID} colors={EGG_COLORS} />;
 }
 
 const SEGMENT_KEYS = Array.from({ length: 20 }, (_, i) => `seg-${i}`);

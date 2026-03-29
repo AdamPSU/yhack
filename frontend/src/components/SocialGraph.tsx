@@ -73,6 +73,17 @@ function roleColor(role: string): string {
   }
 }
 
+function relationshipType(rel: BackendRelationship): BackendRelType {
+  return rel.rel_type ?? "neighbor";
+}
+
+function relationshipStrength(rel: BackendRelationship): number {
+  if (typeof rel.strength === "number") {
+    return rel.strength;
+  }
+  return Math.max(0, Math.min(1, (rel.trust + (rel.affinity + 1) / 2) / 2));
+}
+
 // ── Types ──────────────────────────────────────────────────
 
 interface GraphNode extends d3.SimulationNodeDatum {
@@ -220,8 +231,8 @@ export function SocialGraph({
       .map((r) => ({
         source: r.source_id,
         target: r.target_id,
-        rel_type: r.rel_type,
-        strength: r.strength,
+        rel_type: relationshipType(r),
+        strength: relationshipStrength(r),
         sourceId: r.source_id,
         targetId: r.target_id,
         lastActiveTime: 0,

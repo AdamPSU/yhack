@@ -4,6 +4,7 @@ import {
   BankIcon,
   CoinIcon,
   CrownIcon,
+  EggIcon,
   FistIcon,
   PixelStatBar,
   ShopIcon,
@@ -15,7 +16,8 @@ interface DashboardProps {
   metrics: SimMetrics;
   metricsHistory: SimMetrics[];
   phase: number;
-  month: number;
+  round: number;
+  maxRounds: number;
 }
 
 /* ─── Severity helpers ─── */
@@ -82,11 +84,12 @@ export function Dashboard({
   metrics,
   metricsHistory,
   phase,
-  month,
+  round,
+  maxRounds,
 }: DashboardProps) {
   return (
     <div
-      className="rpg-panel flex h-full w-56 flex-col"
+      className="rpg-panel flex w-56 flex-col"
       data-testid="dashboard"
     >
       {/* Header */}
@@ -104,14 +107,14 @@ export function Dashboard({
           className="text-[10px] font-mono tabular-nums uppercase tracking-widest"
           style={{ color: "#8B7355" }}
         >
-          Month {month || "-"}
+          Round {round}/{maxRounds}
         </span>
       </div>
 
       {/* Stats */}
-      <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin px-1 py-1">
+      <div className="flex flex-col px-1 py-1">
         <PixelStatBar
-          icon={<CoinIcon />}
+          icon={<EggIcon />}
           label="Egg Index"
           value={metrics.eggIndex}
           formatValue={(v) => `$${v.toFixed(2)}`}

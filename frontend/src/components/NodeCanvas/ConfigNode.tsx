@@ -9,8 +9,6 @@ export default function ConfigNode() {
     setNumNpcs,
     numRounds,
     setNumRounds,
-    mapId,
-    setMapId,
     objective,
     setObjective,
   } = useForm();
@@ -108,47 +106,6 @@ export default function ConfigNode() {
             className="rpg-slider"
             data-testid="rounds-slider"
           />
-        </div>
-
-        {/* Map Selection */}
-        <div className="space-y-1.5">
-          <div className="flex flex-col">
-            <span
-              className="text-[8px] font-mono uppercase tracking-tight"
-              style={{ color: "#A0824A" }}
-            >
-              World
-            </span>
-            <label
-              className="text-[10px] font-mono font-bold uppercase"
-              style={{ color: "#3D2510" }}
-            >
-              Topology
-            </label>
-          </div>
-          <div className="grid grid-cols-3 gap-1">
-            {[
-              { id: "ccity", label: "URBAN" },
-              { id: "citypack", label: "MEGA" },
-              { id: "pico8", label: "MICRO" },
-            ].map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMapId(m.id as any)}
-                className="text-[8px] font-mono py-1 rounded transition-all"
-                style={{
-                  background:
-                    mapId === m.id ? "rgba(212,165,32,0.15)" : "#FFF8DC",
-                  border:
-                    mapId === m.id ? "1px solid #D4A520" : "1px solid #C4A46C",
-                  color: mapId === m.id ? "#D4A520" : "#6B4C2A",
-                }}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Objective (merged from ObjectiveNode) */}

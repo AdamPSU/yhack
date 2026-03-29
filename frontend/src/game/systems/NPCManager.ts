@@ -3,7 +3,8 @@ import { getCoordScale, moodToSentiment } from "@/lib/adapter";
 import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS, getMapConfig } from "../config";
+import { CENTER_BOUNDS, TILE_SIZE, getMapConfig } from "../config";
+import { spawnEmotionBubble } from "../effects/EconomicEffects";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
 import { WorldChatBubble } from "../entities/WorldChatBubble";
@@ -55,6 +56,8 @@ export class NPCManager {
   private conversationTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
   /** Monotonic version per NPC used to invalidate stale conversation callbacks. */
   private conversationVersions: Map<string, number> = new Map();
+  /** Random emotion bubble timer */
+  private emotionTimer?: Phaser.Time.TimerEvent;
 
   constructor(
     scene: Phaser.Scene,
@@ -106,6 +109,8 @@ export class NPCManager {
   }
 
   private onResetNPCs() {
+    this.emotionTimer?.destroy();
+    this.emotionTimer = undefined;
     this.movement.destroy();
     for (const bubble of this.chatBubbles.values()) bubble.destroy();
     this.chatBubbles.clear();
@@ -390,6 +395,33 @@ export class NPCManager {
     }
 
     // Center camera on NPC cluster
+
+    // Random emotion bubbles — every 3-7 seconds pick a random NPC
+    this.emotionTimer?.destroy();
+    const scheduleEmotionBubble = () => {
+      this.emotionTimer = this.scene.time.addEvent({
+        delay: 3000 + Math.random() * 4000,
+        callback: () => {
+          const npcs = [...this.npcs.values()].filter(
+            (n) => n.role !== "driver",
+          );
+          if (npcs.length === 0) return;
+          const npc = npcs[Math.floor(Math.random() * npcs.length)];
+          const worldX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
+          const worldY = npc.tileY * TILE_SIZE + TILE_SIZE / 2;
+          const sentiment =
+            npc.sentiment === "happy"
+              ? "happy"
+              : npc.sentiment === "angry"
+                ? "angry"
+                : "neutral";
+          spawnEmotionBubble(this.scene, worldX, worldY, sentiment);
+          scheduleEmotionBubble();
+        },
+        loop: false,
+      });
+    };
+    scheduleEmotionBubble();
   }
 
   /** Check if position has minimum Manhattan distance from all placed NPCs */
@@ -703,6 +735,8 @@ export class NPCManager {
   }
 
   destroy() {
+    this.emotionTimer?.destroy();
+    this.emotionTimer = undefined;
     eventBridge.off("sim:reset-npcs", this.onResetNPCs, this);
     eventBridge.off("sim:add-npc", this.onAddNPC, this);
     eventBridge.off("sim:init-npcs", this.onInitNPCs, this);

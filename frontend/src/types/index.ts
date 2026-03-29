@@ -23,6 +23,8 @@ export interface SimEvent {
   maxRounds: number; // Total rounds
   metrics?: Partial<SimMetrics>;
   timestamp: number;
+  /** Target NPC ID for chat events (who the speaker is addressing) */
+  targetNpcId?: string;
 }
 
 export interface SimMetrics {

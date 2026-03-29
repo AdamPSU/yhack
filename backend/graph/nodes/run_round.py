@@ -184,6 +184,104 @@ def _build_neighbor_ids(
     return neighbors
 
 
+def _find_closest_neighbor(
+    npc_id: str,
+    all_npcs: list[dict[str, Any]],
+    neighbor_ids: list[str],
+) -> str | None:
+    """Find the closest NPC from neighbor_ids to the given NPC."""
+    if not neighbor_ids:
+        return None
+
+    npc = next((n for n in all_npcs if n.get("id") == npc_id), None)
+    if not npc:
+        return neighbor_ids[0] if neighbor_ids else None
+
+    nx, ny = npc.get("x", 0), npc.get("y", 0)
+    closest_id = None
+    closest_dist = float("inf")
+
+    for other in all_npcs:
+        oid = other.get("id", "")
+        if oid not in neighbor_ids:
+            continue
+        dx = abs(other.get("x", 0) - nx)
+        dy = abs(other.get("y", 0) - ny)
+        dist = max(dx, dy)  # Chebyshev distance
+        if dist < closest_dist:
+            closest_dist = dist
+            closest_id = oid
+
+    return closest_id
+
+
+def _validate_chat_target(
+    event: dict[str, Any],
+    speaker_id: str,
+    neighbor_ids: list[str],
+    all_npcs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Validate and correct target_npc_id for chat events.
+
+    If the target is not within proximity (neighbor_ids), auto-correct to the
+    closest valid neighbor. If no neighbors exist, clear the target.
+    """
+    if event.get("event_type") != "chat":
+        return event
+
+    ev_data = event.get("data", {})
+    target_id = ev_data.get("target_npc_id", "")
+
+    # If no target specified or target is valid, return as-is
+    if not target_id:
+        # No target specified - if neighbors exist, pick the closest one
+        if neighbor_ids:
+            closest = _find_closest_neighbor(speaker_id, all_npcs, neighbor_ids)
+            if closest:
+                ev_data = dict(ev_data)
+                ev_data["target_npc_id"] = closest
+                event = dict(event)
+                event["data"] = ev_data
+                logger.debug(
+                    "NPC %s chat had no target, auto-assigned to nearby %s",
+                    speaker_id,
+                    closest,
+                )
+        return event
+
+    if target_id in neighbor_ids:
+        # Target is valid and within proximity
+        return event
+
+    # Target is out of range - auto-correct to closest neighbor
+    if neighbor_ids:
+        closest = _find_closest_neighbor(speaker_id, all_npcs, neighbor_ids)
+        if closest:
+            ev_data = dict(ev_data)
+            ev_data["target_npc_id"] = closest
+            event = dict(event)
+            event["data"] = ev_data
+            logger.debug(
+                "NPC %s chat target %s out of range, corrected to nearby %s",
+                speaker_id,
+                target_id,
+                closest,
+            )
+            return event
+
+    # No valid neighbors - clear target (monologue)
+    ev_data = dict(ev_data)
+    ev_data["target_npc_id"] = ""
+    event = dict(event)
+    event["data"] = ev_data
+    logger.debug(
+        "NPC %s chat target %s out of range with no neighbors, cleared target",
+        speaker_id,
+        target_id,
+    )
+    return event
+
+
 def _format_nearby_npcs(
     neighbor_ids: list[str],
     all_npcs: list[dict[str, Any]],
@@ -193,10 +291,7 @@ def _format_nearby_npcs(
     if not neighbor_ids:
         return "Nobody is nearby right now."
     id_set = set(neighbor_ids)
-    rel_lookup = {
-        other_id: (affinity, trust)
-        for other_id, affinity, trust in npc_rels
-    }
+    rel_lookup = {other_id: (affinity, trust) for other_id, affinity, trust in npc_rels}
     lines: list[str] = []
     for other in all_npcs:
         oid = other.get("id")
@@ -264,9 +359,7 @@ def _format_social_targets(
 
     candidates.sort(key=lambda c: c[0], reverse=True)
     lines: list[str] = []
-    for _, name, oid, affinity, trust, direction, dist in candidates[
-        :3
-    ]:
+    for _, name, oid, affinity, trust, direction, dist in candidates[:3]:
         lines.append(
             f"- {name} [{oid}] (Like: {affinity:.1f}, Trust: {trust:.1f}) — {dist} tiles {direction}"
         )
@@ -346,6 +439,7 @@ async def _simulate_single_npc(
     all_npcs: list[dict[str, Any]],
     name_to_id: dict[str, str],
     objective: str = "",
+    neighbor_id_set: set[str] | None = None,
 ) -> NPCRoundResult:
     """Full per-agent cognitive loop (Park et al. 2023):
     Retrieve → Reflect → Plan → Perceive/React/Act → Store memories.
@@ -432,7 +526,7 @@ async def _simulate_single_npc(
             }
         ]
 
-    # Tag each event with round and NPC id.
+    # Tag each event with round and NPC id, and validate chat targets.
     sim_events: list[dict[str, Any]] = []
     for ev in raw_events:
         ev_data = dict(ev.get("data", {}))
@@ -440,16 +534,17 @@ async def _simulate_single_npc(
             ev_data["target_npc_id"] = normalize_npc_id(
                 ev_data["target_npc_id"], name_to_id
             )
-        sim_events.append(
-            {
-                "round": current_round,
-                "npc_id": npc_id,
-                "event_type": ev.get("event_type", "chat"),
-                "message": ev.get("message", ""),
-                "is_controversial": ev.get("is_controversial", False),
-                "data": ev_data,
-            }
-        )
+        sim_event = {
+            "round": current_round,
+            "npc_id": npc_id,
+            "event_type": ev.get("event_type", "chat"),
+            "message": ev.get("message", ""),
+            "is_controversial": ev.get("is_controversial", False),
+            "data": ev_data,
+        }
+        # Validate chat targets are within proximity (Chebyshev distance <= 2)
+        sim_event = _validate_chat_target(sim_event, npc_id, neighbor_ids, all_npcs)
+        sim_events.append(sim_event)
 
     # ---- 5. Store memories from this round ----
     if perception:
@@ -520,9 +615,7 @@ def _compute_influence_factor(
 ) -> float:
     """Compute I_ij influence factor from relationship and reputation data."""
     rels = rel_map.get(speaker_id, [])
-    rel_match = next(
-        ((a, t) for oid, a, t in rels if oid == target_id), None
-    )
+    rel_match = next(((a, t) for oid, a, t in rels if oid == target_id), None)
 
     if rel_match:
         affinity, trust = rel_match
@@ -625,7 +718,7 @@ def _apply_opinion_dynamics(
         # Affinity increases if opinions are similar or converged
         # Multiplier if it's a controversial idea: they really like or hate you for it.
         impact_mult = 3.0 if is_controversial else 1.0
-        
+
         # If pol_diff is low, they like the speaker more.
         # If behavior is "adopt" or "compromise", they have bonded over the idea.
         if behavior != "keep":
@@ -633,21 +726,21 @@ def _apply_opinion_dynamics(
             trust_delta = 0.05 * impact_mult
         else:
             # They didn't listen. If it was controversial, they might like the speaker LESS.
-            aff_delta = (-0.05 if is_controversial else -0.01)
+            aff_delta = -0.05 if is_controversial else -0.01
             trust_delta = -0.02 if is_controversial else 0.0
 
         # Reputation changes based on how the target reacted.
         # If the target likes the speaker (affinity up), the speaker's reputation grows.
         # If it was a controversial idea and the target HATED it (affinity down), reputation tanks.
         rep_delta = (0.02 if aff_delta > 0 else -0.03) * impact_mult
-        
+
         # High reputation characters have "social armor": they lose less reputation from single bad interactions
         # but also gain it slower (diminishing returns).
         current_rep = float(speaker.get("reputation", 0.5))
         if rep_delta < 0:
-            rep_delta *= (1.2 - current_rep) # Armor: high rep = less loss
+            rep_delta *= 1.2 - current_rep  # Armor: high rep = less loss
         else:
-            rep_delta *= (1.1 - current_rep) # Diminishing returns: high rep = less gain
+            rep_delta *= 1.1 - current_rep  # Diminishing returns: high rep = less gain
 
         npc_lookup[speaker_id]["reputation"] = round(
             clamp(current_rep + rep_delta, 0.05, 1.0), 3

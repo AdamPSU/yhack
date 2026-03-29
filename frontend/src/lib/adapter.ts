@@ -99,6 +99,9 @@ export function adaptEvent(
 
   const { phase } = roundToPhase(round, maxRounds);
 
+  // Extract target_npc_id from event data (for chat events)
+  const targetNpcId = backendEvent.data?.target_npc_id as string | undefined;
+
   return {
     id: `${backendEvent.npc_id}-${round}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: eventType,
@@ -110,6 +113,7 @@ export function adaptEvent(
     round,
     maxRounds,
     timestamp: Date.now(),
+    targetNpcId: targetNpcId || undefined,
   };
 }
 

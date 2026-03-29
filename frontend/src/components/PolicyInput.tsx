@@ -14,14 +14,36 @@ const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
   { id: "citypack", label: "Citypack", desc: "Infinite procedural city" },
 ];
 
+function isSavedSimulation(data: unknown): data is SavedSimulation {
+  if (!data || typeof data !== "object") return false;
+  const candidate = data as Partial<SavedSimulation>;
+  return (
+    candidate.initMsg?.type === "init" &&
+    Array.isArray(candidate.initMsg.npcs) &&
+    Array.isArray(candidate.rounds)
+  );
+}
+
 export function PolicyInput() {
   const [text, setText] = useState("");
   const [mapId, setMapId] = useState<MapType>("ccity");
   const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingCustomRun, setLoadingCustomRun] = useState(false);
   const [record, setRecord] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  function loadReplay(
+    data: SavedSimulation,
+    replayMapId: MapType,
+    replayProcedural = false,
+  ) {
+    const proceduralParam =
+      replayMapId === "citypack" && replayProcedural ? "&procedural=true" : "";
+    setReplayData(data);
+    router.push(`/simulate?mode=replay&map=${replayMapId}${proceduralParam}`);
+  }
 
   function handleLoadFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -30,20 +52,35 @@ export function PolicyInput() {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result as string) as SavedSimulation;
-        if (!parsed.initMsg || !Array.isArray(parsed.rounds)) {
+        if (!isSavedSimulation(parsed)) {
           console.error("Invalid simulation file: missing initMsg or rounds");
           return;
         }
-        const proceduralParam =
-          mapId === "citypack" && procedural ? "&procedural=true" : "";
-        setReplayData(parsed);
-        router.push(`/simulate?mode=replay&map=${mapId}${proceduralParam}`);
+        loadReplay(parsed, mapId, procedural);
       } catch (err) {
         console.error("Failed to parse simulation file:", err);
       }
     };
     reader.readAsText(file);
     e.target.value = "";
+  }
+
+  async function handleLoadCustomRun() {
+    if (loadingCustomRun) return;
+    setLoadingCustomRun(true);
+    try {
+      const module = await import("@/custom_run.json");
+      const bundledReplay = module.default as unknown;
+      if (!isSavedSimulation(bundledReplay)) {
+        console.error("Bundled custom run is invalid");
+        setLoadingCustomRun(false);
+        return;
+      }
+      loadReplay(bundledReplay, "citypack");
+    } catch (err) {
+      console.error("Failed to load bundled custom run:", err);
+      setLoadingCustomRun(false);
+    }
   }
 
   async function handleSimulate() {
@@ -183,22 +220,36 @@ export function PolicyInput() {
         </button>
       </div>
 
-      {/* Load saved simulation */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleLoadFile}
-        className="hidden"
-      />
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        data-testid="load-simulation-button"
-        className="rpg-panel w-full px-6 py-2 text-xs font-mono text-[#8a7a62] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#6a5a42] hover:text-[#d4c4a0] active:translate-y-px"
-      >
-        {">> Load Saved Simulation <<"}
-      </button>
+      {/* Replay loaders */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={handleLoadCustomRun}
+          disabled={loadingCustomRun}
+          data-testid="load-custom-run-button"
+          className="rpg-panel w-full px-6 py-2 text-xs font-mono text-[#8a7a62] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#6a5a42] hover:text-[#d4c4a0] disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px"
+        >
+          {loadingCustomRun
+            ? ">> Loading Custom Run... <<"
+            : ">> Load Custom Run <<"}
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleLoadFile}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          data-testid="load-simulation-button"
+          className="rpg-panel w-full px-6 py-2 text-xs font-mono text-[#8a7a62] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#6a5a42] hover:text-[#d4c4a0] active:translate-y-px"
+        >
+          {">> Load Saved Simulation <<"}
+        </button>
+      </div>
     </div>
   );
 }

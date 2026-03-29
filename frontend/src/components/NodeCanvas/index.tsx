@@ -47,7 +47,8 @@ export default function NodeCanvas() {
   const [numNpcs, setNumNpcs] = useState(25);
   const [numRounds, setNumRounds] = useState(5);
   const [objective, setObjective] = useState('');
-  const [mapId, setMapId] = useState<MapType>('ccity');
+  const mapId: MapType = 'citypack';
+  const setMapId = (_v: MapType) => {};
   const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [uploadingTrends, setUploadingTrends] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);

@@ -25,7 +25,6 @@ function roleToZone(role: string): string {
   }
 }
 
-/** Minimum Manhattan distance between spawned NPCs */
 const MIN_SPAWN_SPACING = 4;
 
 export class NPCManager {
@@ -137,7 +136,12 @@ export class NPCManager {
           CENTER_BOUNDS.minRow,
           Math.min(CENTER_BOUNDS.maxRow, bn.y * COORD_SCALE),
         );
-        const snapped = this.findNearestRoad(tileX, tileY);
+        const snapped = this.findNearestTile(
+          tileX,
+          tileY,
+          (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+          10,
+        );
         if (snapped) {
           tileX = snapped.x;
           tileY = snapped.y;
@@ -328,7 +332,9 @@ export class NPCManager {
     let goalX = targetX;
     let goalY = targetY;
     if (!this.isWalkable(goalX, goalY)) {
-      const snapped = this.findNearestWalkable(goalX, goalY);
+      const snapped = this.findNearestTile(goalX, goalY, (c, r) =>
+        this.isWalkable(c, r),
+      );
       if (!snapped) return;
       goalX = snapped.x;
       goalY = snapped.y;

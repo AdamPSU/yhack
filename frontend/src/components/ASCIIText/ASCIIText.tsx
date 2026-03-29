@@ -602,7 +602,8 @@ export default function ASCIIText({
           text-align: center;
           width: auto;
           white-space: pre;
-          background-image: linear-gradient(to right, #e879f9, #a855f7, #60a5fa);
+          font-family: var(--font-geist-mono), ui-monospace, monospace;
+          background-image: linear-gradient(to right, #e8a43a, #e879f9, #a855f7, #60a5fa);
           background-attachment: fixed;
           -webkit-text-fill-color: transparent;
           -webkit-background-clip: text;

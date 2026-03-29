@@ -24,7 +24,7 @@ export default function ASCIITextHero() {
       <div style={{ 
         position: 'relative', 
         width: '100%', 
-        height: '160px', 
+        height: '176px', 
         zIndex: 100,
         filter: 'drop-shadow(0 0 30px rgba(255,255,255,0.5)) drop-shadow(0 0 80px rgba(255,255,255,0.2)) drop-shadow(0 0 140px rgba(255,255,255,0.1))' 
       }}>
@@ -32,13 +32,13 @@ export default function ASCIITextHero() {
           text="SIMULACRA"
           enableWaves
           asciiFontSize={8}
-          textFontSize={300}
+          textFontSize={288}
           textColor="#ffffff"
           planeBaseHeight={10}
         />
       </div>
       <div 
-        className="w-[360px] mt-0 opacity-40 hover:opacity-100 transition-opacity"
+        className="w-[360px] mt-2 opacity-40 hover:opacity-100 transition-opacity"
         style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.4))' }}
       >
         <LogoLoop

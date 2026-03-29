@@ -42,7 +42,7 @@ export default function Home() {
           <LiquidEtherBackground />
           <RetroTV />
           <main
-            className="relative flex w-full flex-col items-center gap-0 px-8 -mt-12"
+            className="relative flex w-full flex-col items-center gap-4 px-8 -mt-24"
             data-testid="landing-page"
           >
         {/* Title */}
@@ -57,7 +57,7 @@ export default function Home() {
         </div>
 
         {/* Node canvas */}
-        <div className="relative z-[10] mt-4 w-full">
+        <div className="relative z-[10] mt-12 w-full">
           <NodeCanvasClient />
         </div>
       </main>

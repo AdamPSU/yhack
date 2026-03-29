@@ -14,34 +14,34 @@ export default function RetroTV() {
         }
 
         @keyframes global-flicker {
-          0% { opacity: 0.99; }
-          5% { opacity: 0.96; }
-          10% { opacity: 1.0; }
-          15% { opacity: 0.95; }
-          20% { opacity: 0.99; }
-          25% { opacity: 0.96; }
-          30% { opacity: 1.0; }
-          35% { opacity: 0.94; }
-          40% { opacity: 0.98; }
-          45% { opacity: 0.97; }
-          50% { opacity: 0.99; }
-          55% { opacity: 0.96; }
-          60% { opacity: 1.0; }
-          65% { opacity: 0.95; }
-          70% { opacity: 0.99; }
-          75% { opacity: 0.96; }
-          80% { opacity: 1.0; }
-          85% { opacity: 0.94; }
-          90% { opacity: 0.98; }
-          95% { opacity: 0.97; }
-          100% { opacity: 0.99; }
+          0% { opacity: 0.98; }
+          5% { opacity: 0.95; }
+          10% { opacity: 0.99; }
+          15% { opacity: 0.93; }
+          20% { opacity: 0.98; }
+          25% { opacity: 0.94; }
+          30% { opacity: 0.99; }
+          35% { opacity: 0.92; }
+          40% { opacity: 0.97; }
+          45% { opacity: 0.95; }
+          50% { opacity: 0.98; }
+          55% { opacity: 0.94; }
+          60% { opacity: 0.99; }
+          65% { opacity: 0.93; }
+          70% { opacity: 0.98; }
+          75% { opacity: 0.94; }
+          80% { opacity: 0.99; }
+          85% { opacity: 0.92; }
+          90% { opacity: 0.97; }
+          95% { opacity: 0.95; }
+          100% { opacity: 0.98; }
         }
 
         @keyframes v-sync-glitch {
           0% { transform: translateY(-100%); opacity: 0; }
           10% { transform: translateY(-100%); opacity: 0; }
-          11% { transform: translateY(-100%); opacity: 0.23; }
-          25% { transform: translateY(100vh); opacity: 0.23; }
+          11% { transform: translateY(-100%); opacity: 0.3; }
+          25% { transform: translateY(100vh); opacity: 0.3; }
           26% { transform: translateY(100vh); opacity: 0; }
           100% { transform: translateY(100vh); opacity: 0; }
         }
@@ -49,48 +49,48 @@ export default function RetroTV() {
         /* A — medium, moderate brightness */
         @keyframes strobe-a {
           0%   { opacity: 0.00; }
-          12%  { opacity: 0.19; }
+          12%  { opacity: 0.25; }
           13%  { opacity: 0.00; }
-          45%  { opacity: 0.23; }
-          46%  { opacity: 0.02; }
+          45%  { opacity: 0.30; }
+          46%  { opacity: 0.03; }
           72%  { opacity: 0.00; }
-          90%  { opacity: 0.15; }
+          90%  { opacity: 0.20; }
           100% { opacity: 0.00; }
         }
         /* B — very large, near invisible */
         @keyframes strobe-b {
           0%   { opacity: 0.00; }
-          20%  { opacity: 0.06; }
+          20%  { opacity: 0.08; }
           50%  { opacity: 0.00; }
-          80%  { opacity: 0.08; }
-          100% { opacity: 0.01; }
+          80%  { opacity: 0.10; }
+          100% { opacity: 0.02; }
         }
         /* C — tall narrow strip, slightly brighter */
         @keyframes strobe-c {
           0%   { opacity: 0.00; }
-          15%  { opacity: 0.21; }
+          15%  { opacity: 0.28; }
           16%  { opacity: 0.00; }
-          45%  { opacity: 0.14; }
+          45%  { opacity: 0.18; }
           46%  { opacity: 0.00; }
-          75%  { opacity: 0.17; }
-          76%  { opacity: 0.04; }
+          75%  { opacity: 0.22; }
+          76%  { opacity: 0.05; }
           100% { opacity: 0.00; }
         }
         /* D — enormous, barely visible */
         @keyframes strobe-d {
-          0%   { opacity: 0.04; }
+          0%   { opacity: 0.05; }
           35%  { opacity: 0.00; }
-          70%  { opacity: 0.06; }
+          70%  { opacity: 0.08; }
           100% { opacity: 0.00; }
         }
         /* E — wide short band, moderate */
         @keyframes strobe-e {
-          0%   { opacity: 0.09; }
+          0%   { opacity: 0.12; }
           25%  { opacity: 0.00; }
-          55%  { opacity: 0.17; }
-          56%  { opacity: 0.04; }
+          55%  { opacity: 0.22; }
+          56%  { opacity: 0.05; }
           80%  { opacity: 0.00; }
-          100% { opacity: 0.14; }
+          100% { opacity: 0.18; }
         }
 
         .retro-tv-root-bg {
@@ -118,8 +118,8 @@ export default function RetroTV() {
             to bottom,
             transparent 0px,
             transparent 1px,
-            rgba(0, 0, 0, 0.20) 1px,
-            rgba(0, 0, 0, 0.20) 2px
+            rgba(0, 0, 0, 0.25) 1px,
+            rgba(0, 0, 0, 0.25) 2px
           );
         }
 
@@ -131,8 +131,8 @@ export default function RetroTV() {
           background: radial-gradient(
             ellipse at center,
             transparent 40%,
-            rgba(0, 0, 0, 0.55) 80%,
-            rgba(0, 0, 0, 0.85) 100%
+            rgba(0, 0, 0, 0.65) 80%,
+            rgba(0, 0, 0, 0.95) 100%
           );
         }
 
@@ -145,8 +145,8 @@ export default function RetroTV() {
             to bottom,
             transparent 0px,
             transparent 2px,
-            rgba(255, 0, 0, 0.04) 2px,
-            rgba(255, 0, 0, 0.04) 4px
+            rgba(255, 0, 0, 0.05) 2px,
+            rgba(255, 0, 0, 0.05) 4px
           );
           mix-blend-mode: screen;
           transform: translateX(2.5px);
@@ -162,8 +162,8 @@ export default function RetroTV() {
             to bottom,
             transparent 0px,
             transparent 2px,
-            rgba(0, 80, 255, 0.04) 2px,
-            rgba(0, 80, 255, 0.04) 4px
+            rgba(0, 80, 255, 0.05) 2px,
+            rgba(0, 80, 255, 0.05) 4px
           );
           mix-blend-mode: screen;
           transform: translateX(-2.5px);
@@ -175,7 +175,7 @@ export default function RetroTV() {
           position: absolute;
           inset: 0;
           pointer-events: none;
-          opacity: 0.06;
+          opacity: 0.08;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
           background-size: 100px 100px;
         }

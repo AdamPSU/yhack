@@ -629,7 +629,7 @@ function SimulateContent() {
           </div>
         </div>
 
-        {/* Center: Game canvas with chat bubble overlays */}
+        {/* Center: Game canvas with overlays - now full width */}
         <div
           className={
             focusMode
@@ -640,22 +640,10 @@ function SimulateContent() {
         >
           <div
             ref={canvasContainerRef}
-            className={`relative shrink-0 canvas-glow canvas-expand ${focusMode ? "" : ""}`}
+            className="relative w-full h-full"
             style={{
               border: "3px solid #6B4226",
               borderRadius: 4,
-              ...(focusMode
-                ? {
-                    zoom: Math.min(
-                      typeof window !== "undefined"
-                        ? window.innerWidth / GAME_WIDTH
-                        : 1,
-                      typeof window !== "undefined"
-                        ? window.innerHeight / GAME_HEIGHT
-                        : 1,
-                    ),
-                  }
-                : {}),
             }}
           >
             <GameCanvas />
@@ -703,6 +691,16 @@ function SimulateContent() {
               </button>
             </div>
 
+            {/* Dashboard overlay - positioned on bottom right */}
+            <div className="absolute bottom-2 right-2 z-40 pointer-events-auto">
+              <Dashboard
+                metrics={sim.metrics}
+                metricsHistory={sim.metricsHistory}
+                phase={sim.phase}
+                month={sim.month}
+              />
+            </div>
+
             {/* NPC hover tooltip */}
             {hoverInfo && (
               <div
@@ -722,18 +720,6 @@ function SimulateContent() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right: Dashboard */}
-        <div
-          className={`shrink-0 panel-slide-right ${focusMode ? "panel-hidden-right" : ""}`}
-        >
-          <Dashboard
-            metrics={sim.metrics}
-            metricsHistory={sim.metricsHistory}
-            phase={sim.phase}
-            month={sim.month}
-          />
         </div>
       </div>
 

@@ -27,11 +27,11 @@ const SocialGraph = dynamic(
   },
 );
 
-// Mirror game/config constants here to avoid importing Phaser during SSR.
+// Mirror game/constants values here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 960;
-const SCALE_FACTOR = 1; // game runs natively at 1280×960 — no upscale factor
+const SCALE_FACTOR = 2; // must match constants.ts — canvas container is 2x game resolution
 const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only

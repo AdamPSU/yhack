@@ -24,12 +24,25 @@ def _format_indicator(indicator: dict[str, Any]) -> str:
 
 
 async def build_context(state: SimState) -> dict[str, Any]:
-    primary_source = get_source(state["primary_policy_source"])
-    if primary_source is None:
-        raise ValueError("Primary policy PDF source was not found.")
+    policy_ids = state.get("policy_sources") or []
+    merged_doc_parts: list[str] = []
+    for source_id in policy_ids:
+        src = get_source(source_id)
+        if src is None:
+            raise ValueError(f"Policy source {source_id} was not found.")
+        body = (src.get("content_text") or "").strip()
+        if body:
+            label = src.get("filename") or source_id
+            merged_doc_parts.append(f"--- Source: {label} ---\n{body}")
 
     trend_sources = get_sources(state.get("trend_sources", []))
     notes_text = (state.get("notes_text", "") or "").strip()
+    if notes_text:
+        merged_doc_parts.append(f"--- Author notes / pasted text ---\n{notes_text}")
+
+    merged_policy = "\n\n".join(merged_doc_parts).strip()
+    if not merged_policy:
+        raise ValueError("Policy content is empty after merging sources and notes.")
 
     source_summaries: list[str] = []
     indicator_snapshots: list[dict[str, Any]] = []
@@ -44,14 +57,13 @@ async def build_context(state: SimState) -> dict[str, Any]:
         trend_lines = source_summaries[:3]
     trend_summary = "\n".join(f"- {line}" for line in trend_lines) or "No supporting historical CSV data was supplied."
 
+    # Notes and file bodies are merged into policy_text; keep CSV trend summaries here only.
     context_parts: list[str] = []
-    if notes_text:
-        context_parts.append(f"Supporting notes:\n{notes_text}")
     if trend_lines or source_summaries:
         context_parts.append(f"Historical trends:\n{trend_summary}")
 
     return {
-        "policy_text": primary_source.get("content_text", "").strip(),
+        "policy_text": merged_policy,
         "trend_summary": trend_summary,
         "context_summary": "\n\n".join(context_parts).strip(),
         "indicator_snapshots": indicator_snapshots,

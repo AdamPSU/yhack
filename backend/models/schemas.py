@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from config import MAX_X, MAX_Y
 
@@ -43,7 +45,7 @@ class SimEvent(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
-SourceKind = Literal["pdf", "csv"]
+SourceKind = Literal["pdf", "csv", "text", "book", "video"]
 SourceStatus = Literal["ready"]
 TrendDirection = Literal["up", "down", "flat", "unknown"]
 ReportDirection = Literal["positive", "negative", "mixed"]
@@ -82,13 +84,26 @@ class PolicyContextBundle(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    primary_policy_source_id: str
+    """Simulation input: ordered narrative files, optional legacy single PDF id, notes, and trend CSVs."""
+
+    primary_policy_source_id: str | None = None
+    policy_source_ids: list[str] = Field(default_factory=list)
     notes_text: str = Field(default="", max_length=4000)
     trend_source_ids: list[str] = Field(default_factory=list)
     num_rounds: int = 75
     num_npcs: int = 25
     objective: str = Field(default="", max_length=500)
     map_id: str = Field(default="ccity")
+
+    @model_validator(mode="after")
+    def require_mergeable_policy_content(self) -> PolicyInput:
+        has_files = bool(self.policy_source_ids) or bool(self.primary_policy_source_id)
+        notes = (self.notes_text or "").strip()
+        if not has_files and len(notes) < 40:
+            raise ValueError(
+                "Provide at least one policy source upload, or at least 40 characters in notes_text."
+            )
+        return self
 
 
 # --- Structured output response models for LLM calls ---

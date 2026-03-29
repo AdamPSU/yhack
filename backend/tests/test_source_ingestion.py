@@ -85,3 +85,33 @@ class TestSourceIngestion:
         )
 
         assert response["simulation_id"]
+
+    @pytest.mark.asyncio
+    async def test_uploads_markdown_text_source(self) -> None:
+        source = await extract_router.upload_context_source(
+            file=DummyUploadFile(
+                "memo.md",
+                b"# Tariffs\nDomestic manufacturing support with sector credits.",
+            ),  # type: ignore[arg-type]
+            label="Policy memo",
+        )
+
+        assert source.kind == "text"
+        assert source.filename == "memo.md"
+        assert "Tariffs" in (source.preview_text or "") or "Tariffs" in (source.summary or "")
+
+    @pytest.mark.asyncio
+    async def test_start_simulation_notes_only_without_uploads(self) -> None:
+        response = await simulate_router.start_simulation(
+            PolicyInput(
+                notes_text="x" * 45
+                + " A standalone policy description with enough characters for validation.",
+                trend_source_ids=[],
+                num_rounds=3,
+                num_npcs=5,
+                objective="Smoke test",
+                map_id="ccity",
+            )
+        )
+
+        assert response["simulation_id"]

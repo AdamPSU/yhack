@@ -13,7 +13,7 @@ vi.mock("@/services/wsClient", () => ({
   startSimulation,
 }));
 
-describe("NodeCanvas PDF Policy Flow", () => {
+describe("NodeCanvas multimodal policy flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
@@ -60,7 +60,7 @@ describe("NodeCanvas PDF Policy Flow", () => {
 
     render(<NodeCanvas />);
 
-    const pdfInput = screen.getByTestId("policy-pdf-input");
+    const pdfInput = screen.getByTestId("policy-narrative-input");
     const pdfFile = new File(["pdf"], "policy.pdf", {
       type: "application/pdf",
     });
@@ -108,32 +108,52 @@ describe("NodeCanvas PDF Policy Flow", () => {
 
     await waitFor(() => {
       expect(startSimulation).toHaveBeenCalledWith({
-        primary_policy_source_id: "src_policy",
+        policy_source_ids: ["src_policy"],
+        primary_policy_source_id: null,
         notes_text:
           "Focus on inflation pass-through and lower-income households.",
         trend_source_ids: ["src_trend"],
         num_rounds: 10,
         num_npcs: 40,
         objective: "How does this affect local inflation?",
-        map_id: "ccity",
+        map_id: "citypack",
       });
     });
 
-    expect(sessionStorage.getItem("agora-policy")).toBe("policy.pdf");
-    expect(sessionStorage.getItem("agora-notes")).toBe(
-      "Focus on inflation pass-through and lower-income households.",
-    );
-    expect(sessionStorage.getItem("agora-num-npcs")).toBe("40");
-    expect(sessionStorage.getItem("agora-num-rounds")).toBe("10");
-    expect(sessionStorage.getItem("agora-objective")).toBe(
-      "How does this affect local inflation?",
-    );
     expect(mockPush).toHaveBeenCalledWith("/simulate?id=sim-123");
   });
 
-  it("disables the run button until a primary PDF is uploaded", () => {
+  it("disables the run button until a narrative file or long notes", () => {
     render(<NodeCanvas />);
     expect(screen.getByTestId("run-button")).toBeDisabled();
+  });
+
+  it("enables run with notes only when long enough", async () => {
+    startSimulation.mockResolvedValue("sim-notes");
+    const mockPush = vi.fn();
+    (useRouter as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      push: mockPush,
+    });
+    const longNotes =
+      "x".repeat(45) +
+      " Standalone policy description for a text-only simulation run.";
+    render(<NodeCanvas />);
+    const notesTextarea = screen.getByTestId("policy-textarea");
+    fireEvent.change(notesTextarea, {
+      target: { value: longNotes },
+    });
+    expect(screen.getByTestId("run-button")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("run-button"));
+    await waitFor(() => {
+      expect(startSimulation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          policy_source_ids: [],
+          primary_policy_source_id: null,
+          notes_text: longNotes,
+        }),
+      );
+    });
+    expect(mockPush).toHaveBeenCalledWith("/simulate?id=sim-notes");
   });
 
   it("uploads and displays CSV trend sources", async () => {

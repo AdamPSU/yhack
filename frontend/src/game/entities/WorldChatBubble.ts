@@ -16,6 +16,7 @@ const STEM_COLOR = 0xc4a46c;
 const NAME_COLOR = "#5B3A1E";
 const CATEGORY_COLOR = "#A0824A";
 const MESSAGE_COLOR = "#6B4C2A";
+const EVENT_LOG_FONT_FAMILY = 'ui-monospace, "Courier New", monospace';
 
 export class WorldChatBubble extends Phaser.GameObjects.Container {
   private panel = this.scene.add.graphics();
@@ -43,18 +44,18 @@ export class WorldChatBubble extends Phaser.GameObjects.Container {
   );
   private stem = this.scene.add.rectangle(0, 0, 2, STEM_HEIGHT, STEM_COLOR);
   private nameText = this.scene.add.text(0, 0, "", {
-    fontFamily: "monospace",
+    fontFamily: EVENT_LOG_FONT_FAMILY,
     fontSize: "14px",
     fontStyle: "bold",
     color: NAME_COLOR,
   });
   private categoryText = this.scene.add.text(0, 0, "", {
-    fontFamily: "monospace",
+    fontFamily: EVENT_LOG_FONT_FAMILY,
     fontSize: "11px",
     color: CATEGORY_COLOR,
   });
   private messageText = this.scene.add.text(0, 0, "", {
-    fontFamily: "monospace",
+    fontFamily: EVENT_LOG_FONT_FAMILY,
     fontSize: "12px",
     color: MESSAGE_COLOR,
     wordWrap: {
@@ -149,6 +150,6 @@ export class WorldChatBubble extends Phaser.GameObjects.Container {
   }
 
   updateAnchor(x: number, y: number) {
-    this.setPosition(x, y);
+    this.setPosition(Math.round(x), Math.round(y));
   }
 }

@@ -635,7 +635,10 @@ function SimulateContent() {
               border: "3px solid #6B4226",
               borderRadius: 4,
               ...(focusMode ? {
-                zoom: Math.min(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1),
+                zoom: Math.max(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1),
+                border: 'none',
+                padding: 0,
+                boxShadow: 'none',
               } : {}),
             }}
           >

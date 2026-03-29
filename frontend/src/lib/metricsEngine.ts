@@ -84,6 +84,7 @@ export function updateMetrics(
     socialUnrest: unrestCount / total,
     businessSurvival: Math.max(0, 0.95 - acc.closureCount * 0.03),
     govApproval: moodSum / total,
-    interestRate: 5.25,
+    interestRate:
+      Math.round((5.25 + (Math.abs(acc.priceIndex) / 50) * 2) * 100) / 100,
   };
 }

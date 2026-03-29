@@ -314,6 +314,7 @@ export function useSimulation(simulationId?: string, record = false) {
         if (ind && Object.keys(ind).length > 0) {
           merged = {
             ...merged,
+            priceIndex: ind.price_pressure ?? merged.priceIndex,
             socialUnrest:
               (ind.social_unrest_index ?? merged.socialUnrest * 100) / 100,
             govApproval:

@@ -627,7 +627,7 @@ function SimulateContent() {
         </div>
 
         {/* Center: Game canvas with chat bubble overlays */}
-        <div className={focusMode ? "fixed inset-0 z-50 flex items-center justify-center" : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"} style={focusMode ? { background: "#2a5020" } : undefined}>
+        <div className={focusMode ? "fixed inset-0 z-50 flex items-center justify-center overflow-hidden" : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"} style={focusMode ? { background: "#060010" } : undefined}>
           <div
             ref={canvasContainerRef}
             className={`relative shrink-0 canvas-glow canvas-expand ${focusMode ? "" : ""}`}
@@ -635,8 +635,7 @@ function SimulateContent() {
               border: "3px solid #6B4226",
               borderRadius: 4,
               ...(focusMode ? {
-                transform: `scale(${Math.min(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1)})`,
-                transformOrigin: "center center",
+                zoom: Math.min(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1),
               } : {}),
             }}
           >

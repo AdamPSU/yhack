@@ -17,7 +17,7 @@ export function ChatBubble({
 }: ChatBubbleProps) {
   return (
     <div
-      className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full will-change-[left,top]"
+      className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-full will-change-auto [text-rendering:optimizeLegibility] [-webkit-font-smoothing:antialiased]"
       style={{ left: x, top: y }}
       data-testid="chat-bubble"
     >
@@ -26,17 +26,17 @@ export function ChatBubble({
         style={{ background: "#FDF5E6", border: "2px solid #A0824A" }}
       >
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[8px] font-mono" style={{ color: "#5B3A1E" }}>
+          <span className="text-[11px] font-mono" style={{ color: "#5B3A1E" }}>
             {agentName}
           </span>
           {agentCategory && (
-            <span className="text-[7px] font-mono" style={{ color: "#A0824A" }}>
+            <span className="text-[10px] font-mono" style={{ color: "#A0824A" }}>
               {agentCategory}
             </span>
           )}
         </div>
         <p
-          className="mt-1 whitespace-normal break-words text-[10px] font-mono leading-snug"
+          className="mt-1 whitespace-normal break-words text-[11px] font-mono leading-snug"
           style={{ color: "#6B4C2A" }}
         >
           {message.length > 80 ? `${message.slice(0, 80)}...` : message}

@@ -1,7 +1,7 @@
 // Adapter layer: translates backend types to frontend SimEvent/SimEventType
 
-import type { SimEvent, SimEventType } from "@/lib/types";
-import type { BackendNPC, BackendSimEvent } from "./backendTypes";
+import type { SimEvent, SimEventType } from "@/types";
+import type { BackendNPC, BackendSimEvent } from "@/types/backend";
 
 export const LAYOFF_RE = /layoff|fired|let\s+go|cut.*jobs|furlough/i;
 export const CLOSURE_RE =

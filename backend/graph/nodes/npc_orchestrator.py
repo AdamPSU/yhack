@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 
 from langchain_openai import ChatOpenAI
@@ -17,6 +18,8 @@ from graph.prompts import (
 )
 from graph.utils import parse_llm_json
 from models.state import SimState
+
+logger = logging.getLogger(__name__)
 
 _MBTI_TYPES = [
     "INTJ", "INTP", "ENTJ", "ENTP",
@@ -98,11 +101,13 @@ async def _generate_relationships(npcs: list[dict], entities_json: str, llm: Cha
 
 
 async def generate_npcs(state: SimState) -> dict:
+    logger.info("generate_npcs: starting — extracting characters …")
     llm = get_llm(max_tokens=4096)
     entities_json = json.dumps(state["entities"])
 
     extracted = await _extract_characters(state["policy_text"], entities_json, llm)
     extracted = extracted[:MAX_NPCS]
+    logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
 
     npcs: list[dict] = []
     for i, char in enumerate(extracted):
@@ -111,6 +116,7 @@ async def generate_npcs(state: SimState) -> dict:
 
     needed = MAX_NPCS - len(npcs)
     if needed > 0:
+        logger.info("generate_npcs: generating %d random NPCs to fill roster …", needed)
         existing_names = [n["name"] for n in npcs]
         tasks = [generate_random_npc(entities_json, existing_names, llm) for _ in range(needed)]
         random_results = await asyncio.gather(*tasks)
@@ -126,7 +132,9 @@ async def generate_npcs(state: SimState) -> dict:
             npc["id"] = f"npc_{slot + 1:02d}"
             npcs.append(_apply_defaults(npc, slot))
 
+    logger.info("generate_npcs: generating relationships for %d NPCs …", len(npcs))
     relationships = await _generate_relationships(npcs, entities_json, llm)
+    logger.info("generate_npcs: created %d relationships", len(relationships))
 
     npcs = _clamp_positions(npcs)
     return {"npcs": npcs, "relationships": relationships, "current_round": 0}

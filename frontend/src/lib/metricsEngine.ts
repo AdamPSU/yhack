@@ -1,8 +1,8 @@
 // Client-side metrics computation from backend NPC/event data
 
-import type { SimMetrics } from "@/lib/types";
+import type { SimMetrics } from "@/types";
+import type { BackendNPC, BackendSimEvent } from "@/types/backend";
 import { CLOSURE_RE, LAYOFF_RE } from "./adapter";
-import type { BackendNPC, BackendSimEvent } from "./backendTypes";
 
 const MOOD_SCORES: Record<string, number> = {
   angry: 0.1,

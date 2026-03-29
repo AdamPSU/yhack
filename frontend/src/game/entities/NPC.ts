@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import type { NPCHoverInfo, NPCState } from "@/lib/types";
+import type { NPCHoverInfo, NPCState } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { TILE_SIZE } from "../config";
 import { getNPCTile } from "../map/TileRegistry";

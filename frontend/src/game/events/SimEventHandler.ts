@@ -1,4 +1,4 @@
-import type { SimEvent } from "@/lib/types";
+import type { SimEvent } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
 import { ClosureEffect } from "../effects/ClosureEffect";
 import { PriceSpikeEffect } from "../effects/PriceSpikeEffect";

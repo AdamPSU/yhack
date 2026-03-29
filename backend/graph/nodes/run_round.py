@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from collections.abc import Coroutine
 from typing import Any
 
 from langchain_openai import ChatOpenAI
@@ -20,9 +21,9 @@ from graph.llm import get_llm, invoke_llm_structured
 from graph.prompts import NPC_ROUND_PROMPT
 from graph.utils import clamp, normalize_npc_id
 from models.schemas import NPCRoundResponse, SimEvent
+from models.state import SimState
 
 logger = logging.getLogger(__name__)
-from models.state import SimState
 
 
 def _political_label(value: float) -> str:
@@ -176,7 +177,7 @@ def _format_social_targets(
     neighbor_set = set(neighbor_ids)
     npc_lookup: dict[str | None, dict[str, Any]] = {n.get("id"): n for n in all_npcs}
 
-    candidates: list[tuple[float, str, str, float, str, int]] = []
+    candidates: list[tuple[float, str, str, str, float, str, int]] = []
     for other_id, rtype, strength in npc_rels:
         if other_id in neighbor_set:
             continue
@@ -484,6 +485,8 @@ async def run_round(state: SimState) -> dict[str, Any]:
     current_round = state["current_round"]
     max_rounds = state["max_rounds"]
 
+    logger.info("run_round: starting round %d/%d  (%d NPCs) …", current_round + 1, max_rounds, len(npcs))
+
     policy_text = _policy_summary(state.get("entities", []))
     round_context = _build_round_context(current_round, max_rounds, events)
     rel_map = _build_relationship_map(state.get("relationships", []))
@@ -516,12 +519,14 @@ async def run_round(state: SimState) -> dict[str, Any]:
         )
 
     # Fire all 25 NPC calls concurrently.
+    logger.info("run_round: invoking LLM for %d NPCs in parallel …", len(tasks))
     results: list[list[dict[str, Any]]] = await asyncio.gather(*tasks)
 
     # Flatten.
     all_events: list[dict[str, Any]] = []
     for npc_events in results:
         all_events.extend(npc_events)
+    logger.info("run_round: round %d produced %d events", current_round + 1, len(all_events))
 
     # --- Phase 1: Apply LLM mood_shift events BEFORE opinion dynamics ---
     # Individual reactions are the starting point; Deffuant then refines
@@ -546,6 +551,21 @@ async def run_round(state: SimState) -> dict[str, Any]:
                     int(clamp(stepped_x, 0, MAX_X)),
                     int(clamp(stepped_y, 0, MAX_Y)),
                 )
+
+    # --- Deduplicate moves: prevent two NPCs occupying the same tile ---
+    occupied_targets: set[tuple[int, int]] = set()
+    # Pre-populate with positions of NPCs that are NOT moving
+    for npc in npcs:
+        npc_id = npc.get("id", "")
+        if npc_id not in move_updates:
+            occupied_targets.add((npc.get("x", 0), npc.get("y", 0)))
+
+    deduplicated_moves: dict[str, tuple[int, int]] = {}
+    for npc_id, pos in move_updates.items():
+        if pos not in occupied_targets:
+            occupied_targets.add(pos)
+            deduplicated_moves[npc_id] = pos
+    move_updates = deduplicated_moves
 
     # Apply mood shifts before opinion dynamics.
     for npc in npcs:

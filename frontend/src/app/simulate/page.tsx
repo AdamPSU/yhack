@@ -6,7 +6,7 @@ import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
 import { useSimulation } from "@/hooks/useSimulation";
-import type { NPCHoverInfo, NPCState } from "@/lib/types";
+import type { NPCHoverInfo, NPCState } from "@/types";
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
@@ -41,7 +41,10 @@ const PHASE_LABELS: Record<number, string> = {
   3: "Social Crisis & Reckoning",
 };
 
-const SENTIMENT_LABEL: Record<NPCHoverInfo["sentiment"], { symbol: string; color: string }> = {
+const SENTIMENT_LABEL: Record<
+  NPCHoverInfo["sentiment"],
+  { symbol: string; color: string }
+> = {
   happy: { symbol: "+", color: "text-[#5ab85a]" },
   neutral: { symbol: "~", color: "text-[#8a7a62]" },
   worried: { symbol: "?", color: "text-[#e8a43a]" },
@@ -138,7 +141,6 @@ export default function SimulatePage() {
     });
     return () => cleanup?.();
   }, []);
-
 
   // Fullscreen toggle
   const toggleFullscreen = useCallback(() => {

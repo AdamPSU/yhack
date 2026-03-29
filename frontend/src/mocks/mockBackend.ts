@@ -1,0 +1,404 @@
+/**
+ * Mock backend data generator for frontend testing without a running backend.
+ * Activated by NEXT_PUBLIC_MOCK_BACKEND=true in .env.local
+ *
+ * Generates 25 NPCs, 35 relationships, and 75 rounds of events that mirror
+ * the real backend's data shapes (see backendTypes.ts).
+ */
+
+import type {
+  BackendMood,
+  BackendNPC,
+  BackendRelType,
+  BackendRelationship,
+  BackendRole,
+  BackendSimEvent,
+  WSInitMsg,
+  WSRoundMsg,
+} from "@/types/backend";
+
+// ── Helpers ─────────────────────────────────────────────────
+
+let _id = 0;
+function uid(): string {
+  return `mock-${++_id}`;
+}
+
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// ── NPC Generation (25 agents, grid 20x15) ──────────────────
+
+const ROLES: BackendRole[] = [
+  "worker",
+  "business_owner",
+  "politician",
+  "student",
+  "retiree",
+  "activist",
+  "farmer",
+  "shopkeeper",
+];
+
+const MOODS: BackendMood[] = [
+  "angry",
+  "anxious",
+  "worried",
+  "neutral",
+  "hopeful",
+  "excited",
+];
+
+const INDUSTRIES = [
+  "steel",
+  "retail",
+  "agriculture",
+  "tech",
+  "construction",
+  "finance",
+  "education",
+  "healthcare",
+  "manufacturing",
+  "food_service",
+];
+
+const PERSONALITIES = [
+  "cautious and pragmatic",
+  "outspoken and passionate",
+  "quiet but determined",
+  "optimistic and entrepreneurial",
+  "skeptical of government",
+  "community-oriented",
+  "fiscally conservative",
+  "progressive and idealistic",
+  "hardworking and stoic",
+  "anxious about the future",
+];
+
+const FIRST_NAMES = [
+  "Maria",
+  "James",
+  "Chen",
+  "Aisha",
+  "Roberto",
+  "Sarah",
+  "Dmitri",
+  "Kenji",
+  "Fatima",
+  "Luis",
+  "Emma",
+  "Raj",
+  "Olga",
+  "Marcus",
+  "Yuki",
+  "Ahmed",
+  "Rosa",
+  "Thomas",
+  "Priya",
+  "Diego",
+  "Anna",
+  "Omar",
+  "Svetlana",
+  "Jin",
+  "Elena",
+];
+
+const LAST_NAMES = [
+  "Rodriguez",
+  "Chen",
+  "Williams",
+  "Hassan",
+  "Garcia",
+  "Kim",
+  "Petrov",
+  "Tanaka",
+  "Singh",
+  "Martinez",
+  "Johnson",
+  "Patel",
+  "Ivanova",
+  "Brown",
+  "Yamamoto",
+  "Ali",
+  "Lopez",
+  "Mueller",
+  "Sharma",
+  "Hernandez",
+  "Taylor",
+  "Said",
+  "Volkov",
+  "Wei",
+  "Popov",
+];
+
+function generateNPCs(): BackendNPC[] {
+  // Track occupied cells to avoid stacking NPCs
+  const occupied = new Set<string>();
+  const npcs: BackendNPC[] = [];
+
+  for (let i = 0; i < 25; i++) {
+    let x: number;
+    let y: number;
+    do {
+      x = randInt(0, 19);
+      y = randInt(0, 14);
+    } while (occupied.has(`${x},${y}`));
+    occupied.add(`${x},${y}`);
+
+    npcs.push({
+      id: uid(),
+      name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
+      role: i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
+      income_level: pick(["low", "medium", "high"]),
+      political_leaning: Math.round((Math.random() * 2 - 1) * 100) / 100,
+      industry: INDUSTRIES[i % INDUSTRIES.length],
+      personality: PERSONALITIES[i % PERSONALITIES.length],
+      x,
+      y,
+      mood: i < 8 ? "neutral" : pick(MOODS),
+    });
+  }
+
+  return npcs;
+}
+
+// ── Relationships (30-40 links) ─────────────────────────────
+
+const REL_TYPES: BackendRelType[] = [
+  "friend",
+  "family",
+  "employer",
+  "neighbor",
+  "colleague",
+];
+
+function generateRelationships(npcs: BackendNPC[]): BackendRelationship[] {
+  const rels: BackendRelationship[] = [];
+  const seen = new Set<string>();
+  const count = randInt(30, 40);
+
+  while (rels.length < count) {
+    const a = randInt(0, npcs.length - 1);
+    let b = randInt(0, npcs.length - 1);
+    if (a === b) continue;
+    const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    rels.push({
+      source_id: npcs[a].id,
+      target_id: npcs[b].id,
+      rel_type: pick(REL_TYPES),
+      strength: Math.round(Math.random() * 100) / 100,
+    });
+  }
+
+  return rels;
+}
+
+// ── Round Event Generation ──────────────────────────────────
+
+const CHAT_MESSAGES_BY_PHASE: Record<number, string[]> = {
+  1: [
+    "I just heard about the new policy — not sure what to make of it yet.",
+    "Prices might go up, we should stock up on essentials.",
+    "The government says this will create jobs, but I'm skeptical.",
+    "My boss called a meeting about the policy changes tomorrow.",
+    "I think this could actually help our industry in the long run.",
+    "People at the market are already talking about price hikes.",
+    "I need to figure out how this affects my pension.",
+    "This is exactly what we've been asking for!",
+    "I'm worried about my small business — margins are already thin.",
+    "Let's wait and see before we panic.",
+  ],
+  2: [
+    "Prices at the grocery store went up 15% this week alone.",
+    "Two shops on Main Street just closed — this is getting real.",
+    "I got my hours cut. They say it's because of the new costs.",
+    "The factory is talking about layoffs if things don't improve.",
+    "I can barely afford rent anymore with these price increases.",
+    "Some people are organizing a protest downtown this weekend.",
+    "My neighbor lost their job — the whole block is worried.",
+    "Business is actually up for me — imported goods cost more so people buy local.",
+    "The government needs to do something about these prices.",
+    "I'm thinking about moving to find better opportunities.",
+  ],
+  3: [
+    "There's a protest every week now. People are angry.",
+    "I had to close my shop. Twenty years of work, gone.",
+    "The community is really coming together to support each other.",
+    "Crime is up in our neighborhood — people are desperate.",
+    "I've never seen so many 'For Sale' signs on this street.",
+    "They're talking about rolling back the policy — too little too late.",
+    "My family is splitting apart over politics because of this.",
+    "We need to adapt. The old way isn't coming back.",
+    "I started a mutual aid group — we help each other now.",
+    "I'm going to run for local office. Someone has to fix this.",
+  ],
+};
+
+const PROTEST_MESSAGES = [
+  "Enough is enough! We demand fair prices!",
+  "Workers unite! We won't be silenced!",
+  "This policy is destroying our livelihoods!",
+  "Roll back the policy! Save our jobs!",
+  "We the people say NO!",
+];
+
+const PRICE_CHANGE_MESSAGES = [
+  "Adjusted prices due to increased supply costs.",
+  "Had to raise prices — supplier costs are through the roof.",
+  "Lowered prices to attract more customers in tough times.",
+  "Emergency price hike to stay afloat.",
+];
+
+function generateRoundEvents(
+  npcs: BackendNPC[],
+  round: number,
+  maxRounds: number,
+): { events: BackendSimEvent[]; updatedNpcs: BackendNPC[] } {
+  const third = Math.floor(maxRounds / 3);
+  const phase = round < third ? 1 : round < third * 2 ? 2 : 3;
+  const events: BackendSimEvent[] = [];
+  const updated = npcs.map((n) => ({ ...n }));
+
+  // Each round: 3-8 active NPCs produce events
+  const activeCount = randInt(3, 8);
+  const activeIndices = new Set<number>();
+  while (activeIndices.size < activeCount) {
+    activeIndices.add(randInt(0, updated.length - 1));
+  }
+
+  for (const idx of activeIndices) {
+    const npc = updated[idx];
+
+    // ~60% chat, ~15% move, ~10% mood_shift, ~10% protest (higher in later phases), ~5% price_change
+    const roll = Math.random();
+    const protestThreshold = phase === 1 ? 0.95 : phase === 2 ? 0.85 : 0.75;
+
+    if (roll < 0.15) {
+      // Move
+      const dx = randInt(-1, 1);
+      const dy = randInt(-1, 1);
+      const newX = clamp(npc.x + dx, 0, 19);
+      const newY = clamp(npc.y + dy, 0, 14);
+      events.push({
+        round,
+        npc_id: npc.id,
+        event_type: "move",
+        message: "",
+        data: { from_x: npc.x, from_y: npc.y, to_x: newX, to_y: newY },
+      });
+      npc.x = newX;
+      npc.y = newY;
+    } else if (roll < 0.25) {
+      // Mood shift
+      const newMood = pick(MOODS);
+      events.push({
+        round,
+        npc_id: npc.id,
+        event_type: "mood_shift",
+        message: `Feeling ${newMood} about the situation.`,
+        data: { old_mood: npc.mood, new_mood: newMood },
+      });
+      npc.mood = newMood;
+    } else if (roll < protestThreshold) {
+      // Chat
+      const msgs = CHAT_MESSAGES_BY_PHASE[phase];
+      events.push({
+        round,
+        npc_id: npc.id,
+        event_type: "chat",
+        message: pick(msgs),
+        data: {},
+      });
+
+      // Sprinkle in layoff/closure keywords for later phases
+      if (phase >= 2 && Math.random() < 0.15) {
+        events.push({
+          round,
+          npc_id: npc.id,
+          event_type: "chat",
+          message:
+            npc.role === "business_owner"
+              ? "I might have to close up shop if this continues."
+              : "I heard they're planning layoffs at the factory next week.",
+          data: {},
+        });
+      }
+    } else if (roll < protestThreshold + (1 - protestThreshold) * 0.6) {
+      // Protest
+      events.push({
+        round,
+        npc_id: npc.id,
+        event_type: "protest",
+        message: pick(PROTEST_MESSAGES),
+        data: {},
+      });
+    } else {
+      // Price change (shopkeepers/business_owners)
+      const pctChange =
+        phase === 1
+          ? randInt(2, 8)
+          : phase === 2
+            ? randInt(5, 20)
+            : randInt(10, 35);
+      const direction = Math.random() < 0.8 ? 1 : -1;
+      events.push({
+        round,
+        npc_id: npc.id,
+        event_type: "price_change",
+        message: pick(PRICE_CHANGE_MESSAGES),
+        data: { pct_change: pctChange * direction },
+      });
+    }
+  }
+
+  return { events, updatedNpcs: updated };
+}
+
+// ── Public API ──────────────────────────────────────────────
+
+export interface MockSimulation {
+  initMsg: WSInitMsg;
+  rounds: WSRoundMsg[];
+}
+
+/**
+ * Generate a complete mock simulation: init + 75 rounds of events.
+ * Data shapes match the real backend WebSocket messages exactly.
+ */
+export function generateMockSimulation(maxRounds = 75): MockSimulation {
+  _id = 0; // reset for deterministic-ish IDs
+  let npcs = generateNPCs();
+  const relationships = generateRelationships(npcs);
+
+  const initMsg: WSInitMsg = {
+    type: "init",
+    npcs: [...npcs],
+    relationships,
+  };
+
+  const rounds: WSRoundMsg[] = [];
+  for (let r = 0; r < maxRounds; r++) {
+    const { events, updatedNpcs } = generateRoundEvents(npcs, r, maxRounds);
+    npcs = updatedNpcs;
+    rounds.push({
+      type: "round",
+      round: r,
+      events,
+      npcs: npcs.map((n) => ({ ...n })),
+    });
+  }
+
+  return { initMsg, rounds };
+}

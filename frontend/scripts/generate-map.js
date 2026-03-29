@@ -151,13 +151,25 @@ const V_ROAD_PAIRS = [
 ];
 
 const hRoadSet = new Set();
-for (const [a, b] of H_ROAD_PAIRS) { hRoadSet.add(a); hRoadSet.add(b); }
+for (const [a, b] of H_ROAD_PAIRS) {
+  hRoadSet.add(a);
+  hRoadSet.add(b);
+}
 const vRoadSet = new Set();
-for (const [a, b] of V_ROAD_PAIRS) { vRoadSet.add(a); vRoadSet.add(b); }
+for (const [a, b] of V_ROAD_PAIRS) {
+  vRoadSet.add(a);
+  vRoadSet.add(b);
+}
 
-function isHRoadRow(r) { return hRoadSet.has(r); }
-function isVRoadCol(c) { return vRoadSet.has(c); }
-function isRoad(r, c) { return isHRoadRow(r) || isVRoadCol(c); }
+function isHRoadRow(r) {
+  return hRoadSet.has(r);
+}
+function isVRoadCol(c) {
+  return vRoadSet.has(c);
+}
+function isRoad(r, c) {
+  return isHRoadRow(r) || isVRoadCol(c);
+}
 
 // ─── 2. Rivers ───
 const RIVER1_EDGE_TOP = 29;
@@ -171,16 +183,24 @@ const RIVER2_WATER_END = 51;
 const RIVER2_EDGE_BOTTOM = 52;
 
 function isRiverRow(r) {
-  return (r >= RIVER1_EDGE_TOP && r <= RIVER1_EDGE_BOTTOM) ||
-         (r >= RIVER2_EDGE_TOP && r <= RIVER2_EDGE_BOTTOM);
+  return (
+    (r >= RIVER1_EDGE_TOP && r <= RIVER1_EDGE_BOTTOM) ||
+    (r >= RIVER2_EDGE_TOP && r <= RIVER2_EDGE_BOTTOM)
+  );
 }
 function isWaterRow(r) {
-  return (r >= RIVER1_WATER_START && r <= RIVER1_WATER_END) ||
-         (r >= RIVER2_WATER_START && r <= RIVER2_WATER_END);
+  return (
+    (r >= RIVER1_WATER_START && r <= RIVER1_WATER_END) ||
+    (r >= RIVER2_WATER_START && r <= RIVER2_WATER_END)
+  );
 }
 function isRiverBank(r) {
-  return r === RIVER1_EDGE_TOP - 1 || r === RIVER1_EDGE_BOTTOM + 1 ||
-         r === RIVER2_EDGE_TOP - 1 || r === RIVER2_EDGE_BOTTOM + 1;
+  return (
+    r === RIVER1_EDGE_TOP - 1 ||
+    r === RIVER1_EDGE_BOTTOM + 1 ||
+    r === RIVER2_EDGE_TOP - 1 ||
+    r === RIVER2_EDGE_BOTTOM + 1
+  );
 }
 
 // ─── 3. Compute city blocks ───
@@ -216,7 +236,10 @@ function computeBlocks() {
       // Skip blocks that are entirely inside a river
       let allRiver = true;
       for (let r = r1; r <= r2; r++) {
-        if (!isRiverRow(r)) { allRiver = false; break; }
+        if (!isRiverRow(r)) {
+          allRiver = false;
+          break;
+        }
       }
       if (allRiver) continue;
 
@@ -397,7 +420,11 @@ function fillGovernment(r1, c1, r2, c2) {
 
   // Place 1-2 hospitals in the center
   let hospitalsPlaced = 0;
-  for (let startC = midC - 6; startC <= midC + 2 && hospitalsPlaced < 2; startC += 5) {
+  for (
+    let startC = midC - 6;
+    startC <= midC + 2 && hospitalsPlaced < 2;
+    startC += 5
+  ) {
     if (areaFree(r1, startC, 4, 4)) {
       placeGroup(buildings, HOSPITAL, r1, startC);
       hospitalsPlaced++;
@@ -490,7 +517,10 @@ function packBuildings(r1, c1, r2, c2, palette, zone) {
     let c = c1;
     let rowAdvance = 1;
     while (c <= c2) {
-      if (isRoad(r, c) || isRiverRow(r)) { c++; continue; }
+      if (isRoad(r, c) || isRiverRow(r)) {
+        c++;
+        continue;
+      }
 
       let placed = false;
       // Try each building in the palette
@@ -612,8 +642,12 @@ for (const block of blocks) {
 function decorateRiverbank(bankRow) {
   for (let c = 0; c < MAP_COLS - 1; c += 3) {
     if (isVRoadCol(c) || isVRoadCol(c + 1)) continue;
-    if (buildings[bankRow][c] === 0 && buildings[bankRow][c + 1] === 0 &&
-        !isRoad(bankRow, c) && !isRiverRow(bankRow)) {
+    if (
+      buildings[bankRow][c] === 0 &&
+      buildings[bankRow][c + 1] === 0 &&
+      !isRoad(bankRow, c) &&
+      !isRiverRow(bankRow)
+    ) {
       if (rand() < 0.5) {
         buildings[bankRow][c] = gid(TREE[0][0]);
         buildings[bankRow][c + 1] = gid(TREE[0][1]);
@@ -718,13 +752,18 @@ console.log(`Non-empty building tiles: ${nonEmptyBuildings}`);
 const allGids = [...groundData, ...buildingsData];
 const invalidGids = allGids.filter((g) => g < 0 || g > 640);
 if (invalidGids.length > 0) {
-  console.error(`ERROR: Found ${invalidGids.length} invalid GIDs:`, [...new Set(invalidGids)]);
+  console.error(`ERROR: Found ${invalidGids.length} invalid GIDs:`, [
+    ...new Set(invalidGids),
+  ]);
   process.exit(1);
 } else {
   console.log("All GIDs valid (0-640 range).");
 }
 
-if (groundData.length !== MAP_COLS * MAP_ROWS || buildingsData.length !== MAP_COLS * MAP_ROWS) {
+if (
+  groundData.length !== MAP_COLS * MAP_ROWS ||
+  buildingsData.length !== MAP_COLS * MAP_ROWS
+) {
   console.error("ERROR: Data array length mismatch!");
   process.exit(1);
 }
@@ -741,10 +780,14 @@ const waterTiles = groundData.filter((g) => g === gid(WATER_FULL)).length;
 const edgeTiles = groundData.filter((g) => g === gid(RIVER_EDGE_H)).length;
 console.log(`River: ${waterTiles} water, ${edgeTiles} edge tiles`);
 
-const crossingTiles = groundData.filter((g) =>
-  g === gid(CROSSING_X_L) || g === gid(CROSSING_X_R) ||
-  g === gid(CROSSING_Y_RIGHT_TOP) || g === gid(CROSSING_Y_RIGHT_BOT) ||
-  g === gid(CROSSING_Y_LEFT_TOP) || g === gid(CROSSING_Y_LEFT_BOT)
+const crossingTiles = groundData.filter(
+  (g) =>
+    g === gid(CROSSING_X_L) ||
+    g === gid(CROSSING_X_R) ||
+    g === gid(CROSSING_Y_RIGHT_TOP) ||
+    g === gid(CROSSING_Y_RIGHT_BOT) ||
+    g === gid(CROSSING_Y_LEFT_TOP) ||
+    g === gid(CROSSING_Y_LEFT_BOT),
 ).length;
 console.log(`Crossing tiles: ${crossingTiles}`);
 

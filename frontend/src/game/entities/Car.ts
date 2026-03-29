@@ -8,7 +8,9 @@ export class Car extends Phaser.GameObjects.Container {
   readonly npcId: string;
   readonly npcName: string;
   readonly template: CarTemplate;
+  profession = "";
   role = "driver";
+  reputation = 0.5;
   sentiment: NPCHoverInfo["sentiment"] = "neutral";
   tileX: number;
   tileY: number;
@@ -135,7 +137,9 @@ export class Car extends Phaser.GameObjects.Container {
     return {
       id: this.npcId,
       name: this.npcName,
+      profession: this.profession,
       role: this.role,
+      reputation: this.reputation,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       direction: this.direction,
@@ -150,9 +154,9 @@ export class Car extends Phaser.GameObjects.Container {
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
-      profession: "Commuter",
+      profession: this.profession,
       role: this.role,
-      reputation: 0.5,
+      reputation: this.reputation,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       sentiment: this.sentiment,

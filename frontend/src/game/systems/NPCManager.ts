@@ -6,6 +6,7 @@ import { eventBridge } from "../bridge/EventBridge";
 import { CENTER_BOUNDS, getMapConfig } from "../config";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
+import { WorldChatBubble } from "../entities/WorldChatBubble";
 import { CAR_TEMPLATES, type CarTemplate } from "../map/CarRegistry";
 import { roleToCharacter } from "../map/NPCCharacterRegistry";
 import { MovementSystem } from "./MovementSystem";
@@ -46,6 +47,8 @@ export class NPCManager {
   private spawnAreaReady = false;
   /** Track active position-update timers per NPC to avoid duplicates */
   private positionTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
+  /** Active in-world chat bubbles keyed by NPC id. */
+  private chatBubbles: Map<string, WorldChatBubble> = new Map();
   /** Track active message-expiry timers per NPC so newer chats replace older ones cleanly. */
   private messageTimers: Map<string, Phaser.Time.TimerEvent> = new Map();
   /** Track delayed conversation-release timers per NPC to avoid stale releases. */
@@ -104,6 +107,15 @@ export class NPCManager {
 
   private onResetNPCs() {
     this.movement.destroy();
+    for (const bubble of this.chatBubbles.values()) bubble.destroy();
+    this.chatBubbles.clear();
+    for (const timer of this.positionTimers.values()) timer.destroy();
+    this.positionTimers.clear();
+    for (const timer of this.messageTimers.values()) timer.destroy();
+    this.messageTimers.clear();
+    for (const timer of this.conversationTimers.values()) timer.destroy();
+    this.conversationTimers.clear();
+    this.conversationVersions.clear();
     for (const npc of this.npcs.values()) npc.destroy();
     this.npcs.clear();
     this.npcZones.clear();
@@ -162,7 +174,9 @@ export class NPCManager {
       tileY,
     );
     npc.role = bn.role;
+    npc.profession = bn.profession;
     npc.category = bn.category ?? "";
+    npc.reputation = bn.reputation;
     npc.sentiment = moodToSentiment(bn.mood);
     this.npcs.set(bn.id, npc);
     this.occupancy.occupy(bn.id, tileX, tileY);
@@ -179,6 +193,8 @@ export class NPCManager {
     this.movement.destroy();
     for (const timer of this.positionTimers.values()) timer.destroy();
     this.positionTimers.clear();
+    for (const bubble of this.chatBubbles.values()) bubble.destroy();
+    this.chatBubbles.clear();
     for (const timer of this.messageTimers.values()) timer.destroy();
     this.messageTimers.clear();
     for (const timer of this.conversationTimers.values()) timer.destroy();
@@ -289,7 +305,9 @@ export class NPCManager {
         if (tileX === -1) continue; // skip if no valid spawn found
 
         const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
+        car.profession = bn.profession;
         car.role = bn.role;
+        car.reputation = bn.reputation;
         car.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, car as unknown as NPC);
 
@@ -358,7 +376,9 @@ export class NPCManager {
         const charType = roleToCharacter(bn.role, i);
         const npc = new NPC(this.scene, bn.id, bn.name, charType, i, tileX, tileY);
         npc.role = bn.role;
+        npc.profession = bn.profession;
         npc.category = bn.category ?? "";
+        npc.reputation = bn.reputation;
         npc.sentiment = moodToSentiment(bn.mood);
         this.npcs.set(bn.id, npc);
         this.occupancy.occupy(bn.id, tileX, tileY);
@@ -409,6 +429,35 @@ export class NPCManager {
     eventBridge.emitNPCPosition(state);
   }
 
+  private upsertChatBubble(npc: NPC) {
+    if (!npc.message) {
+      this.chatBubbles.get(npc.npcId)?.destroy();
+      this.chatBubbles.delete(npc.npcId);
+      return;
+    }
+
+    const existing = this.chatBubbles.get(npc.npcId);
+    const category =
+      "category" in npc && typeof npc.category === "string"
+        ? npc.category
+        : undefined;
+
+    if (existing) {
+      existing.updateContent(npc.npcName, npc.message, category);
+      existing.updateAnchor(npc.x, npc.y);
+      return;
+    }
+
+    const bubble = new WorldChatBubble(
+      this.scene,
+      npc.npcName,
+      npc.message,
+      category,
+    );
+    bubble.updateAnchor(npc.x, npc.y);
+    this.chatBubbles.set(npc.npcId, bubble);
+  }
+
   private clearConversationTimer(npcId: string) {
     this.conversationTimers.get(npcId)?.destroy();
     this.conversationTimers.delete(npcId);
@@ -445,8 +494,11 @@ export class NPCManager {
   /** Re-emit positions for NPCs with active bubbles so camera pan/zoom stays in sync. */
   refreshActiveBubblePositions() {
     for (const npc of this.npcs.values()) {
-      if (!npc.message) continue;
-      this.emitNPCPosition(npc);
+      if (!npc.message) {
+        this.upsertChatBubble(npc);
+        continue;
+      }
+      this.upsertChatBubble(npc);
     }
   }
 
@@ -477,6 +529,7 @@ export class NPCManager {
     if (!npc) return;
 
     npc.message = message;
+    this.upsertChatBubble(npc);
     this.emitNPCPosition(npc);
 
     // Cancel existing position timer for this NPC if any
@@ -505,6 +558,7 @@ export class NPCManager {
     // Clear message after display time
     const messageTimer = this.scene.time.delayedCall(5000, () => {
       npc.message = undefined;
+      this.upsertChatBubble(npc);
       this.messageTimers.delete(npcId);
     });
     this.messageTimers.set(npcId, messageTimer);
@@ -656,6 +710,8 @@ export class NPCManager {
     eventBridge.off("sim:npc-mood", this.onNPCMood, this);
     for (const t of this.positionTimers.values()) t.destroy();
     this.positionTimers.clear();
+    for (const bubble of this.chatBubbles.values()) bubble.destroy();
+    this.chatBubbles.clear();
     for (const t of this.messageTimers.values()) t.destroy();
     this.messageTimers.clear();
     for (const t of this.conversationTimers.values()) t.destroy();

@@ -20,7 +20,7 @@ const SocialGraph = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center text-[10px] font-mono text-[#5a4a32]">
+      <div className="flex h-full items-center justify-center text-[8px] font-pixel text-white/20 uppercase tracking-widest">
         Loading graph...
       </div>
     ),
@@ -43,13 +43,15 @@ const GameCanvas = dynamic(
 function GameCanvasPlaceholder() {
   return (
     <div
-      className="rpg-panel flex items-center justify-center box-border"
+      className="rpg-panel flex items-center justify-center box-border bg-black/80 border-white/10 backdrop-blur-md"
       style={{
         width: GAME_WIDTH * SCALE_FACTOR,
         height: GAME_HEIGHT * SCALE_FACTOR,
       }}
     >
-      <span className="text-xs font-mono text-[#5a4a32]">Loading world...</span>
+      <span className="text-[8px] font-pixel text-white/20 uppercase tracking-widest animate-pulse">
+        Loading world...
+      </span>
     </div>
   );
 }
@@ -62,12 +64,12 @@ const PHASE_LABELS: Record<number, string> = {
 
 const SENTIMENT_LABEL: Record<
   NPCHoverInfo["sentiment"],
-  { symbol: string; color: string }
+  { symbol: string; color: string; glow: string }
 > = {
-  happy: { symbol: "+", color: "text-[#5ab85a]" },
-  neutral: { symbol: "~", color: "text-[#8a7a62]" },
-  worried: { symbol: "?", color: "text-[#e8a43a]" },
-  angry: { symbol: "!", color: "text-[#d45050]" },
+  happy: { symbol: "+", color: "text-teal-400", glow: "neon-text-teal" },
+  neutral: { symbol: "~", color: "text-white/40", glow: "" },
+  worried: { symbol: "?", color: "text-yellow-400", glow: "neon-text-yellow" },
+  angry: { symbol: "!", color: "text-pink-500", glow: "neon-text-pink" },
 };
 
 interface OverlayMetrics {
@@ -97,16 +99,16 @@ function NPCTooltip({
         top: info.y * scaleY - 4,
       }}
     >
-      <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
+      <div className="rounded border border-white/10 bg-black/90 px-2 py-1 shadow-2xl backdrop-blur-md neon-border-purple">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono font-bold text-[#e8a43a]">
+          <span className="text-[10px] font-pixel text-purple-400 neon-text-purple">
             {info.name}
           </span>
-          <span className={`text-[10px] font-mono font-bold ${sent.color}`}>
+          <span className={`text-[10px] font-pixel ${sent.color} ${sent.glow}`}>
             [{sent.symbol}]
           </span>
         </div>
-        <div className="text-[9px] font-mono text-[#8a7a62]">{info.role}</div>
+        <div className="text-[8px] font-mono tracking-widest uppercase text-white/40">{info.role}</div>
       </div>
     </div>
   );
@@ -410,21 +412,21 @@ function SimulateContent() {
 
   if (!simulationId && !isMock && !isReplay) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
-        <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
-          <span className="text-[10px] font-mono font-bold tracking-widest text-[#e8a43a]">
-            AGORA
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#060010] px-6">
+        <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center bg-black/80 border-white/10 neon-border-purple shadow-2xl">
+          <span className="text-[10px] font-pixel tracking-widest text-purple-400 neon-text-purple">
+            SIMULACRA
           </span>
-          <p className="text-sm font-mono text-[#d4c4a0]">
+          <p className="text-[10px] font-mono text-white/80 uppercase tracking-widest neon-text-white">
             No policy specified.
           </p>
-          <p className="text-xs font-mono text-[#8a7a62]">
+          <p className="text-[10px] font-mono text-white/40 uppercase tracking-widest">
             Please describe an economic policy on the home page before running a
             simulation.
           </p>
           <Link
             href="/"
-            className="rpg-panel mt-2 px-6 py-2 text-xs font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)]"
+            className="rpg-panel mt-2 px-6 py-2 text-[10px] font-pixel text-purple-400 transition-all duration-150 hover:bg-purple-900/20 hover:border-purple-400/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] neon-border-purple"
           >
             {">> Enter Policy <<"}
           </Link>
@@ -435,39 +437,29 @@ function SimulateContent() {
 
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden bg-[#1a1510]"
+      className="relative flex h-screen flex-col overflow-hidden bg-[#060010]"
       data-testid="simulate-page"
     >
       {/* Phase indicator bar — scanline overlay + grid dots */}
       <div
-        className="rpg-panel scanline-overlay grid-dot-bg flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4"
+        className="rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4 bg-black/80 border-white/10 backdrop-blur-md"
         data-testid="phase-bar"
       >
-        <div className="relative z-[2] flex items-center gap-3">
-          <span className="text-[11px] font-mono font-bold tracking-[0.25em] uppercase text-[#e8a43a] logo-glow">
-            AGORA
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-pixel tracking-tight text-purple-400 neon-text-purple">
+            SIMULACRA
           </span>
-          <span className="text-[10px] font-mono text-[#3a2e1e]">///</span>
+          <span className="text-[10px] font-mono text-white/10">|</span>
           <div className="flex gap-1">
-            {[1, 2, 3].map((p) => {
-              const isActive = sim.phase >= p;
-              const bgColor = isActive
-                ? p === 3
-                  ? "bg-[#d45050]"
-                  : p === 2
-                    ? "bg-[#e8a43a]"
-                    : "bg-[#5ab85a]"
-                : "bg-[#251e15]";
-              return (
-                <div
-                  key={p}
-                  className={`h-2 w-14 border border-[#3a2e1e] transition-all duration-500 ${bgColor} ${isActive && sim.phase === p ? "phase-segment-active" : ""}`}
-                />
-              );
-            })}
+            {[1, 2, 3].map((p) => (
+              <div
+                key={p}
+                className={`h-2 w-12 border border-white/5 transition-colors duration-500 ${sim.phase >= p ? (p === 3 ? "bg-pink-500 neon-pink" : p === 2 ? "bg-yellow-400 neon-yellow" : "bg-teal-400 neon-teal") : "bg-white/5"}`}
+              />
+            ))}
           </div>
           {sim.phase > 0 && (
-            <span className="text-[9px] font-mono uppercase tracking-wider text-[#6a5a42]">
+            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest ml-2">
               {PHASE_LABELS[sim.phase]}
             </span>
           )}
@@ -475,13 +467,13 @@ function SimulateContent() {
 
         <div className="relative z-[2] flex items-center gap-3">
           {sim.isRunning && isRecording && (
-            <span className="text-[10px] font-mono font-bold text-[#d45050] animate-pulse">
-              [REC]
+            <span className="text-[9px] font-pixel text-pink-500 neon-text-pink animate-pulse">
+              REC
             </span>
           )}
           {sim.isComplete && (
             <>
-              <span className="text-[10px] font-mono font-bold tracking-wider text-[#5ab85a]">
+              <span className="text-[9px] font-pixel text-teal-400 neon-text-teal">
                 COMPLETE
               </span>
               {sim.getRecording() && (
@@ -501,7 +493,7 @@ function SimulateContent() {
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
-                  className="terminal-btn"
+                  className="text-[9px] font-mono text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
                 >
                   SAVE JSON
                 </button>
@@ -509,8 +501,8 @@ function SimulateContent() {
             </>
           )}
           {sim.isRunning && !isRecording && (
-            <span className="text-[10px] font-mono tracking-wider text-[#6a5a42] terminal-cursor">
-              SIMULATING
+            <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest">
+              Simulating...
             </span>
           )}
         </div>
@@ -519,15 +511,15 @@ function SimulateContent() {
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
-        <div className="rpg-panel grid-dot-bg flex h-full w-64 shrink-0 flex-col">
-          <div className="scanline-overlay flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
-            <h2 className="relative z-[2] text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-[#e8a43a]">
+        <div className="rpg-panel flex h-full w-64 shrink-0 flex-col bg-black/40 border-white/10">
+          <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
+            <h2 className="text-[8px] font-pixel uppercase text-purple-400">
               Event Log
             </h2>
             <button
               type="button"
               onClick={() => setShowGraph(true)}
-              className="relative z-[2] terminal-btn"
+              className="text-[9px] font-mono text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
               title="Open Social Graph"
             >
               GRAPH
@@ -558,7 +550,7 @@ function SimulateContent() {
                     },
                   );
                 }}
-                className="terminal-btn"
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-white/40 hover:text-white/90 hover:border-white/40 bg-black/60 border-white/10 transition-colors"
                 title="Zoom in"
               >
                 ZOOM+
@@ -572,7 +564,7 @@ function SimulateContent() {
                     },
                   );
                 }}
-                className="terminal-btn"
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-white/40 hover:text-white/90 hover:border-white/40 bg-black/60 border-white/10 transition-colors"
                 title="Zoom out"
               >
                 ZOOM-
@@ -580,7 +572,7 @@ function SimulateContent() {
               <button
                 type="button"
                 onClick={toggleFullscreen}
-                className="terminal-btn"
+                className="rpg-panel px-1.5 py-1 text-[10px] font-mono text-white/40 hover:text-white/90 hover:border-white/40 bg-black/60 border-white/10 transition-colors"
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? "EXIT" : "FULL"}
@@ -654,23 +646,23 @@ function SimulateContent() {
       {/* Social Graph Modal */}
       {showGraph && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowGraph(false);
           }}
         >
           <div
-            className="rpg-panel relative flex flex-col"
+            className="rpg-panel relative flex flex-col bg-[#060010] border-white/20 shadow-2xl"
             style={{ width: 700, height: 560 }}
           >
-            <div className="flex items-center justify-between border-b border-[#3a2e1e] px-4 py-2">
-              <h2 className="text-[11px] font-mono font-bold uppercase text-[#e8a43a]">
+            <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
+              <h2 className="text-[10px] font-pixel uppercase text-purple-400">
                 Social Graph
               </h2>
               <button
                 type="button"
                 onClick={() => setShowGraph(false)}
-                className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                className="text-[10px] font-mono text-white/30 hover:text-white/60 transition-colors uppercase tracking-widest"
               >
                 [ESC]
               </button>

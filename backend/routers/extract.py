@@ -1,27 +1,20 @@
-"""File extraction endpoint — converts uploaded documents/images to policy text."""
+"""File ingestion endpoints for policy PDFs and trend CSV sources."""
 
 from __future__ import annotations
 
-import base64
+import csv
 import io
 import logging
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, UploadFile
-from langchain_core.messages import HumanMessage
+from fastapi import APIRouter, Form, HTTPException, UploadFile
 
-from graph.llm import get_llm
+from models.schemas import ContextSourceResponse
+from services.context_store import create_source_record
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_VISION_PROMPT = (
-    "This image was uploaded as part of an economic policy document. "
-    "Extract and transcribe all visible text verbatim. If the image contains charts, "
-    "tables, or diagrams, describe their key data and what they communicate. "
-    "Be thorough — every detail may be relevant for policy analysis."
-)
-
 
 async def _extract_pdf(data: bytes) -> str:
     from pypdf import PdfReader
@@ -31,50 +24,170 @@ async def _extract_pdf(data: bytes) -> str:
     return "\n\n".join(p.strip() for p in pages if p.strip())
 
 
-async def _extract_pptx(data: bytes) -> str:
-    from pptx import Presentation
-
-    prs = Presentation(io.BytesIO(data))
-    parts: list[str] = []
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                text = " ".join(
-                    para.text for para in shape.text_frame.paragraphs
-                ).strip()
-                if text:
-                    parts.append(text)
-    return "\n\n".join(parts)
+def _safe_float(value: str | None) -> float | None:
+    cleaned = (value or "").strip().replace(",", "").replace("$", "").replace("%", "")
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
 
 
-async def _extract_image(data: bytes, mime: str) -> str:
-    llm = get_llm(max_tokens=2048)
-    b64 = base64.b64encode(data).decode()
-    msg = HumanMessage(content=[
-        {"type": "text", "text": _VISION_PROMPT},
-        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-    ])
-    response = await llm.ainvoke([msg])
-    return str(response.content)
+def _extract_csv(data: bytes, source_id: str) -> tuple[str, dict[str, Any]]:
+    text = data.decode("utf-8", errors="replace").strip()
+    reader = csv.DictReader(io.StringIO(text))
+    rows = list(reader)
+    columns = reader.fieldnames or []
+
+    if not columns or not rows:
+        raise HTTPException(status_code=422, detail="CSV file has no rows.")
+
+    period_col = next(
+        (col for col in columns if any(token in col.lower() for token in ("date", "time", "period", "quarter", "year", "month"))),
+        columns[0],
+    )
+
+    numeric_columns: list[str] = []
+    for col in columns:
+        values = [_safe_float(row.get(col, "")) for row in rows]
+        numeric_values = [value for value in values if value is not None]
+        if numeric_values:
+            numeric_columns.append(col)
+
+    indicators: list[dict[str, Any]] = []
+    summary_lines = [f"{len(rows)} rows across columns: {', '.join(columns)}."]
+    for col in numeric_columns[:5]:
+        numeric_points: list[tuple[str | None, float]] = []
+        for row in rows:
+            value = _safe_float(row.get(col, ""))
+            if value is None:
+                continue
+            numeric_points.append((str(row.get(period_col, "")).strip() or None, value))
+        if not numeric_points:
+            continue
+
+        first_period, first_value = numeric_points[0]
+        latest_period, latest_value = numeric_points[-1]
+        previous_value = numeric_points[-2][1] if len(numeric_points) > 1 else None
+        change = latest_value - previous_value if previous_value is not None else None
+
+        if change is None:
+            trend = "unknown"
+        elif abs(change) < 1e-9:
+            trend = "flat"
+        elif change > 0:
+            trend = "up"
+        else:
+            trend = "down"
+
+        unit = "%" if "%" in col or "rate" in col.lower() else "$" if "$" in col else None
+        indicator = {
+            "metric": col,
+            "latest_value": latest_value,
+            "previous_value": previous_value,
+            "change": change,
+            "trend": trend,
+            "latest_period": latest_period,
+            "source_id": source_id,
+            "unit": unit,
+        }
+        indicators.append(indicator)
+
+        if previous_value is None:
+            summary_lines.append(f"{col}: latest value {latest_value:g}{unit or ''} at {latest_period or first_period or 'latest period'}.")
+        else:
+            summary_lines.append(
+                f"{col}: {previous_value:g}{unit or ''} -> {latest_value:g}{unit or ''} ({trend}) by {latest_period or 'latest period'}."
+            )
+
+    metadata = {
+        "row_count": len(rows),
+        "columns": columns,
+        "period_column": period_col,
+        "indicator_snapshots": indicators,
+    }
+    return "\n".join(summary_lines), metadata
+
+
+def _pdf_summary(text: str) -> str:
+    paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
+    if not paragraphs:
+        return ""
+    summary = " ".join(paragraphs[:2]).strip()
+    return summary[:600]
+
+
+def _source_response(record: dict[str, Any]) -> ContextSourceResponse:
+    return ContextSourceResponse(
+        id=record["id"],
+        kind=record["kind"],
+        filename=record["filename"],
+        label=record["label"],
+        status=record["status"],
+        preview_text=record["preview_text"],
+        summary=record["summary"],
+        metadata=record["metadata"],
+    )
+
+
+@router.post("/context/sources", response_model=ContextSourceResponse)
+async def upload_context_source(
+    file: UploadFile,
+    label: str | None = Form(default=None),
+) -> ContextSourceResponse:
+    data = await file.read()
+    filename = (file.filename or "source").lower()
+    source_label = label or file.filename or "Source"
+
+    logger.info("context source upload: file=%s size=%d", filename, len(data))
+
+    if filename.endswith(".pdf"):
+        text = await _extract_pdf(data)
+        if not text.strip():
+            raise HTTPException(status_code=422, detail="No text could be extracted from the PDF.")
+        summary = _pdf_summary(text)
+        record = create_source_record(
+            kind="pdf",
+            filename=file.filename or "policy.pdf",
+            label=source_label,
+            preview_text=summary or text[:500],
+            summary=summary or "Primary policy document ready.",
+            metadata={"page_count_estimate": max(1, text.count("\n\n"))},
+            content_text=text.strip(),
+        )
+        return _source_response(record)
+
+    if filename.endswith(".csv"):
+        provisional_id = f"src_preview_{filename.replace('.', '_')}"
+        summary, metadata = _extract_csv(data, provisional_id)
+        record = create_source_record(
+            kind="csv",
+            filename=file.filename or "trend.csv",
+            label=source_label,
+            preview_text=summary[:500],
+            summary=summary,
+            metadata=metadata,
+            content_text=data.decode("utf-8", errors="replace").strip(),
+        )
+        for indicator in record["metadata"].get("indicator_snapshots", []):
+            indicator["source_id"] = record["id"]
+        return _source_response(record)
+
+    raise HTTPException(status_code=415, detail=f"Unsupported source type: {filename}")
 
 
 @router.post("/extract")
 async def extract_file(file: UploadFile) -> dict[str, str]:
     data = await file.read()
     filename = (file.filename or "").lower()
-    content_type = file.content_type or ""
-
-    logger.info("extract: file=%s  size=%d  type=%s", filename, len(data), content_type)
+    logger.info("extract: file=%s  size=%d", filename, len(data))
 
     try:
-        if filename.endswith((".txt", ".md")):
-            text = data.decode("utf-8", errors="replace")
-        elif filename.endswith(".pdf") or "pdf" in content_type:
+        if filename.endswith(".pdf"):
             text = await _extract_pdf(data)
-        elif filename.endswith((".pptx", ".ppt")) or "presentation" in content_type:
-            text = await _extract_pptx(data)
-        elif filename.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")) or content_type.startswith("image/"):
-            text = await _extract_image(data, content_type or "image/png")
+        elif filename.endswith(".csv"):
+            text, _ = _extract_csv(data, "extract_preview")
         else:
             raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename}")
     except HTTPException:

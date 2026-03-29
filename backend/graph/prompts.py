@@ -18,6 +18,14 @@ Given the policy text below, perform a thorough analysis and extract structured 
 {policy_text}
 </policy_text>
 
+<supporting_notes>
+{notes_text}
+</supporting_notes>
+
+<historical_trend_context>
+{trend_summary}
+</historical_trend_context>
+
 <user_objective>
 The user is specifically curious about: {objective}
 Tailor your analysis to surface insights most relevant to this objective. If no objective is given, perform a general analysis.

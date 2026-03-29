@@ -39,15 +39,15 @@ export function Dashboard({
 }: DashboardProps) {
   return (
     <div
-      className="rpg-panel grid-dot-bg flex h-full w-56 flex-col"
+      className="rpg-panel flex h-full w-56 flex-col bg-black/40 border-white/10 backdrop-blur-md"
       data-testid="dashboard"
     >
       {/* Header */}
-      <div className="scanline-overlay flex items-center justify-between border-b border-[#3a2e1e] px-3 py-2">
-        <span className="relative z-[2] text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-[#e8a43a]">
+      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
+        <span className="text-[8px] font-pixel uppercase text-purple-400 neon-text-purple">
           Phase {phase || "-"}
         </span>
-        <span className="relative z-[2] text-[9px] font-mono uppercase tracking-wider tabular-nums text-[#6a5a42]">
+        <span className="text-[10px] font-mono tabular-nums text-white/40 uppercase tracking-widest">
           Month {month || "-"}
         </span>
       </div>

@@ -1,4 +1,4 @@
-// Shared types for AGORA frontend
+// Shared types for SIMULACRA frontend
 
 export type SimEventType =
   | "reaction"

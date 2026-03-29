@@ -7,6 +7,13 @@ from typing import Annotated, Any, NotRequired, TypedDict
 
 class SimState(TypedDict):
     policy_text: str
+    notes_text: str
+    trend_summary: str
+    context_summary: str
+    indicator_snapshots: list[dict[str, Any]]
+    source_summaries: list[str]
+    primary_policy_source: str
+    trend_sources: list[str]
     objective: str
     entities: list[dict[str, Any]]
     npcs: list[dict[str, Any]]

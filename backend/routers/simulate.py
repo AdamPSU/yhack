@@ -2,11 +2,12 @@ import logging
 import uuid
 
 import socketio
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from graph.builder import build_graph
 from models.schemas import PolicyInput
 from models.state import SimState
+from services.context_store import get_source
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,22 @@ simulations: dict[str, PolicyInput] = {}
 
 @router.post("/simulate")
 async def start_simulation(policy: PolicyInput):
+    primary_source = get_source(policy.primary_policy_source_id)
+    if primary_source is None or primary_source.get("kind") != "pdf":
+        raise HTTPException(status_code=404, detail="Primary policy PDF not found.")
+
+    trend_sources = [get_source(source_id) for source_id in policy.trend_source_ids]
+    if any(source is None or source.get("kind") != "csv" for source in trend_sources):
+        raise HTTPException(status_code=404, detail="One or more CSV trend sources were not found.")
+
     simulation_id = str(uuid.uuid4())
     simulations[simulation_id] = policy
     logger.info(
-        "POST /simulate → id=%s  rounds=%d  policy=%d chars",
+        "POST /simulate → id=%s  rounds=%d  pdf=%s  trends=%d",
         simulation_id,
         policy.num_rounds,
-        len(policy.text),
+        primary_source.get("filename", "?"),
+        len(policy.trend_source_ids),
     )
     return {"simulation_id": simulation_id}
 
@@ -51,10 +61,18 @@ async def start_sim(sid: str, data: dict) -> None:
             pass
 
     initial_state: SimState = {
-        "policy_text": policy.text,
+        "policy_text": "",
+        "notes_text": policy.notes_text,
+        "trend_summary": "",
+        "context_summary": "",
+        "indicator_snapshots": [],
+        "source_summaries": [],
+        "primary_policy_source": policy.primary_policy_source_id,
+        "trend_sources": policy.trend_source_ids,
         "objective": policy.objective,
         "max_rounds": policy.num_rounds,
         "num_npcs": policy.num_npcs,
+        "map_id": policy.map_id,
         "entities": [],
         "npcs": [],
         "relationships": [],

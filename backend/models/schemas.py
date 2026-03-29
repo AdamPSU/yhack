@@ -39,8 +39,45 @@ class SimEvent(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+SourceKind = Literal["pdf", "csv"]
+SourceStatus = Literal["ready"]
+TrendDirection = Literal["up", "down", "flat", "unknown"]
+
+
+class IndicatorSnapshot(BaseModel):
+    metric: str
+    latest_value: float
+    previous_value: float | None = None
+    change: float | None = None
+    trend: TrendDirection = "unknown"
+    latest_period: str | None = None
+    source_id: str
+    unit: str | None = None
+
+
+class ContextSourceResponse(BaseModel):
+    id: str
+    kind: SourceKind
+    filename: str
+    label: str
+    status: SourceStatus = "ready"
+    preview_text: str = ""
+    summary: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PolicyContextBundle(BaseModel):
+    policy_text: str
+    notes_text: str = ""
+    trend_summary: str = ""
+    source_summaries: list[str] = Field(default_factory=list)
+    indicator_snapshots: list[IndicatorSnapshot] = Field(default_factory=list)
+
+
 class PolicyInput(BaseModel):
-    text: str = Field(max_length=10000)
+    primary_policy_source_id: str
+    notes_text: str = Field(default="", max_length=4000)
+    trend_source_ids: list[str] = Field(default_factory=list)
     num_rounds: int = 75
     num_npcs: int = 25
     objective: str = Field(default="", max_length=500)

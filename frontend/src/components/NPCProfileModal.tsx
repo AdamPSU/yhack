@@ -9,18 +9,18 @@ interface NPCProfileModalProps {
 }
 
 const MOOD_COLOR: Record<string, string> = {
-  angry: "#d45050",
-  anxious: "#e87840",
-  worried: "#e8a43a",
-  neutral: "#8a7a62",
-  hopeful: "#5ab85a",
-  excited: "#50a0d4",
+  angry: "#f472b6",   // Pink
+  anxious: "#fbbf24", // Yellow
+  worried: "#facc15", // Neon Yellow
+  neutral: "#818cf8", // Indigo
+  hopeful: "#2dd4bf", // Teal
+  excited: "#a855f7", // Purple
 };
 
 const INCOME_LABEL: Record<string, { text: string; color: string }> = {
-  low: { text: "LOW", color: "#d45050" },
-  medium: { text: "MED", color: "#e8a43a" },
-  high: { text: "HIGH", color: "#5ab85a" },
+  low: { text: "LOW", color: "#f472b6" },
+  medium: { text: "MED", color: "#facc15" },
+  high: { text: "HIGH", color: "#2dd4bf" },
 };
 
 function politicalLabel(v: number): string {
@@ -32,28 +32,36 @@ function politicalLabel(v: number): string {
 }
 
 function politicalColor(v: number): string {
-  if (v <= -0.4) return "#50a0d4";
-  if (v <= 0.4) return "#8a7a62";
-  return "#d45050";
+  if (v <= -0.4) return "#2dd4bf";
+  if (v <= 0.4) return "#818cf8";
+  return "#f472b6";
+}
+
+function politicalGlow(v: number): string {
+  if (v <= -0.4) return "neon-text-teal";
+  if (v <= 0.4) return "neon-text-indigo";
+  return "neon-text-pink";
 }
 
 function StatRow({
   label,
   value,
   valueColor,
+  glowClass,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  glowClass?: string;
 }) {
   return (
     <div className="flex items-center justify-between py-[3px]">
-      <span className="text-[10px] font-mono uppercase text-[#5a4a32]">
+      <span className="text-[9px] font-mono uppercase tracking-widest text-white/40">
         {label}
       </span>
       <span
-        className="text-[10px] font-mono font-bold"
-        style={{ color: valueColor ?? "#c4b490" }}
+        className={`text-[10px] font-mono font-bold ${glowClass || ""}`}
+        style={{ color: valueColor ?? "rgba(255,255,255,0.9)" }}
       >
         {value}
       </span>
@@ -74,15 +82,15 @@ function SectionBlock({
 }) {
   const hasContent = content && content.trim().length > 0;
   return (
-    <div className="border-t border-[#3a2e1e] px-3 py-2">
+    <div className="border-t border-white/5 px-3 py-2">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[10px] font-mono text-[#5a4a32]">{symbol}</span>
-        <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#5a4a32]">
+        <span className="text-[10px] font-mono text-white/20">{symbol}</span>
+        <span className="text-[8px] font-pixel uppercase text-purple-400/60">
           {label}
         </span>
       </div>
       <p
-        className={`text-[10px] font-mono leading-relaxed ${hasContent ? "text-[#c4b490] italic" : "text-[#4a3c2a]"}`}
+        className={`text-[10px] font-mono leading-relaxed ${hasContent ? "text-white/80 italic" : "text-white/20"}`}
       >
         {hasContent ? `"${content}"` : fallback}
       </p>
@@ -103,49 +111,58 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
   const income = INCOME_LABEL[npc.income_level] ?? INCOME_LABEL.medium;
   const polLabel = politicalLabel(npc.political_leaning);
   const polColor = politicalColor(npc.political_leaning);
+  const polGlow = politicalGlow(npc.political_leaning);
+
+  const moodGlow = npc.mood === 'angry' ? 'neon-text-pink' : 
+                   (npc.mood === 'anxious' || npc.mood === 'worried') ? 'neon-text-yellow' :
+                   npc.mood === 'hopeful' ? 'neon-text-teal' :
+                   npc.mood === 'excited' ? 'neon-text-purple' : 'neon-text-indigo';
+
+  const incomeGlow = npc.income_level === 'low' ? 'neon-text-pink' :
+                     npc.income_level === 'medium' ? 'neon-text-yellow' : 'neon-text-teal';
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm"
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70" />
+      <div className="absolute inset-0 bg-black/60" />
 
       {/* Panel */}
       <div
-        className="rpg-panel relative z-10 w-[320px] max-h-[80vh] overflow-y-auto scrollbar-thin animate-[modalIn_150ms_ease-out]"
+        className="rpg-panel relative z-10 w-[320px] max-h-[80vh] overflow-y-auto scrollbar-thin animate-[modalIn_150ms_ease-out] bg-[#060010] border-white/20 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-[#3a2e1e] px-3 py-2.5">
+        <div className="flex items-start justify-between border-b border-white/5 px-3 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-[#5a4a32]">
+              <span className="text-[10px] font-mono text-purple-500/50">
                 {">>"}
               </span>
-              <h2 className="text-[11px] font-mono font-bold uppercase tracking-wide text-[#e8a43a] truncate">
+              <h2 className="text-[9px] font-pixel uppercase tracking-wide text-purple-400 truncate neon-text-purple">
                 {npc.name}
               </h2>
             </div>
-            <div className="mt-0.5 ml-5 text-[10px] font-mono text-[#8a7a62]">
+            <div className="mt-1 ml-5 text-[9px] font-mono text-white/40 uppercase tracking-widest">
               {npc.role?.replace(/_/g, " ")} · {npc.industry || "Millfield"}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors px-1 -mr-1"
+            className="text-[10px] font-mono text-white/20 hover:text-white/60 transition-colors px-1 -mr-1 uppercase"
           >
             [x]
           </button>
         </div>
 
         {/* Stats */}
-        <div className="px-3 py-1.5 border-b border-[#3a2e1e]">
+        <div className="px-3 py-2 border-b border-white/5 bg-white/5">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[10px] font-mono text-[#5a4a32]">*</span>
-            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#5a4a32]">
+            <span className="text-[10px] font-mono text-white/20">*</span>
+            <span className="text-[8px] font-pixel uppercase text-purple-400/60">
               Status
             </span>
           </div>
@@ -154,16 +171,19 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
               label="Mood"
               value={npc.mood.toUpperCase()}
               valueColor={moodColor}
+              glowClass={moodGlow}
             />
             <StatRow
               label="Income"
               value={income.text}
               valueColor={income.color}
+              glowClass={incomeGlow}
             />
             <StatRow
               label="Political"
               value={`${npc.political_leaning > 0 ? "+" : ""}${npc.political_leaning.toFixed(1)} ${polLabel}`}
               valueColor={polColor}
+              glowClass={polGlow}
             />
             {npc.personality && (
               <StatRow label="Type" value={npc.personality} />
@@ -193,9 +213,9 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
         />
 
         {/* Footer bar */}
-        <div className="border-t border-[#3a2e1e] px-3 py-1.5">
-          <span className="text-[9px] font-mono text-[#3a2e1e]">
-            {npc.id} · click outside or [esc] to close
+        <div className="border-t border-white/5 px-3 py-2 bg-black/40">
+          <span className="text-[9px] font-mono text-white/20 uppercase tracking-tight">
+            {npc.id} · ESC TO CLOSE
           </span>
         </div>
       </div>

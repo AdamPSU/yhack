@@ -78,6 +78,44 @@ export interface EconomicImpact {
   timeframe: "immediate" | "short-term" | "long-term";
 }
 
+export interface IndicatorSnapshot {
+  metric: string;
+  latest_value: number;
+  previous_value?: number | null;
+  change?: number | null;
+  trend: "up" | "down" | "flat" | "unknown";
+  latest_period?: string | null;
+  source_id: string;
+  unit?: string | null;
+}
+
+export interface UploadedContextSource {
+  id: string;
+  kind: "pdf" | "csv";
+  filename: string;
+  label: string;
+  status: "ready";
+  preview_text: string;
+  summary: string;
+  metadata: {
+    row_count?: number;
+    columns?: string[];
+    period_column?: string;
+    indicator_snapshots?: IndicatorSnapshot[];
+    page_count_estimate?: number;
+  };
+}
+
+export interface StartSimulationRequest {
+  primary_policy_source_id: string;
+  notes_text?: string;
+  trend_source_ids?: string[];
+  num_rounds?: number;
+  num_npcs?: number;
+  objective?: string;
+  map_id?: string;
+}
+
 export interface BackendPolicyAnalysis {
   sectors: string[];
   stakeholders: StakeholderInfo[];

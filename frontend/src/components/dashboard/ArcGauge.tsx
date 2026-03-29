@@ -5,10 +5,10 @@ import { useAnimatedValue } from "@/hooks/useAnimatedValue";
 type Severity = "good" | "warn" | "bad" | "neutral";
 
 const SEVERITY_HEX: Record<Severity, string> = {
-  good: "#5ab85a",
-  warn: "#e8a43a",
-  bad: "#d45050",
-  neutral: "#d4c4a0",
+  good: "#2dd4bf", // Electric Teal
+  warn: "#facc15", // Neon Yellow
+  bad: "#f472b6",  // Hot Pink
+  neutral: "#818cf8", // Electric Indigo
 };
 
 interface ArcGaugeProps {
@@ -38,10 +38,11 @@ export function ArcGauge({
   const color = SEVERITY_HEX[severity];
   const dashOffset = ARC_LEN * (1 - animatedValue);
   const isBad = severity === "bad";
+  const glowClass = severity === "good" ? "neon-text-teal" : severity === "warn" ? "neon-text-yellow" : severity === "bad" ? "neon-text-pink" : "neon-text-indigo";
 
   return (
-    <div className="border-b border-[#3a2e1e] px-2 py-2 last:border-b-0">
-      <span className="text-[9px] font-mono uppercase tracking-wider text-[#6a5a42] block mb-1">
+    <div className="border-b border-white/5 px-2 py-2 last:border-b-0">
+      <span className="text-[9px] font-mono uppercase tracking-widest text-white/40 block mb-1">
         {label}
       </span>
 
@@ -68,7 +69,7 @@ export function ArcGauge({
         <path
           d={describeArc(CX, CY, RADIUS, 180, 360)}
           fill="none"
-          stroke="#2a2218"
+          stroke="rgba(255, 255, 255, 0.05)"
           strokeWidth={STROKE}
           strokeLinecap="round"
         />
@@ -87,7 +88,7 @@ export function ArcGauge({
               "stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1), stroke 300ms",
           }}
           filter={
-            isBad ? `url(#glow-${label.replace(/\s+/g, "-")})` : undefined
+            isBad ? `url(#glow-${label.replace(/\s+/g, "-")})` : `drop-shadow(0 0 3px ${color}80)`
           }
           className={isBad ? "gauge-glow" : undefined}
         />
@@ -104,7 +105,7 @@ export function ArcGauge({
               y1={CY + Math.sin(angle) * innerR}
               x2={CX + Math.cos(angle) * outerR}
               y2={CY + Math.sin(angle) * outerR}
-              stroke="#3a2e1e"
+              stroke="rgba(255, 255, 255, 0.1)"
               strokeWidth={0.5}
             />
           );
@@ -116,9 +117,10 @@ export function ArcGauge({
           y={CY - 8}
           textAnchor="middle"
           fill={color}
-          fontSize="14"
+          fontSize="12"
           fontFamily="monospace"
           fontWeight="bold"
+          className={glowClass}
           style={{ transition: "fill 300ms" }}
         >
           {formatValue(animatedValue)}

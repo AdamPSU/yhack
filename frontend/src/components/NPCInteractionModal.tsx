@@ -363,7 +363,7 @@ export function NPCInteractionModal({
             <SectionBlock
               label="Feeling"
               symbol="~"
-              content={npc.emotional_reaction}
+              content={npc.mood}
               fallback="No feelings recorded yet..."
             />
             <SectionBlock

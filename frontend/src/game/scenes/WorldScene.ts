@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS, GAME_HEIGHT, GAME_WIDTH, getMapConfig, selectedMap } from "../config";
+import { CENTER_BOUNDS, GAME_HEIGHT, GAME_WIDTH, getMapConfig, proceduralMap, selectedMap } from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
 import { ChunkManager } from "../map/ChunkManager";
 import { CitypackChunkManager } from "../map/CitypackChunkManager";
@@ -31,15 +31,18 @@ export class WorldScene extends Phaser.Scene {
 
   create() {
     if (selectedMap === "citypack") {
-      try {
-        this.citypackChunkManager = new CitypackChunkManager(this);
-        if (this.citypackChunkManager.isReady()) {
-          this.useCitypackChunks = true;
-          this.citypackChunkManager.update(this.cameras.main);
+      if (proceduralMap) {
+        try {
+          this.citypackChunkManager = new CitypackChunkManager(this);
+          if (this.citypackChunkManager.isReady()) {
+            this.useCitypackChunks = true;
+            this.citypackChunkManager.update(this.cameras.main);
+          }
+        } catch (e) {
+          console.warn("CitypackChunkManager failed:", e);
         }
-      } catch (e) {
-        console.warn("CitypackChunkManager failed:", e);
       }
+      // If !proceduralMap, fall through to initStaticMap()
     } else if (selectedMap !== "pico8") {
       try {
         this.chunkManager = new ChunkManager(this);
@@ -66,6 +69,14 @@ export class WorldScene extends Phaser.Scene {
       const zoom = Math.min(GAME_WIDTH / mapPixelW, GAME_HEIGHT / mapPixelH);
       this.cameras.main.setZoom(zoom);
       this.cameras.main.centerOn(mapPixelW / 2, mapPixelH / 2);
+    }
+
+    // Citypack static map is 100×80 at 16px = 1600×1280px — center camera on map
+    if (!this.useChunks && !this.useCitypackChunks && selectedMap === "citypack") {
+      this.cameras.main.centerOn(
+        (100 * 16) / 2,
+        (80 * 16) / 2,
+      );
     }
 
     // Phase-change color overlay (sits above buildings, below NPCs)
@@ -116,21 +127,41 @@ export class WorldScene extends Phaser.Scene {
   // ─── Static map initialization (fallback) ───
 
   private initStaticMap() {
-    const map = this.make.tilemap({ key: "city" });
-    this.staticMap = map;
+    let mapKey: string;
+    let tilesetKey: string;
+    let tilesetName: string;
+    let groundLayerName: string;
+    let buildingLayerName: string;
+
+    if (selectedMap === "citypack") {
+      mapKey = "citypack-city";
+      tilesetKey = "citypack";
+      tilesetName = "citypack";
+      groundLayerName = "Terrain";
+      buildingLayerName = "Objects";
+    } else if (selectedMap === "pico8") {
+      mapKey = "city";
+      tilesetKey = "pico8";
+      tilesetName = "city-tileset";
+      groundLayerName = "Terrain";
+      buildingLayerName = "Objects";
+    } else {
+      mapKey = "city";
+      tilesetKey = "urban";
+      tilesetName = "urban";
+      groundLayerName = "ground";
+      buildingLayerName = "buildings";
+    }
 
     const mc = getMapConfig();
-    const tilesetKey = selectedMap === "pico8" ? "pico8" : "urban";
-    // For pico8, the tileset name in the JSON is "city-tileset"; for ccity it's "urban"
-    const tilesetName = selectedMap === "pico8" ? "city-tileset" : "urban";
+    const map = this.make.tilemap({ key: mapKey });
+    this.staticMap = map;
+
     const tileset = map.addTilesetImage(tilesetName, tilesetKey, mc.tileSize, mc.tileSize, 0, mc.spacing);
     if (!tileset) {
       console.error("Failed to load tileset");
       return;
     }
-
-    const groundLayerName = selectedMap === "pico8" ? "Terrain" : "ground";
-    const buildingLayerName = selectedMap === "pico8" ? "Objects" : "buildings";
 
     const groundLayer = map.createLayer(groundLayerName, tileset);
     if (!groundLayer) {

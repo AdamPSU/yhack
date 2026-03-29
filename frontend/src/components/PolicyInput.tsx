@@ -14,12 +14,13 @@ const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
 export function PolicyInput() {
   const [text, setText] = useState("");
   const [mapId, setMapId] = useState<MapType>("ccity");
+  const [procedural, setProcedural] = useState(false);
   const router = useRouter();
 
   function handleSimulate() {
     if (text.trim().length < 20) return;
     sessionStorage.setItem("agora-policy", text);
-    router.push(`/simulate?map=${mapId}`);
+    router.push(`/simulate?map=${mapId}${mapId === "citypack" && procedural ? "&procedural=true" : ""}`);
   }
 
   return (
@@ -52,6 +53,15 @@ export function PolicyInput() {
               <span className="block mt-0.5 text-[10px] font-mono text-[#8a7a62]">
                 {opt.desc}
               </span>
+              {opt.id === "citypack" && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setProcedural(p => !p); }}
+                  className="mt-1 text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                >
+                  [{procedural ? "■" : "□"}] Procedural: {procedural ? "ON" : "OFF"}
+                </button>
+              )}
             </button>
           ))}
         </div>

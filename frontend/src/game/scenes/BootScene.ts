@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { selectedMap } from "../config";
+import { proceduralMap, selectedMap } from "../config";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -37,7 +37,9 @@ export class BootScene extends Phaser.Scene {
       this.load.tilemapTiledJSON("city", "/assets/maps/pico8-city.json");
     } else if (selectedMap === "citypack") {
       this.load.image("citypack", "/assets/maps/citypack.png");
-      // No tilemapTiledJSON needed — citypack uses procedural ChunkManager only
+      if (!proceduralMap) {
+        this.load.tilemapTiledJSON("citypack-city", "/assets/maps/citypack-city.json");
+      }
     } else {
       this.load.image("urban", "/assets/citymap_tilesets/CCity_mockup.png");
       this.load.tilemapTiledJSON("city", "/assets/maps/city.json");

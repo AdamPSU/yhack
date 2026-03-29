@@ -299,7 +299,17 @@ export function useSimulation(simulationId?: string, record = false) {
         msg.events,
       );
       setState((prev) => {
-        const merged = { ...prev.metrics, ...newMetrics };
+        let merged = { ...prev.metrics, ...newMetrics };
+        // Override with real backend economic indicators when available
+        const ind = msg.economic_indicators;
+        if (ind && Object.keys(ind).length > 0) {
+          merged = {
+            ...merged,
+            priceIndex: ind.price_pressure ?? merged.priceIndex,
+            socialUnrest: (ind.social_unrest_index ?? merged.socialUnrest * 100) / 100,
+            govApproval: (ind.policy_approval ?? merged.govApproval * 100) / 100,
+          };
+        }
         return {
           ...prev,
           metrics: merged,

@@ -773,6 +773,44 @@ def _apply_opinion_dynamics(
     return list(npc_lookup.values()), rel_updates, influence_log
 
 
+def _compute_economic_indicators(
+    npcs: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    round_num: int,
+    max_rounds: int,
+) -> dict[str, float]:
+    """Derive economic metrics from NPC state and events this round."""
+    total = len(npcs) or 1
+
+    mood_scores = {
+        "excited": 1.0, "hopeful": 0.75, "neutral": 0.5,
+        "worried": 0.3, "anxious": 0.2, "angry": 0.0,
+    }
+    moods = [n.get("mood", "neutral") for n in npcs]
+    avg_sentiment = sum(mood_scores.get(m, 0.5) for m in moods) / total
+
+    protests = sum(1 for e in events if e.get("event_type") == "protest")
+    price_changes = [e for e in events if e.get("event_type") == "price_change"]
+    avg_price_change = (
+        sum(e.get("data", {}).get("pct_change", 0) for e in price_changes)
+        / max(len(price_changes), 1)
+    )
+
+    biz_npcs = [n for n in npcs if n.get("role") in ("business_owner", "shopkeeper")]
+    worker_npcs = [n for n in npcs if n.get("role") in ("worker", "farmer")]
+    biz_sentiment = sum(mood_scores.get(n.get("mood", "neutral"), 0.5) for n in biz_npcs) / max(len(biz_npcs), 1)
+    worker_sentiment = sum(mood_scores.get(n.get("mood", "neutral"), 0.5) for n in worker_npcs) / max(len(worker_npcs), 1)
+
+    return {
+        "consumer_confidence": round(avg_sentiment * 100, 1),
+        "business_climate": round(biz_sentiment * 100, 1),
+        "worker_welfare": round(worker_sentiment * 100, 1),
+        "price_pressure": round(avg_price_change, 1),
+        "social_unrest_index": round((protests / total) * 100, 1),
+        "policy_approval": round(avg_sentiment * 100, 1),
+    }
+
+
 async def run_round(state: SimState) -> dict[str, Any]:
     """Run one simulation round for all 25 NPCs in parallel."""
 
@@ -931,6 +969,8 @@ async def run_round(state: SimState) -> dict[str, Any]:
             npc_copy["x"], npc_copy["y"] = move_updates[npc_id]
         updated_npcs.append(npc_copy)
 
+    indicators = _compute_economic_indicators(updated_npcs, all_events, current_round, max_rounds)
+
     return {
         "events": all_events,
         "current_round": current_round + 1,
@@ -938,4 +978,5 @@ async def run_round(state: SimState) -> dict[str, Any]:
         "relationships": updated_rels,
         "memory_streams": memory_streams,
         "influence_events": influence_log,
+        "economic_indicators": indicators,
     }

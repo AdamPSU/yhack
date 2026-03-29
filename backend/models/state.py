@@ -23,6 +23,7 @@ class SimState(TypedDict):
     max_rounds: int
     num_npcs: int
     map_id: NotRequired[str]
+    economic_indicators: dict[str, float]
     memory_streams: dict[str, list[dict[str, Any]]]
     npc_stream_callback: NotRequired[Callable[[list[dict[str, Any]]], Awaitable[None]] | None]
     npc_added_callback: NotRequired[Callable[[dict[str, Any]], Awaitable[None]] | None]

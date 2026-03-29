@@ -163,6 +163,7 @@ export interface WSRoundMsg {
   events: BackendSimEvent[];
   npcs: BackendNPC[];
   influence_events?: BackendInfluenceEvent[];
+  economic_indicators?: Record<string, number>;
   max_rounds?: number;
 }
 

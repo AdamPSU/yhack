@@ -67,7 +67,7 @@ export function updateMetrics(
   }
 
   return {
-    eggIndex: acc.eggIndex + (acc.priceIndex / 1000) + (Math.random() * 0.05 - 0.02),
+    eggIndex: Math.max(0.5, Math.min(2.0, 1.0 + acc.priceIndex / 100)),
     priceIndex: Math.max(-50, Math.min(50, acc.priceIndex)),
     unemploymentRate: Math.min(15, 4.2 + acc.layoffCount * 0.4),
     socialUnrest: unrestCount / total,

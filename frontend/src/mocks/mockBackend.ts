@@ -10,8 +10,8 @@ import type {
   BackendInfluenceEvent,
   BackendMood,
   BackendNPC,
-  BackendRelType,
   BackendRelationship,
+  BackendRelType,
   BackendRole,
   BackendSimEvent,
   WSInitMsg,
@@ -158,7 +158,8 @@ function generateNPCs(): BackendNPC[] {
     npcs.push({
       id: uid(),
       name: `${FIRST_NAMES[i]} ${LAST_NAMES[i]}`,
-      role: i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
+      role:
+        i < 4 ? "worker" : i < 7 ? "business_owner" : ROLES[i % ROLES.length],
       income_level: pick(["low", "medium", "high"]),
       political_leaning: Math.round((Math.random() * 2 - 1) * 100) / 100,
       industry: INDUSTRIES[i % INDUSTRIES.length],
@@ -189,7 +190,7 @@ function generateRelationships(npcs: BackendNPC[]): BackendRelationship[] {
 
   while (rels.length < count) {
     const a = randInt(0, npcs.length - 1);
-    let b = randInt(0, npcs.length - 1);
+    const b = randInt(0, npcs.length - 1);
     if (a === b) continue;
     const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
     if (seen.has(key)) continue;
@@ -379,9 +380,7 @@ function generateRoundEvents(
     "adopt",
   ];
   const influenceEvents: BackendInfluenceEvent[] = events
-    .filter(
-      (e) => e.event_type === "chat" && e.data.target_npc_id,
-    )
+    .filter((e) => e.event_type === "chat" && e.data.target_npc_id)
     .map((e) => {
       const behavior = pick(BEHAVIORS);
       const influence =

@@ -147,12 +147,20 @@ function isWaterRow(worldRow: number): boolean {
 /** Check if world row is a river edge (top or bottom) */
 function isRiverEdge(worldRow: number): boolean {
   const mod = ((worldRow % RIVER_PERIOD) + RIVER_PERIOD) % RIVER_PERIOD;
-  return mod === RIVER_START_OFFSET || mod === RIVER_START_OFFSET + RIVER_WIDTH - 1;
+  return (
+    mod === RIVER_START_OFFSET || mod === RIVER_START_OFFSET + RIVER_WIDTH - 1
+  );
 }
 
 // ─── Zone assignment for infinite world ───
 
-type Zone = "PARK" | "GOVERNMENT" | "COMMERCIAL" | "RESIDENTIAL" | "INDUSTRIAL" | "WATERFRONT";
+type Zone =
+  | "PARK"
+  | "GOVERNMENT"
+  | "COMMERCIAL"
+  | "RESIDENTIAL"
+  | "INDUSTRIAL"
+  | "WATERFRONT";
 
 function getZone(worldRow: number, worldCol: number): Zone {
   // Use the row's position within the road period to determine zone
@@ -163,8 +171,13 @@ function getZone(worldRow: number, worldCol: number): Zone {
 
   // Check proximity to river
   const riverMod = ((worldRow % RIVER_PERIOD) + RIVER_PERIOD) % RIVER_PERIOD;
-  if (riverMod >= RIVER_START_OFFSET - 2 && riverMod < RIVER_START_OFFSET) return "WATERFRONT";
-  if (riverMod >= RIVER_START_OFFSET + RIVER_WIDTH && riverMod < RIVER_START_OFFSET + RIVER_WIDTH + 2) return "WATERFRONT";
+  if (riverMod >= RIVER_START_OFFSET - 2 && riverMod < RIVER_START_OFFSET)
+    return "WATERFRONT";
+  if (
+    riverMod >= RIVER_START_OFFSET + RIVER_WIDTH &&
+    riverMod < RIVER_START_OFFSET + RIVER_WIDTH + 2
+  )
+    return "WATERFRONT";
 
   // Use a larger period to create zone variety
   const superRow = ((worldRow % 48) + 48) % 48;
@@ -173,7 +186,8 @@ function getZone(worldRow: number, worldCol: number): Zone {
   // Top band: parks
   if (superRow < 5) return "PARK";
   // Government: center-ish blocks
-  if (superRow >= 7 && superRow < 14 && superCol >= 20 && superCol < 40) return "GOVERNMENT";
+  if (superRow >= 7 && superRow < 14 && superCol >= 20 && superCol < 40)
+    return "GOVERNMENT";
   // Commercial: middle
   if (superRow >= 15 && superRow < 28) return "COMMERCIAL";
   // Industrial: lower-middle
@@ -220,7 +234,8 @@ export function generateChunk(cx: number, cy: number): ChunkData {
         if (isVRoadCol(wc)) {
           // Bridge over river
           const colMod = ((wc % ROAD_PERIOD_H) + ROAD_PERIOD_H) % ROAD_PERIOD_H;
-          ground[lr][lc] = colMod === VROAD_OFFSET_A ? gid(ROAD_Y_LEFT) : gid(ROAD_Y_RIGHT);
+          ground[lr][lc] =
+            colMod === VROAD_OFFSET_A ? gid(ROAD_Y_LEFT) : gid(ROAD_Y_RIGHT);
         } else if (isWaterRow(wr)) {
           ground[lr][lc] = gid(WATER_FULL);
         } else {
@@ -236,10 +251,12 @@ export function generateChunk(cx: number, cy: number): ChunkData {
         ground[lr][lc] = gid(ROAD_INTERIOR);
       } else if (hRoad) {
         const rowMod = ((wr % ROAD_PERIOD_V) + ROAD_PERIOD_V) % ROAD_PERIOD_V;
-        ground[lr][lc] = rowMod === ROAD_OFFSET_A ? gid(ROAD_X_TOP) : gid(ROAD_X_BOTTOM);
+        ground[lr][lc] =
+          rowMod === ROAD_OFFSET_A ? gid(ROAD_X_TOP) : gid(ROAD_X_BOTTOM);
       } else if (vRoad) {
         const colMod = ((wc % ROAD_PERIOD_H) + ROAD_PERIOD_H) % ROAD_PERIOD_H;
-        ground[lr][lc] = colMod === VROAD_OFFSET_A ? gid(ROAD_Y_LEFT) : gid(ROAD_Y_RIGHT);
+        ground[lr][lc] =
+          colMod === VROAD_OFFSET_A ? gid(ROAD_Y_LEFT) : gid(ROAD_Y_RIGHT);
       }
     }
   }

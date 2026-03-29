@@ -3,15 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { POLICY_PRESETS } from "@/mocks/mockData";
+import { startSimulation } from "@/services/wsClient";
 
 export function PolicyInput() {
   const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  function handleSimulate() {
-    if (text.trim().length < 20) return;
-    sessionStorage.setItem("agora-policy", text);
-    router.push("/simulate");
+  async function handleSimulate() {
+    if (text.trim().length < 20 || loading) return;
+    setLoading(true);
+    try {
+      const simId = await startSimulation(text);
+      router.push(`/simulate?id=${simId}`);
+    } catch (err) {
+      console.error("Failed to start simulation:", err);
+      setLoading(false);
+    }
   }
 
   return (
@@ -50,12 +58,12 @@ export function PolicyInput() {
       <button
         type="button"
         onClick={handleSimulate}
-        disabled={text.trim().length < 20}
+        disabled={text.trim().length < 20 || loading}
         suppressHydrationWarning
         data-testid="simulate-button"
         className="rpg-panel w-full px-6 py-3 text-sm font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px"
       >
-        {">> Run Simulation <<"}
+        {loading ? ">> Starting... <<" : ">> Run Simulation <<"}
       </button>
     </div>
   );

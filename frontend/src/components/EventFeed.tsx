@@ -62,10 +62,7 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
   }, [events.length]);
 
   return (
-    <div
-      className="flex h-full flex-col"
-      data-testid="event-feed"
-    >
+    <div className="flex h-full flex-col" data-testid="event-feed">
       {/* Events */}
       <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin">
         {events.length === 0 && (

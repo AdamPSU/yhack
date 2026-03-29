@@ -114,6 +114,11 @@ export interface WSRoundMsg {
   influence_events?: BackendInfluenceEvent[];
 }
 
+export interface WSNPCEventsMsg {
+  type: "npc_events";
+  events: BackendSimEvent[];
+}
+
 export interface WSDoneMsg {
   type: "done";
 }
@@ -127,5 +132,6 @@ export type WSMessage =
   | WSPolicyAnalysisMsg
   | WSInitMsg
   | WSRoundMsg
+  | WSNPCEventsMsg
   | WSDoneMsg
   | WSErrorMsg;

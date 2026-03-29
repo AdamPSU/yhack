@@ -8,12 +8,14 @@ import {
   updateMetrics,
 } from "@/lib/metricsEngine";
 import { generateMockSimulation } from "@/mocks/mockBackend";
-import { connectWebSocket, startSimulation } from "@/services/wsClient";
+import { connectSimulation } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
 import type {
   BackendInfluenceEvent,
   BackendNPC,
   BackendRelationship,
+  BackendSimEvent,
+  WSNPCEventsMsg,
   WSRoundMsg,
 } from "@/types/backend";
 
@@ -79,7 +81,7 @@ function waitForQueueDrain(
   tick();
 }
 
-export function useSimulation(policyText?: string) {
+export function useSimulation(simulationId?: string) {
   const [state, setState] = useState<SimulationState>({
     events: [],
     metrics: { ...INITIAL_METRICS },
@@ -142,6 +144,45 @@ export function useSimulation(policyText?: string) {
       event.type === "phase_change" ? 2000 : 1200 + Math.random() * 600;
     timerRef.current = setTimeout(drainQueue, delay);
   }, []);
+
+  /** Process streamed NPC events that arrive before the full round completes. */
+  const processNPCEvents = useCallback(
+    (msg: WSNPCEventsMsg) => {
+      const lookup = npcLookupRef.current;
+
+      getBridge().then(({ eventBridge }) => {
+        for (const be of msg.events) {
+          if (
+            be.event_type === "move" &&
+            be.data.to_x != null &&
+            be.data.to_y != null
+          ) {
+            eventBridge.emitNPCMove(
+              be.npc_id,
+              Number(be.data.to_x),
+              Number(be.data.to_y),
+            );
+          }
+          if (be.event_type === "mood_shift" && be.data.new_mood) {
+            eventBridge.emitNPCMood(be.npc_id, String(be.data.new_mood));
+          }
+        }
+      });
+
+      for (const be of msg.events) {
+        const round = be.round ?? 0;
+        const adapted = adaptEvent(be, lookup, round, maxRoundsRef.current);
+        if (adapted) {
+          eventQueueRef.current.push(adapted);
+        }
+      }
+
+      if (!timerRef.current && eventQueueRef.current.length > 0) {
+        timerRef.current = setTimeout(drainQueue, 300);
+      }
+    },
+    [drainQueue],
+  );
 
   /** Feed a single WSRoundMsg through the same pipeline as the real backend. */
   const processRound = useCallback(
@@ -239,69 +280,37 @@ export function useSimulation(policyText?: string) {
     metricsAccRef.current = createAccumulator();
     eventQueueRef.current = [];
     lastPhaseRef.current = 0;
-    setGraphData({ relationships: [], npcs: [], influenceEvents: [], version: 0 });
+    setGraphData({
+      relationships: [],
+      npcs: [],
+      influenceEvents: [],
+      version: 0,
+    });
 
-    console.log("[sim] start() called — mode=%s, policyText=%d chars", USE_MOCK ? "MOCK" : "LIVE", (policyText || "").length);
-
-    // ── Mock backend path ──────────────────────────────────
-    if (USE_MOCK) {
-      const mock = generateMockSimulation(maxRoundsRef.current);
-      console.log("[sim] mock generated — %d NPCs, %d rounds", mock.initMsg.npcs.length, mock.rounds.length);
-
-      // Init NPCs + relationships
-      const lookup = npcLookupRef.current;
-      for (const npc of mock.initMsg.npcs) {
-        lookup.set(npc.id, npc);
-      }
-      relationshipsRef.current = mock.initMsg.relationships;
-      setGraphData((prev) => ({
-        ...prev,
-        relationships: mock.initMsg.relationships,
-        npcs: mock.initMsg.npcs,
-        version: prev.version + 1,
-      }));
-      getBridge().then(({ eventBridge }) => {
-        eventBridge.emitInitNPCs(mock.initMsg.npcs);
-      });
-
-      // Drip-feed rounds with a small delay so the UI plays back naturally
-      let i = 0;
-      const feedNext = () => {
-        if (i >= mock.rounds.length) {
-          console.log("[sim] mock complete — all %d rounds fed", mock.rounds.length);
-          waitForQueueDrain(eventQueueRef, setState);
-          return;
-        }
-        processRound(mock.rounds[i]);
-        i++;
-        const delay = 150 + Math.random() * 100;
-        const t = setTimeout(feedNext, delay);
-        cleanupRef.current = () => clearTimeout(t);
-      };
-      feedNext();
-      return;
-    }
-
-    // ── Real backend path ──────────────────────────────────
-    const text = policyText || "";
-    if (!text) {
-      console.warn("[sim] no policy text — aborting");
+    const simId = simulationId || "";
+    if (!simId) {
+      console.warn("[sim] no simulation ID — aborting");
       setState((prev) => ({ ...prev, isRunning: false }));
       return;
     }
 
-    try {
-      console.log("[sim] POST /simulate (%d chars)…", text.length);
-      const simId = await startSimulation(text);
-      console.log("[sim] simulation created — id=%s, connecting WS…", simId);
+    console.log("[sim] start() called — connecting WS for sim=%s", simId);
 
-      const cleanup = connectWebSocket(simId, {
+    try {
+      const cleanup = connectSimulation(simId, {
         onPolicyAnalysis: (msg) => {
-          console.log("[sim] policy_analysis received — %d entities", msg.entities?.length ?? 0);
+          console.log(
+            "[sim] policy_analysis received — %d entities",
+            msg.entities?.length ?? 0,
+          );
         },
 
         onInit: (msg) => {
-          console.log("[sim] init received — %d NPCs, %d relationships", msg.npcs.length, msg.relationships.length);
+          console.log(
+            "[sim] init received — %d NPCs, %d relationships",
+            msg.npcs.length,
+            msg.relationships.length,
+          );
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {
             lookup.set(npc.id, npc);
@@ -320,12 +329,24 @@ export function useSimulation(policyText?: string) {
         },
 
         onRound: (msg: WSRoundMsg) => {
-          console.log("[sim] round %d — %d events, %d NPCs", msg.round, msg.events.length, msg.npcs.length);
+          console.log(
+            "[sim] round %d — %d events, %d NPCs",
+            msg.round,
+            msg.events.length,
+            msg.npcs.length,
+          );
           processRound(msg);
         },
 
+        onNPCEvents: (msg) => {
+          processNPCEvents(msg);
+        },
+
         onDone: () => {
-          console.log("[sim] done — draining event queue (%d remaining)", eventQueueRef.current.length);
+          console.log(
+            "[sim] done — draining event queue (%d remaining)",
+            eventQueueRef.current.length,
+          );
           waitForQueueDrain(eventQueueRef, setState);
         },
 
@@ -340,7 +361,7 @@ export function useSimulation(policyText?: string) {
       console.error("Failed to start simulation:", err);
       setState((prev) => ({ ...prev, isRunning: false }));
     }
-  }, [policyText, processRound]);
+  }, [simulationId, processRound, processNPCEvents]);
 
   useEffect(() => {
     return () => {
@@ -349,10 +370,7 @@ export function useSimulation(policyText?: string) {
     };
   }, []);
 
-  const getNpc = useCallback(
-    (id: string) => npcLookupRef.current.get(id),
-    [],
-  );
+  const getNpc = useCallback((id: string) => npcLookupRef.current.get(id), []);
 
   return {
     ...state,

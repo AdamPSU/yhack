@@ -1,7 +1,13 @@
 import * as Phaser from "phaser";
 import type { BuildingPositions } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS, GAME_HEIGHT, GAME_WIDTH, MAP_COLS, MAP_ROWS } from "../config";
+import {
+  CENTER_BOUNDS,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  MAP_COLS,
+  MAP_ROWS,
+} from "../config";
 import { SimEventHandler } from "../events/SimEventHandler";
 import { ChunkManager } from "../map/ChunkManager";
 import { NPCManager } from "../systems/NPCManager";
@@ -152,7 +158,11 @@ export class WorldScene extends Phaser.Scene {
         const g = tile.index;
 
         if (g === FACTORY_TL) {
-          positions.factories.push({ id: `factory-${factoryIdx++}`, x: c, y: r });
+          positions.factories.push({
+            id: `factory-${factoryIdx++}`,
+            x: c,
+            y: r,
+          });
         } else if (g === SHOP1_TL || g === SHOP2_TL || g === LONG_SHOP_TL) {
           positions.shops.push({ id: `shop-${shopIdx++}`, x: c, y: r });
         } else if (g === HOUSE_TL) {

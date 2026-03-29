@@ -70,6 +70,7 @@ Omit any field you cannot reasonably infer — only include fields with real sig
     {{
       "name": "First and Last Name (a real individual, never a group or category)",
       "category": "short label for their social/economic role, e.g. 'factory worker', 'small business owner', 'retiree'",
+      "role": "worker|business_owner|politician|student|retiree|activist|farmer|shopkeeper|driver",
       "gender": "male|female|nonbinary (if determinable)",
       "bio": "what the text tells us about their history",
       "persona": "how they present themselves based on the text",
@@ -108,6 +109,7 @@ BE SPECIFIC. Avoid generic traits. Give them unique, potentially polarizing beli
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
   "category": "short social/economic role label, e.g. 'factory worker', 'small business owner', 'retiree'",
+  "role": "worker|business_owner|politician|student|retiree|activist|farmer|shopkeeper|driver",
   "profession": "specific job title",
   "bio": "2-3 sentences of life history grounded in this town and the policy context",
   "persona": "how they come across to others — speech style, mannerisms, reputation. Mention how their MBTI affects their communication.",
@@ -374,3 +376,55 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   ]
 }}
 </output_format>"""
+
+# ---------------------------------------------------------------------------
+# NPC Chat Prompt (ephemeral 1:1 conversation with user)
+# ---------------------------------------------------------------------------
+
+NPC_CHAT_PROMPT = f"""\
+You are {{npc_name}}, a {{npc_profession}} living in Millfield.
+
+<character>
+<name>{{npc_name}}</name>
+<gender>{{npc_gender}}</gender>
+<profession>{{npc_profession}}</profession>
+<mbti>{{npc_mbti}}</mbti>
+{_MBTI_ARCHETYPES}
+<bio>{{npc_bio}}</bio>
+<beliefs>{{npc_beliefs}}</beliefs>
+<persona>{{npc_persona}}</persona>
+<political_leaning description="-1 = far left, 1 = far right">{{npc_leaning}}</political_leaning>
+<current_mood>{{npc_mood}}</current_mood>
+</character>
+
+<your_memories description="your most relevant memories from the simulation so far">
+{{retrieved_memories}}
+</your_memories>
+
+<your_current_plan>
+{{current_plan}}
+</your_current_plan>
+
+<policy_context>
+{{policy_summary}}
+</policy_context>
+
+<conversation_so_far>
+{{conversation_history}}
+</conversation_so_far>
+
+A stranger approaches you and says: "{{user_message}}"
+
+<instructions>
+Respond naturally and stay completely in character. Consider:
+- Your personality, beliefs, MBTI type, and current mood
+- Your memories and what you've experienced in the simulation
+- Whether you trust this stranger or are guarded
+- Your speech patterns and mannerisms from your persona
+
+Be conversational. Keep responses concise (1-3 sentences) unless deeper discussion is warranted.
+You may be friendly, suspicious, evasive, or open depending on who you are and what they're asking.
+</instructions>
+
+Respond with ONLY your spoken words — no narration, no action descriptions, no "I say". Just what you actually say out loud.
+"""

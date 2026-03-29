@@ -14,6 +14,17 @@ class NPC(BaseModel):
     id: str
     name: str
     category: str = ""
+    role: Literal[
+        "worker",
+        "business_owner",
+        "politician",
+        "student",
+        "retiree",
+        "activist",
+        "farmer",
+        "shopkeeper",
+        "driver",
+    ] = "worker"
     gender: str
     bio: str
     persona: str

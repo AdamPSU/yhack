@@ -37,6 +37,23 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/**
+ * Get NPCs within Chebyshev distance (max of |dx|, |dy|) of the given NPC.
+ * Matches backend proximity check.
+ */
+function getNearbyNpcs(
+  npc: BackendNPC,
+  allNpcs: BackendNPC[],
+  radius = 2,
+): BackendNPC[] {
+  return allNpcs.filter((other) => {
+    if (other.id === npc.id) return false;
+    const dx = Math.abs(other.x - npc.x);
+    const dy = Math.abs(other.y - npc.y);
+    return Math.max(dx, dy) <= radius;
+  });
+}
+
 // ── NPC Generation (25 agents, grid 20x15) ──────────────────
 
 const ROLES: BackendRole[] = [
@@ -429,30 +446,42 @@ function generateRoundEvents(
       });
       npc.mood = newMood;
     } else if (roll < protestThreshold) {
-      // Chat — pick a random other NPC as target
-      const others = updated.filter((n) => n.id !== npc.id);
-      const target = pick(others);
-      const msgs = CHAT_MESSAGES_BY_PHASE[phase];
-      events.push({
-        round,
-        npc_id: npc.id,
-        event_type: "chat",
-        message: pick(msgs),
-        data: { target_npc_id: target.id },
-      });
-
-      // Sprinkle in layoff/closure keywords for later phases
-      if (phase >= 2 && Math.random() < 0.15) {
-        const target2 = pick(others);
+      // Chat — pick a nearby NPC as target (within Chebyshev distance 2)
+      const nearbyNpcs = getNearbyNpcs(npc, updated, 2);
+      if (nearbyNpcs.length > 0) {
+        const target = pick(nearbyNpcs);
+        const msgs = CHAT_MESSAGES_BY_PHASE[phase];
         events.push({
           round,
           npc_id: npc.id,
           event_type: "chat",
-          message:
-            npc.role === "business_owner"
-              ? "I might have to close up shop if this continues."
-              : "I heard they're planning layoffs at the factory next week.",
-          data: { target_npc_id: target2.id },
+          message: pick(msgs),
+          data: { target_npc_id: target.id },
+        });
+
+        // Sprinkle in layoff/closure keywords for later phases
+        if (phase >= 2 && Math.random() < 0.15) {
+          const target2 = pick(nearbyNpcs);
+          events.push({
+            round,
+            npc_id: npc.id,
+            event_type: "chat",
+            message:
+              npc.role === "business_owner"
+                ? "I might have to close up shop if this continues."
+                : "I heard they're planning layoffs at the factory next week.",
+            data: { target_npc_id: target2.id },
+          });
+        }
+      } else {
+        // No one nearby — NPC talks to themselves (monologue)
+        const msgs = CHAT_MESSAGES_BY_PHASE[phase];
+        events.push({
+          round,
+          npc_id: npc.id,
+          event_type: "chat",
+          message: pick(msgs),
+          data: {}, // No target — monologue
         });
       }
     } else if (roll < protestThreshold + (1 - protestThreshold) * 0.6) {
@@ -538,6 +567,7 @@ export function generateMockSimulation(maxRounds = 15): MockSimulation {
     type: "init",
     npcs: [...npcs],
     relationships,
+    max_rounds: maxRounds,
   };
 
   const rounds: WSRoundMsg[] = [];
@@ -555,6 +585,7 @@ export function generateMockSimulation(maxRounds = 15): MockSimulation {
       events,
       npcs: npcs.map((n) => ({ ...n })),
       influence_events: influenceEvents,
+      max_rounds: maxRounds,
     });
   }
 

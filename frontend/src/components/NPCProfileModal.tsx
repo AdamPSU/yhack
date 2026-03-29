@@ -6,6 +6,7 @@ import type { BackendNPC } from "@/types/backend";
 interface NPCProfileModalProps {
   npc: BackendNPC;
   onClose: () => void;
+  onOpenChat?: (npc: BackendNPC) => void;
 }
 
 const MOOD_COLOR: Record<string, string> = {
@@ -100,7 +101,7 @@ function SectionBlock({
   );
 }
 
-export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
+export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -244,7 +245,7 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
 
         {/* Footer bar */}
         <div
-          className="px-3 py-2"
+          className="flex items-center justify-between px-3 py-2"
           style={{ background: "#E8D5A3", borderTop: "2px solid #C4A46C" }}
         >
           <span
@@ -253,6 +254,22 @@ export function NPCProfileModal({ npc, onClose }: NPCProfileModalProps) {
           >
             {npc.id} · ESC TO CLOSE
           </span>
+          {onOpenChat && (
+            <button
+              type="button"
+              onClick={() => onOpenChat(npc)}
+              className="px-3 py-1 text-[9px] font-pixel uppercase tracking-wide transition-opacity hover:opacity-80"
+              style={{
+                background: "#3E7C34",
+                border: "2px solid #2A5424",
+                borderRadius: "4px",
+                color: "#FDF5E6",
+                boxShadow: "inset 1px 1px 0 #5A9B4A, 2px 2px 0 #1A3414",
+              }}
+            >
+              Chat
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -70,6 +70,8 @@ export interface BackendSimEvent {
 export interface BackendRelationship {
   source_id: string;
   target_id: string;
+  rel_type?: BackendRelType;
+  strength?: number; // 0-1
   affinity: number; // -1 to 1
   trust: number; // 0-1
 }
@@ -154,6 +156,7 @@ export interface WSInitMsg {
   type: "init";
   npcs: BackendNPC[];
   relationships: BackendRelationship[];
+  max_rounds?: number;
 }
 
 export interface BackendInfluenceEvent {
@@ -171,6 +174,7 @@ export interface WSRoundMsg {
   events: BackendSimEvent[];
   npcs: BackendNPC[];
   influence_events?: BackendInfluenceEvent[];
+  max_rounds?: number;
 }
 
 export interface WSNPCAddedMsg {

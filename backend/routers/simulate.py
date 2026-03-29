@@ -7,6 +7,7 @@ import socketio
 from fastapi import APIRouter, HTTPException
 
 from graph.builder import build_graph
+from graph.chat import generate_npc_chat_response
 from models.schemas import EconomicReportResponse, PolicyInput
 from models.state import SimState
 from services.context_store import get_source
@@ -38,6 +39,7 @@ class SimulationRecord:
     current_round: int = 0
     error_message: str | None = None
     economic_report: EconomicReportResponse | None = None
+    memory_streams: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 simulations: dict[str, SimulationRecord] = {}
@@ -66,7 +68,9 @@ async def start_simulation(policy: PolicyInput):
 
     trend_sources = [get_source(source_id) for source_id in policy.trend_source_ids]
     if any(source is None or source.get("kind") != "csv" for source in trend_sources):
-        raise HTTPException(status_code=404, detail="One or more CSV trend sources were not found.")
+        raise HTTPException(
+            status_code=404, detail="One or more CSV trend sources were not found."
+        )
 
     simulation_id = str(uuid.uuid4())
     simulations[simulation_id] = SimulationRecord(policy=policy)
@@ -156,29 +160,61 @@ async def start_sim(sid: str, data: dict) -> None:
             elif "parse_policy" in chunk:
                 update = chunk["parse_policy"]
                 record.entities = update.get("entities", [])
-                logger.info("sim=%s  parse_policy  entities=%d", simulation_id, len(update["entities"]))
-                await sio.emit("policy_analysis", {"entities": update["entities"]}, to=sid)
+                logger.info(
+                    "sim=%s  parse_policy  entities=%d",
+                    simulation_id,
+                    len(update["entities"]),
+                )
+                await sio.emit(
+                    "policy_analysis", {"entities": update["entities"]}, to=sid
+                )
 
             elif "generate_npcs" in chunk:
                 update = chunk["generate_npcs"]
                 record.final_npcs = update.get("npcs", [])
                 record.relationships = update.get("relationships", [])
-                logger.info("sim=%s  generate_npcs  npcs=%d  rels=%d", simulation_id, len(update["npcs"]), len(update["relationships"]))
-                await sio.emit("init", {"npcs": update["npcs"], "relationships": update["relationships"]}, to=sid)
+                logger.info(
+                    "sim=%s  generate_npcs  npcs=%d  rels=%d",
+                    simulation_id,
+                    len(update["npcs"]),
+                    len(update["relationships"]),
+                )
+                await sio.emit(
+                    "init",
+                    {
+                        "npcs": update["npcs"],
+                        "relationships": update["relationships"],
+                        "max_rounds": policy.num_rounds,
+                    },
+                    to=sid,
+                )
 
             elif "run_round" in chunk:
                 update = chunk["run_round"]
                 record.current_round = update.get("current_round", record.current_round)
                 record.final_npcs = update.get("npcs", record.final_npcs)
                 record.events.extend(update.get("events", []))
+                record.memory_streams = update.get(
+                    "memory_streams", record.memory_streams
+                )
                 round_num = update["current_round"] - 1
-                logger.info("sim=%s  round %d  events=%d", simulation_id, round_num, len(update["events"]))
-                await sio.emit("round", {
-                    "round": round_num,
-                    "events": update["events"],
-                    "npcs": update["npcs"],
-                    "influence_events": update.get("influence_events", []),
-                }, to=sid)
+                logger.info(
+                    "sim=%s  round %d  events=%d",
+                    simulation_id,
+                    round_num,
+                    len(update["events"]),
+                )
+                await sio.emit(
+                    "round",
+                    {
+                        "round": round_num,
+                        "events": update["events"],
+                        "npcs": update["npcs"],
+                        "influence_events": update.get("influence_events", []),
+                        "max_rounds": policy.num_rounds,
+                    },
+                    to=sid,
+                )
 
         record.status = "complete"
         logger.info("sim=%s  done", simulation_id)
@@ -189,12 +225,16 @@ async def start_sim(sid: str, data: dict) -> None:
         record.error_message = str(exc)
         logger.exception("Simulation %s failed", simulation_id)
         try:
-            await sio.emit("sim_error", {"message": f"Simulation failed: {exc}"}, to=sid)
+            await sio.emit(
+                "sim_error", {"message": f"Simulation failed: {exc}"}, to=sid
+            )
         except Exception:
             pass
 
 
-@router.get("/simulate/{simulation_id}/economic-report", response_model=EconomicReportResponse)
+@router.get(
+    "/simulate/{simulation_id}/economic-report", response_model=EconomicReportResponse
+)
 async def get_economic_report(simulation_id: str):
     record = simulations.get(simulation_id)
     if record is None or record.status != "complete":
@@ -215,3 +255,66 @@ async def get_economic_report(simulation_id: str):
         max_rounds=record.policy.num_rounds,
     )
     return record.economic_report
+
+
+@sio.event
+async def chat_with_npc(sid: str, data: dict) -> None:
+    """Handle user chatting with an NPC (ephemeral, doesn't affect sim state).
+
+    The conversation is "forked" from the current simulation state - the NPC
+    has access to all its memories and context, but the chat itself is
+    ephemeral and maintained on the frontend.
+    """
+    simulation_id = data.get("simulation_id", "")
+    npc_id = data.get("npc_id", "")
+    user_message = data.get("message", "")
+    conversation_history = data.get("history", [])
+
+    logger.info(
+        "sio chat_with_npc  sid=%s  sim=%s  npc=%s  msg='%s...'",
+        sid,
+        simulation_id,
+        npc_id,
+        user_message[:30] if user_message else "",
+    )
+
+    record = simulations.get(simulation_id)
+    if not record:
+        await sio.emit(
+            "npc_chat_error",
+            {"npc_id": npc_id, "message": "Simulation not found"},
+            to=sid,
+        )
+        return
+
+    # Find the NPC in the current state
+    npc = next((n for n in record.final_npcs if n.get("id") == npc_id), None)
+    if not npc:
+        await sio.emit(
+            "npc_chat_error",
+            {"npc_id": npc_id, "message": "NPC not found"},
+            to=sid,
+        )
+        return
+
+    try:
+        response = await generate_npc_chat_response(
+            npc=npc,
+            user_message=user_message,
+            conversation_history=conversation_history,
+            memory_stream=record.memory_streams.get(npc_id, []),
+            policy_context=record.policy_text,
+        )
+
+        await sio.emit(
+            "npc_chat_response",
+            {"npc_id": npc_id, "response": response},
+            to=sid,
+        )
+    except Exception as e:
+        logger.exception("Chat with NPC %s failed: %s", npc_id, e)
+        await sio.emit(
+            "npc_chat_error",
+            {"npc_id": npc_id, "message": f"Chat failed: {e}"},
+            to=sid,
+        )

@@ -1,6 +1,13 @@
 import type { SimEvent } from "@/types";
 import { eventBridge } from "../bridge/EventBridge";
+import { GAME_HEIGHT, GAME_WIDTH, TILE_SIZE } from "../config";
 import { ClosureEffect } from "../effects/ClosureEffect";
+import {
+  spawnBankruptcy,
+  spawnMoneyGain,
+  spawnMoneyLoss,
+  spawnPhaseFlash,
+} from "../effects/EconomicEffects";
 import { PriceSpikeEffect } from "../effects/PriceSpikeEffect";
 import { ProtestEffect } from "../effects/ProtestEffect";
 import type { NPCManager } from "../systems/NPCManager";
@@ -15,8 +22,6 @@ export class SimEventHandler {
   private protestEffect: ProtestEffect;
   private closureEffect: ClosureEffect;
   private priceSpikeEffect: PriceSpikeEffect;
-  /** Track last speaker for NPC-to-NPC conversation detection */
-  private lastSpeaker: { npcId: string; time: number } | null = null;
 
   constructor(scene: Phaser.Scene, npcManager: NPCManager) {
     this.scene = scene;
@@ -26,6 +31,11 @@ export class SimEventHandler {
     this.priceSpikeEffect = new PriceSpikeEffect(scene);
 
     eventBridge.on("sim:event", this.onSimEvent, this);
+    eventBridge.on("sim:phase-change", this.onPhaseChange, this);
+  }
+
+  private onPhaseChange(data: { phase: number; round: number }) {
+    spawnPhaseFlash(this.scene, data.phase, GAME_WIDTH, GAME_HEIGHT);
   }
 
   private onSimEvent(event: SimEvent) {
@@ -35,17 +45,14 @@ export class SimEventHandler {
       const npcId = event.agentId;
       this.npcManager.showMessage(npcId, event.message);
 
-      // Detect NPC-to-NPC conversation: if a different NPC spoke recently, walk them together
-      if (
-        event.type === "reaction" &&
-        this.lastSpeaker &&
-        this.lastSpeaker.npcId !== npcId &&
-        Date.now() - this.lastSpeaker.time < 5000
-      ) {
-        this.npcManager.converseWith(npcId, this.lastSpeaker.npcId);
-        this.lastSpeaker = null; // Reset so we don't chain more meetups
-      } else {
-        this.lastSpeaker = { npcId, time: Date.now() };
+      // If this event has a valid targetNpcId, trigger conversation between speaker and target
+      if (event.targetNpcId && event.targetNpcId !== npcId) {
+        // Only converseWith if the target NPC actually exists in our NPC list
+        const allNPCs = this.npcManager.getAllNPCs();
+        const targetExists = allNPCs.some((n) => n.npcId === event.targetNpcId);
+        if (targetExists) {
+          this.npcManager.converseWith(npcId, event.targetNpcId);
+        }
       }
     }
 
@@ -71,15 +78,22 @@ export class SimEventHandler {
   private handleProtest() {
     // Dynamically pick angry/worried NPCs for the protest (up to 5)
     const allNPCs = this.npcManager.getAllNPCs();
-    const protestNPCIds = allNPCs
+    const protestNPCs = allNPCs
       .filter((n) => n.sentiment === "angry" || n.sentiment === "worried")
-      .slice(0, 5)
-      .map((n) => n.npcId);
+      .slice(0, 5);
     // Fallback: if nobody is angry/worried, pick first 3 NPCs
-    if (protestNPCIds.length === 0) {
-      protestNPCIds.push(...allNPCs.slice(0, 3).map((n) => n.npcId));
+    if (protestNPCs.length === 0) {
+      protestNPCs.push(...allNPCs.slice(0, 3));
     }
+    const protestNPCIds = protestNPCs.map((n) => n.npcId);
     this.protestEffect.trigger(protestNPCIds);
+
+    // Floating bankruptcy text above each protesting NPC
+    for (const npc of protestNPCs) {
+      const worldX = npc.tileX * TILE_SIZE + TILE_SIZE / 2;
+      const worldY = npc.tileY * TILE_SIZE;
+      spawnBankruptcy(this.scene, worldX, worldY);
+    }
   }
 
   private handleStrike() {
@@ -118,6 +132,11 @@ export class SimEventHandler {
     if (shops.length === 0) return;
     const shop = shops[Math.floor(Math.random() * shops.length)];
     this.closureEffect.trigger(shop.x, shop.y);
+    spawnBankruptcy(
+      this.scene,
+      shop.x * TILE_SIZE + TILE_SIZE,
+      shop.y * TILE_SIZE,
+    );
   }
 
   private handlePriceChange(message: string) {
@@ -126,9 +145,21 @@ export class SimEventHandler {
     if (shops.length === 0) return;
     const shop = shops[Math.floor(Math.random() * shops.length)];
     this.priceSpikeEffect.trigger(shop.x, shop.y, message);
+
+    // Detect positive/negative from message text
+    const worldX = shop.x * TILE_SIZE + TILE_SIZE;
+    const worldY = shop.y * TILE_SIZE;
+    const isNegative =
+      /decrease|drop|lower|cut|reduc|down|fell|decline/i.test(message);
+    if (isNegative) {
+      spawnMoneyGain(this.scene, worldX, worldY);
+    } else {
+      spawnMoneyLoss(this.scene, worldX, worldY);
+    }
   }
 
   destroy() {
     eventBridge.off("sim:event", this.onSimEvent, this);
+    eventBridge.off("sim:phase-change", this.onPhaseChange, this);
   }
 }

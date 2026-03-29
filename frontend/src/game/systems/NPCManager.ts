@@ -351,7 +351,7 @@ export class NPCManager {
 
     // Continuously emit position updates while message is active so React bubble follows NPC
     const posTimer = this.scene.time.addEvent({
-      delay: 100,
+      delay: 16,
       callback: () => {
         if (!npc.message) {
           posTimer.destroy();

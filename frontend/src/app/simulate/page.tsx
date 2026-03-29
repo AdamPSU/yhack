@@ -100,8 +100,23 @@ interface BubbleState {
   npcId: string;
   agentName: string;
   message: string;
+  role: string;
   x: number;
   y: number;
+}
+
+function roleToBubbleColor(role: string): "orange" | "blue" | "yellow" {
+  switch (role) {
+    case "politician":
+    case "business_owner":
+    case "shopkeeper":
+      return "blue";
+    case "retiree":
+    case "farmer":
+      return "yellow";
+    default:
+      return "orange";
+  }
 }
 
 export default function SimulatePage() {
@@ -170,6 +185,7 @@ function SimulateContent() {
               npcId: npc.id,
               agentName: npc.name,
               message: npc.message,
+              role: npc.role ?? "",
               x: npc.x,
               y: npc.y,
             });
@@ -482,6 +498,7 @@ function SimulateContent() {
                 message={b.message}
                 x={b.x * SCALE_FACTOR + BORDER_WIDTH}
                 y={b.y * SCALE_FACTOR + BORDER_WIDTH}
+                color={roleToBubbleColor(b.role)}
               />
             ))}
 

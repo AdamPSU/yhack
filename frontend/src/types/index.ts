@@ -35,6 +35,7 @@ export interface SimMetrics {
 export interface NPCState {
   id: string;
   name: string;
+  role?: string;
   x: number;
   y: number;
   direction: "up" | "down" | "left" | "right";

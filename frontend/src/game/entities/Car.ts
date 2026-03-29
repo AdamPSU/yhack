@@ -130,6 +130,7 @@ export class Car extends Phaser.GameObjects.Container {
     return {
       id: this.npcId,
       name: this.npcName,
+      role: this.role,
       x: (this.x - cam.scrollX) * cam.zoom,
       y: (this.y - cam.scrollY) * cam.zoom,
       direction: this.direction,

@@ -710,7 +710,7 @@ async def run_round(state: SimState) -> dict[str, Any]:
     name_to_id = {npc.get("name", ""): npc.get("id", "") for npc in npcs}
 
     npc_neighbor_ids: dict[str, list[str]] = {}
-    npc_rels_map: dict[str, list[tuple[str, str, float, float, float]]] = {}
+    npc_rels_map: dict[str, list[tuple[str, float, float]]] = {}
     for npc in npcs:
         npc_id = npc.get("id", "")
         npc_neighbor_ids[npc_id] = _build_neighbor_ids(npc, npcs)

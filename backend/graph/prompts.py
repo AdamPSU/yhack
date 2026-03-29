@@ -232,7 +232,7 @@ _NPC_ACTION_TYPES = """\
 <style_rules>
 CRITICAL: Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and MBTI speech patterns.
 Set is_controversial to true ONLY if you are expressing an idea that is likely to polarize others, challenge the status quo, or damage your reputation in some circles.
-</style_rules>""""""
+</style_rules>"""
 
 _NPC_DATA_FIELDS = """\
 Data fields by event_type:

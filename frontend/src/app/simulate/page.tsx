@@ -4,14 +4,13 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
-import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
+import type { NPCHoverInfo, SimEvent } from "@/types";
 
 const SocialGraph = dynamic(
   () =>
@@ -137,15 +136,6 @@ function NPCTooltip({
   );
 }
 
-interface BubbleState {
-  npcId: string;
-  agentName: string;
-  agentCategory?: string;
-  message: string;
-  x: number;
-  y: number;
-}
-
 const DEFAULT_OVERLAY_METRICS: OverlayMetrics = {
   offsetX: 0,
   offsetY: 0,
@@ -170,7 +160,6 @@ function SimulateContent() {
   const isReplay = searchParams.get("mode") === "replay";
   const isRecording = searchParams.get("record") === "true";
   const sim = useSimulation(simulationId || undefined, isRecording);
-  const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
   const handleEventClick = useCallback((event: SimEvent) => {
@@ -185,6 +174,7 @@ function SimulateContent() {
 
   const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
@@ -214,40 +204,11 @@ function SimulateContent() {
     };
   }, [simulationId, isReplay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listen for NPC position updates from Phaser — only source for bubble positions
-  useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-      const handler = (npc: NPCState) => {
-        setBubbles((prev) => {
-          const next = new Map(prev);
-          if (npc.message) {
-            next.set(npc.id, {
-              npcId: npc.id,
-              agentName: npc.name,
-              agentCategory: npc.category,
-              message: npc.message,
-              x: npc.x,
-              y: npc.y,
-            });
-          } else {
-            next.delete(npc.id);
-          }
-          return next;
-        });
-      };
-      eventBridge.on("sim:npc-position", handler);
-      cleanup = () => eventBridge.off("sim:npc-position", handler);
-    });
-    return () => cleanup?.();
-  }, []);
-
   // Reset transient overlay UI when Phaser re-initializes the NPC set.
   useEffect(() => {
     let cleanup: (() => void) | undefined;
     import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
       const handler = () => {
-        setBubbles(new Map());
         setHoverInfo(null);
       };
       eventBridge.on("sim:init-npcs", handler);
@@ -435,10 +396,11 @@ function SimulateContent() {
     };
   }, []);
 
-  // Close graph modal on ESC
+  // Close modals / focus mode on ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        setFocusMode(false);
         setShowGraph(false);
         setShowReport(false);
       }
@@ -459,9 +421,6 @@ function SimulateContent() {
       setShowReport(true);
     }
   }, [sim.isComplete, sim.reportLoading, sim.report]);
-
-  const bubbleList = Array.from(bubbles.values());
-
   if (!simulationId && !isMock && !isReplay) {
     return (
       <div
@@ -517,7 +476,7 @@ function SimulateContent() {
     >
       {/* Phase indicator bar */}
       <div
-        className="rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4"
+        className={`rpg-panel flex h-10 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 px-4 panel-slide-top ${focusMode ? "panel-hidden-top" : ""}`}
         style={{ background: "#E8D5A3", borderBottom: "3px solid #6B4226" }}
         data-testid="phase-bar"
       >
@@ -622,13 +581,26 @@ function SimulateContent() {
               Simulating...
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setFocusMode((f) => !f)}
+            className="rpg-panel px-3 py-1 text-[9px] font-mono font-bold tracking-widest transition-all hover:opacity-80"
+            style={{
+              color: focusMode ? "#D4A520" : "#8B7355",
+              background: focusMode ? "rgba(212,165,32,0.1)" : undefined,
+              borderColor: focusMode ? "#D4A520" : undefined,
+            }}
+            title="Toggle focus mode (hides panels)"
+          >
+            {focusMode ? "[ EXIT FOCUS ]" : "[ FOCUS ]"}
+          </button>
         </div>
       </div>
 
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
         {/* Left: Event feed */}
-        <div className="rpg-panel flex h-full w-64 shrink-0 flex-col">
+        <div className={`rpg-panel flex h-full w-64 shrink-0 flex-col panel-slide-left ${focusMode ? "panel-hidden-left" : ""}`}>
           <div
             className="flex items-center justify-between px-3 py-2"
             style={{ borderBottom: "2px solid #C4A46C" }}
@@ -655,11 +627,17 @@ function SimulateContent() {
         </div>
 
         {/* Center: Game canvas with chat bubble overlays */}
-        <div className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
+        <div className={focusMode ? "fixed inset-0 z-50 flex items-center justify-center overflow-hidden" : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"} style={focusMode ? { background: "#060010" } : undefined}>
           <div
             ref={canvasContainerRef}
-            className="relative shrink-0 canvas-glow"
-            style={{ border: "3px solid #6B4226", borderRadius: 4 }}
+            className={`relative shrink-0 canvas-glow canvas-expand ${focusMode ? "" : ""}`}
+            style={{
+              border: "3px solid #6B4226",
+              borderRadius: 4,
+              ...(focusMode ? {
+                zoom: Math.min(typeof window !== "undefined" ? window.innerWidth / GAME_WIDTH : 1, typeof window !== "undefined" ? window.innerHeight / GAME_HEIGHT : 1),
+              } : {}),
+            }}
           >
             <GameCanvas />
 
@@ -706,53 +684,29 @@ function SimulateContent() {
               </button>
             </div>
 
-            {/* Chat bubbles anchored to NPCs */}
-            <div
-              className="pointer-events-none absolute z-30 overflow-hidden"
-              style={{
-                left: overlayMetrics.offsetX,
-                top: overlayMetrics.offsetY,
-                width: overlayMetrics.width,
-                height: overlayMetrics.height,
-              }}
-            >
-              {bubbleList.map((b) => {
-                const cx = b.x * overlayMetrics.scaleX;
-                const cy = b.y * overlayMetrics.scaleY;
-                if (
-                  cx < 0 ||
-                  cy < 0 ||
-                  cx > overlayMetrics.width ||
-                  cy > overlayMetrics.height
-                ) {
-                  return null;
-                }
-                return (
-                  <ChatBubble
-                    key={b.npcId}
-                    agentName={b.agentName}
-                    agentCategory={b.agentCategory}
-                    message={b.message}
-                    x={cx}
-                    y={cy}
-                  />
-                );
-              })}
-
-              {/* NPC hover tooltip */}
-              {hoverInfo && (
+            {/* NPC hover tooltip */}
+            {hoverInfo && (
+              <div
+                className="pointer-events-none absolute z-30 overflow-hidden"
+                style={{
+                  left: overlayMetrics.offsetX,
+                  top: overlayMetrics.offsetY,
+                  width: overlayMetrics.width,
+                  height: overlayMetrics.height,
+                }}
+              >
                 <NPCTooltip
                   info={hoverInfo}
                   scaleX={overlayMetrics.scaleX}
                   scaleY={overlayMetrics.scaleY}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right: Dashboard */}
-        <div className="shrink-0">
+        <div className={`shrink-0 panel-slide-right ${focusMode ? "panel-hidden-right" : ""}`}>
           <Dashboard
             metrics={sim.metrics}
             metricsHistory={sim.metricsHistory}
@@ -762,6 +716,18 @@ function SimulateContent() {
           />
         </div>
       </div>
+
+      {/* Focus mode exit overlay */}
+      {focusMode && (
+        <button
+          type="button"
+          className="fixed top-4 right-4 z-[60] rpg-panel px-3 py-1.5 text-[9px] font-mono transition-opacity hover:opacity-70"
+          style={{ color: "#5B3A1E", background: "#E8D5A3", border: "2px solid #6B4226" }}
+          onClick={() => setFocusMode(false)}
+        >
+          [ESC] exit focus
+        </button>
+      )}
 
       {/* NPC Profile Modal */}
       {selectedNpc && (

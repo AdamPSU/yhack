@@ -122,6 +122,17 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.centerOn((100 * 16) / 2, (80 * 16) / 2);
     }
 
+    if (selectedMap === "citypack") {
+      const MAP_PX_W = 100 * TILE_SIZE; // 1600
+      const MAP_PX_H = 80 * TILE_SIZE; // 1280
+      const minZoom = Math.max(GAME_WIDTH / MAP_PX_W, GAME_HEIGHT / MAP_PX_H);
+      this.cameras.main.setZoom(Math.max(this.cameras.main.zoom, minZoom));
+      this.cameras.main.setBounds(0, 0, MAP_PX_W, MAP_PX_H, true);
+      (this as any)._minZoom = minZoom;
+      (this as any)._mapPxW = MAP_PX_W;
+      (this as any)._mapPxH = MAP_PX_H;
+    }
+
     // Snap camera to integer pixels to prevent tile seams during pan/zoom
     this.cameras.main.roundPixels = true;
 
@@ -176,6 +187,31 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.npcManager?.refreshActiveBubblePositions();
+
+    // Camera spring bounce for citypack
+    if (selectedMap === "citypack") {
+      const cam = this.cameras.main;
+      const SOFT_X_MIN = 160;
+      const SOFT_X_MAX = 1440;
+      const SOFT_Y_MIN = 80;
+      const SOFT_Y_MAX = 1200;
+      const SPRING = 0.08;
+
+      const cx = cam.scrollX + cam.width / (2 * cam.zoom);
+      const cy = cam.scrollY + cam.height / (2 * cam.zoom);
+
+      let tx = cx;
+      let ty = cy;
+      if (cx < SOFT_X_MIN) tx = cx + (SOFT_X_MIN - cx) * SPRING;
+      else if (cx > SOFT_X_MAX) tx = cx + (SOFT_X_MAX - cx) * SPRING;
+      if (cy < SOFT_Y_MIN) ty = cy + (SOFT_Y_MIN - cy) * SPRING;
+      else if (cy > SOFT_Y_MAX) ty = cy + (SOFT_Y_MAX - cy) * SPRING;
+
+      if (tx !== cx || ty !== cy) {
+        cam.scrollX = Math.round(tx - cam.width / (2 * cam.zoom));
+        cam.scrollY = Math.round(ty - cam.height / (2 * cam.zoom));
+      }
+    }
 
     // Keyboard panning
     if (this.cursors) {
@@ -423,7 +459,7 @@ export class WorldScene extends Phaser.Scene {
     if (!cam) return;
 
     const zoomStep = 0.2;
-    const minZoom = 0.5;
+    const minZoom = (this as any)._minZoom ?? 0.5;
     const maxZoom = 5.0;
 
     const oldZoom = cam.zoom;

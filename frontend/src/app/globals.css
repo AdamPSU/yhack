@@ -243,3 +243,20 @@ body {
 .progress-glow {
   animation: progressGlow 1.5s ease-in-out infinite;
 }
+
+/* Focus mode panel transitions (spring overshoot) */
+.panel-slide-left {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.panel-slide-right {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.panel-slide-top {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.panel-hidden-left  { transform: translateX(-110%); }
+.panel-hidden-right { transform: translateX(110%); }
+.panel-hidden-top   { transform: translateY(-110%); }
+.canvas-expand {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}

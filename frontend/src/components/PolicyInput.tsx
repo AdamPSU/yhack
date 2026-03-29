@@ -15,15 +15,21 @@ const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
 export function PolicyInput() {
   const [text, setText] = useState("");
   const [mapId, setMapId] = useState<MapType>("ccity");
+  const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function handleSimulate() {
     if (text.trim().length < 20 || loading) return;
+    const proceduralParam = mapId === "citypack" && procedural ? "&procedural=true" : "";
+    if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
+      router.push(`/simulate?map=${mapId}${proceduralParam}`);
+      return;
+    }
     setLoading(true);
     try {
       const simId = await startSimulation(text);
-      router.push(`/simulate?id=${simId}&map=${mapId}`);
+      router.push(`/simulate?id=${simId}&map=${mapId}${proceduralParam}`);
     } catch (err) {
       console.error("Failed to start simulation:", err);
       setLoading(false);
@@ -60,6 +66,15 @@ export function PolicyInput() {
               <span className="block mt-0.5 text-[10px] font-mono text-[#8a7a62]">
                 {opt.desc}
               </span>
+              {opt.id === "citypack" && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setProcedural(p => !p); }}
+                  className="mt-1 text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                >
+                  [{procedural ? "■" : "□"}] Procedural: {procedural ? "ON" : "OFF"}
+                </button>
+              )}
             </button>
           ))}
         </div>

@@ -28,6 +28,12 @@ export function GameCanvas() {
         setSelectedMap(mapParam);
       }
 
+      const proceduralParam = params.get("procedural");
+      if (proceduralParam === "true") {
+        const { setProceduralMap } = await import("@/game/config");
+        setProceduralMap(true);
+      }
+
       // Try to load the real scenes from Agent A's build
       // turbopackOptional suppresses build errors when these files don't exist yet
       let scenes: Phaser.Types.Scenes.SceneType[];

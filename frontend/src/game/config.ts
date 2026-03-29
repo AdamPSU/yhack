@@ -6,6 +6,9 @@ export function setSelectedMap(m: MapType) {
   selectedMap = m;
 }
 
+export let proceduralMap = false;
+export function setProceduralMap(v: boolean) { proceduralMap = v; }
+
 // Per-map tile/grid constants
 const MAP_CONFIGS = {
   ccity: { tileSize: 16, cols: 80, rows: 60, spacing: 0 },

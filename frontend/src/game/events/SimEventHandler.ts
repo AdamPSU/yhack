@@ -22,8 +22,6 @@ export class SimEventHandler {
   private protestEffect: ProtestEffect;
   private closureEffect: ClosureEffect;
   private priceSpikeEffect: PriceSpikeEffect;
-  /** Track last speaker for NPC-to-NPC conversation detection */
-  private lastSpeaker: { npcId: string; time: number } | null = null;
 
   constructor(scene: Phaser.Scene, npcManager: NPCManager) {
     this.scene = scene;
@@ -47,17 +45,14 @@ export class SimEventHandler {
       const npcId = event.agentId;
       this.npcManager.showMessage(npcId, event.message);
 
-      // Detect NPC-to-NPC conversation: if a different NPC spoke recently, walk them together
-      if (
-        event.type === "reaction" &&
-        this.lastSpeaker &&
-        this.lastSpeaker.npcId !== npcId &&
-        Date.now() - this.lastSpeaker.time < 5000
-      ) {
-        this.npcManager.converseWith(npcId, this.lastSpeaker.npcId);
-        this.lastSpeaker = null; // Reset so we don't chain more meetups
-      } else {
-        this.lastSpeaker = { npcId, time: Date.now() };
+      // If this event has a valid targetNpcId, trigger conversation between speaker and target
+      if (event.targetNpcId && event.targetNpcId !== npcId) {
+        // Only converseWith if the target NPC actually exists in our NPC list
+        const allNPCs = this.npcManager.getAllNPCs();
+        const targetExists = allNPCs.some((n) => n.npcId === event.targetNpcId);
+        if (targetExists) {
+          this.npcManager.converseWith(npcId, event.targetNpcId);
+        }
       }
     }
 

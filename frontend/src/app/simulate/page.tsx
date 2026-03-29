@@ -7,7 +7,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
-import { NPCProfileModal } from "@/components/NPCProfileModal";
+import { NPCInteractionModal } from "@/components/NPCInteractionModal";
+import { StatsLegend } from "@/components/StatsLegend";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, SimEvent } from "@/types";
@@ -164,12 +165,6 @@ function SimulateContent() {
 
   const handleEventClick = useCallback((event: SimEvent) => {
     setSelectedNpcId(event.agentId);
-    // Removed automatic camera snap to allow manual control
-    /*
-    import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
-      eventBridge.emitCameraSnapToNPC(event.agentId);
-    });
-    */
   }, []);
 
   const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
@@ -187,7 +182,12 @@ function SimulateContent() {
 
   useEffect(() => {
     if (focusMode) {
-      setFocusScale(Math.max(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT));
+      setFocusScale(
+        Math.max(
+          window.innerWidth / GAME_WIDTH,
+          window.innerHeight / GAME_HEIGHT,
+        ),
+      );
     } else {
       setFocusScale(1);
     }
@@ -759,10 +759,11 @@ function SimulateContent() {
         </button>
       )}
 
-      {/* NPC Profile Modal */}
+      {/* NPC Interaction Modal (Profile + Chat side-by-side) */}
       {selectedNpc && (
-        <NPCProfileModal
+        <NPCInteractionModal
           npc={selectedNpc}
+          simulationId={simulationId}
           onClose={() => setSelectedNpcId(null)}
         />
       )}

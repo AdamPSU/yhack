@@ -287,6 +287,36 @@ export function useSimulation(simulationId?: string) {
       version: 0,
     });
 
+    // ── Mock backend path ──────────────────────────────────
+    if (USE_MOCK) {
+      const mock = generateMockSimulation(maxRoundsRef.current);
+      const lookup = npcLookupRef.current;
+      for (const npc of mock.initMsg.npcs) lookup.set(npc.id, npc);
+      relationshipsRef.current = mock.initMsg.relationships;
+      setGraphData((prev) => ({
+        ...prev,
+        relationships: mock.initMsg.relationships,
+        npcs: mock.initMsg.npcs,
+        version: prev.version + 1,
+      }));
+      getBridge().then(({ eventBridge }) => {
+        eventBridge.emitInitNPCs(mock.initMsg.npcs);
+      });
+      let i = 0;
+      const feedNext = () => {
+        if (i >= mock.rounds.length) {
+          waitForQueueDrain(eventQueueRef, setState);
+          return;
+        }
+        processRound(mock.rounds[i++]);
+        const t = setTimeout(feedNext, 150 + Math.random() * 100);
+        cleanupRef.current = () => clearTimeout(t);
+      };
+      feedNext();
+      return;
+    }
+
+    // ── Real backend path ──────────────────────────────────
     const simId = simulationId || "";
     if (!simId) {
       console.warn("[sim] no simulation ID — aborting");

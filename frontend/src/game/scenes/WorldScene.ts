@@ -79,6 +79,9 @@ export class WorldScene extends Phaser.Scene {
       );
     }
 
+    // Snap camera to integer pixels to prevent tile seams during pan/zoom
+    this.cameras.main.roundPixels = true;
+
     // Phase-change color overlay (sits above buildings, below NPCs)
     this.phaseOverlay = this.add.rectangle(
       GAME_WIDTH / 2,
@@ -294,8 +297,8 @@ export class WorldScene extends Phaser.Scene {
   // ─── Internal event handlers ───
 
   private onCameraPan(data: { dx: number; dy: number }) {
-    this.cameras.main.scrollX += data.dx;
-    this.cameras.main.scrollY += data.dy;
+    this.cameras.main.scrollX = Math.round(this.cameras.main.scrollX + data.dx);
+    this.cameras.main.scrollY = Math.round(this.cameras.main.scrollY + data.dy);
   }
 
   private onCameraZoom(data: { delta: number }) {

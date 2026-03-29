@@ -548,7 +548,7 @@ const map = {
   renderorder: "right-down",
   type: "map",
   version: "1.10",
-  tiledversion: "1.10.2",
+  tiledversion: "1.12.1",
   nextlayerid: 3,
   nextobjectid: 1,
   layers: [
@@ -581,7 +581,7 @@ const map = {
     {
       columns: 64,
       firstgid: 1,
-      image: "/assets/maps/citypack.png",
+      image: "citypack.png",
       imageheight: 1024,
       imagewidth: 1024,
       margin: 0,

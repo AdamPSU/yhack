@@ -44,8 +44,8 @@ function GameCanvasPlaceholder() {
     <div
       className="rpg-panel flex items-center justify-center box-border"
       style={{
-        width: GAME_WIDTH * SCALE_FACTOR + 4,
-        height: GAME_HEIGHT * SCALE_FACTOR + 4,
+        width: GAME_WIDTH * SCALE_FACTOR,
+        height: GAME_HEIGHT * SCALE_FACTOR,
       }}
     >
       <span className="text-xs font-mono text-[#5a4a32]">Loading world...</span>

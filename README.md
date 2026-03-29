@@ -1,5 +1,5 @@
 # SIMULACRA
-
+> Learn not just from the past, but also from the future.
 **Economic policy simulation with 25 AI agents in a pixel-art city.**
 
 Built at YHack 2026.

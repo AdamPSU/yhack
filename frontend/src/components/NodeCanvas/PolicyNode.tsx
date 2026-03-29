@@ -35,6 +35,7 @@ export default function PolicyNode() {
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
+            data-testid="policy-textarea"
             placeholder="Upload .md, .txt, or policy photos. Snap a policy, we'll extract the rules. Multimodal-ready."
             rows={8}
             className="rpg-panel w-full resize-none p-3 text-xs leading-relaxed font-mono text-white placeholder-white/40 outline-none focus:border-purple-400/50 transition-colors"
@@ -42,9 +43,10 @@ export default function PolicyNode() {
           <span className="absolute right-2 bottom-2 text-[9px] font-mono text-white/60">{text.length} chars</span>
         </div>
         <div className="flex items-center gap-2">
-          <input ref={fileRef} type="file" accept={ACCEPTED} onChange={handleFile} className="hidden" id="policy-file-node" />
+          <input ref={fileRef} type="file" accept={ACCEPTED} onChange={handleFile} className="hidden" id="policy-file-node" data-testid="policy-file-input" />
           <label
             htmlFor="policy-file-node"
+            data-testid="upload-button"
             className={`rpg-panel px-3 py-1.5 text-[10px] font-mono cursor-pointer hover:border-white hover:text-white ${extracting ? 'opacity-50 cursor-wait text-white/50' : 'text-white'}`}
           >
             {extracting ? 'Extracting...' : '↑ Multimodal Upload'}

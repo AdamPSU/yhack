@@ -13,6 +13,7 @@ export default function ObjectiveNode() {
           <textarea
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
+            data-testid="objective-textarea"
             placeholder={"What are you curious about?\n\ne.g. 'How does this affect\nlow-income workers?'"}
             rows={6}
             maxLength={500}

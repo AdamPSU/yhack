@@ -26,6 +26,7 @@ export default function ConfigNode() {
             value={numNpcs}
             onChange={(e) => setNumNpcs(parseInt(e.target.value))}
             className="rpg-slider"
+            data-testid="npcs-slider"
           />
         </div>
 
@@ -46,6 +47,7 @@ export default function ConfigNode() {
             value={numRounds}
             onChange={(e) => setNumRounds(parseInt(e.target.value))}
             className="rpg-slider"
+            data-testid="rounds-slider"
           />
         </div>
       </div>

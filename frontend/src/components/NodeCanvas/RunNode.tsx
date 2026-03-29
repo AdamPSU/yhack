@@ -14,6 +14,7 @@ export default function RunNode() {
           type="button"
           onClick={handleSimulate}
           disabled={!canRun}
+          data-testid="run-button"
           className="rpg-panel w-full py-5 text-sm font-mono font-bold text-white hover:bg-[#1a1a1a] hover:border-white hover:shadow-[0_0_12px_rgba(168,85,247,0.4)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px transition-all duration-150"
         >
           ▶

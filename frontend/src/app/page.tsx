@@ -64,7 +64,7 @@ export default function Home() {
 
       {/* Footer - Fixed to bottom, non-scrollable */}
       <footer 
-        className="fixed bottom-0 left-0 right-0 z-20 flex flex-col items-center pointer-events-none"
+        className="fixed bottom-0 left-0 right-0 z-[110] flex flex-col items-center pointer-events-none"
       >
         {/* The "Peeking" Box (clipped to bottom) */}
         <div className="rpg-panel w-full max-w-xl px-10 py-3 translate-y-[calc(30%-10px)] border-b-0 rounded-t-lg bg-black/80 backdrop-blur-md flex justify-between items-center opacity-100">

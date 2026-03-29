@@ -1,5 +1,6 @@
-# SIMULACRA
-> Learn not just from the past, but also from the future.
+# SIMULACRA: Learn not just from the past, but also from the future
+![Simulation](https://i.imgur.com/jkbhQAB.png)
+
 **Economic policy simulation with 25 AI agents in a pixel-art city.**
 
 Built at YHack 2026.

@@ -1,4 +1,5 @@
-# SIMULACRA
+# SIMULACRA: Learn not just from the past, but also from the future
+![Simulation](https://i.imgur.com/jkbhQAB.png)
 
 > Learn not only from the past, but also from possible futures.
 

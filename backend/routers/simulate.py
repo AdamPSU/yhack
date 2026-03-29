@@ -198,6 +198,9 @@ async def start_sim(sid: str, data: dict) -> None:
                 record.memory_streams = update.get(
                     "memory_streams", record.memory_streams
                 )
+                record.relationships = update.get(
+                    "relationships", record.relationships
+                )
                 round_num = update["current_round"] - 1
                 logger.info(
                     "sim=%s  round %d  events=%d",
@@ -213,6 +216,7 @@ async def start_sim(sid: str, data: dict) -> None:
                         "npcs": update["npcs"],
                         "influence_events": update.get("influence_events", []),
                         "economic_indicators": update.get("economic_indicators", {}),
+                        "relationships": update.get("relationships", []),
                         "max_rounds": policy.num_rounds,
                     },
                     to=sid,

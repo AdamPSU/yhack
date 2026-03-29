@@ -292,6 +292,9 @@ export function useSimulation(simulationId?: string, record = false) {
           ...msg.influence_events,
         ];
       }
+      if (msg.relationships) {
+        relationshipsRef.current = msg.relationships;
+      }
       setGraphData((prev) => ({
         relationships: relationshipsRef.current,
         npcs: Array.from(npcLookupRef.current.values()),

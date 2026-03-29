@@ -12,11 +12,11 @@ import type {
 // ── Color palette ──────────────────────────────────────────
 
 const EDGE_COLORS: Record<BackendRelType, string> = {
-  family: "#a855f7",  // Purple
-  friend: "#2dd4bf",  // Teal
-  employer: "#ffffff",
-  colleague: "#818cf8", // Indigo
-  neighbor: "#475569",
+  family: "#a855f7",
+  friend: "#4ade80",
+  employer: "#f59e0b",
+  colleague: "#06b6d4",
+  neighbor: "rgba(255,255,255,0.25)",
 };
 
 const EDGE_LABELS: Record<BackendRelType, string> = {
@@ -28,26 +28,49 @@ const EDGE_LABELS: Record<BackendRelType, string> = {
 };
 
 const MOOD_COLORS: Record<string, string> = {
-  angry: "#f472b6",
-  anxious: "#fbbf24",
+  angry: "#f43f5e",
+  anxious: "#fb923c",
   worried: "#facc15",
-  neutral: "#818cf8",
-  hopeful: "#2dd4bf",
-  excited: "#a855f7",
+  neutral: "rgba(255,255,255,0.2)",
+  hopeful: "#4ade80",
+  excited: "#a78bfa",
 };
 
 const BEHAVIOR_COLORS: Record<string, string> = {
-  keep: "#475569",
-  compromise: "#facc15",
-  adopt: "#ffffff",
+  keep: "rgba(255,255,255,0.2)",
+  compromise: "#f59e0b",
+  adopt: "#a855f7",
 };
 
 function politicalColor(leaning: number): string {
   const t = (leaning + 1) / 2;
   if (t <= 0.5) {
-    return d3.interpolateRgb("#2dd4bf", "#818cf8")(t / 0.5);
+    return d3.interpolateRgb("#14b8a6", "#a855f7")(t / 0.5);
   }
-  return d3.interpolateRgb("#818cf8", "#f472b6")((t - 0.5) / 0.5);
+  return d3.interpolateRgb("#a855f7", "#ec4899")((t - 0.5) / 0.5);
+}
+
+function roleColor(role: string): string {
+  switch (role) {
+    case "worker":
+    case "farmer":
+      return "#14b8a6";
+    case "business_owner":
+    case "shopkeeper":
+      return "#f59e0b";
+    case "politician":
+      return "#a855f7";
+    case "retiree":
+      return "#6b7280";
+    case "activist":
+      return "#ec4899";
+    case "student":
+      return "#06b6d4";
+    case "driver":
+      return "#f97316";
+    default:
+      return "#8b5cf6";
+  }
 }
 
 // ── Types ──────────────────────────────────────────────────
@@ -292,7 +315,7 @@ export function SocialGraph({
 
     ctx.clearRect(0, 0, dims.w, dims.h);
 
-    // Subtle radial gradient background (fixed, not zoomed)
+    // Deep purple background gradient (fixed, not zoomed)
     const bgGrad = ctx.createRadialGradient(
       dims.w / 2,
       dims.h / 2,
@@ -301,8 +324,8 @@ export function SocialGraph({
       dims.h / 2,
       dims.w * 0.6,
     );
-    bgGrad.addColorStop(0, "rgba(168, 85, 247, 0.05)");
-    bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    bgGrad.addColorStop(0, "#0d0020");
+    bgGrad.addColorStop(1, "#060010");
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, dims.w, dims.h);
 
@@ -421,7 +444,7 @@ export function SocialGraph({
       const eased = 1 - (1 - t) * (1 - t);
       const px = s.x + (e.x - s.x) * eased;
       const py = s.y + (e.y - s.y) * eased;
-      const color = BEHAVIOR_COLORS[p.behavior] || "#e8a43a";
+      const color = BEHAVIOR_COLORS[p.behavior] || "#a855f7";
       const fade = t < 0.1 ? t / 0.1 : t > 0.8 ? (1 - t) / 0.2 : 1;
       const pulseSize =
         p.behavior === "adopt" ? 5 : p.behavior === "compromise" ? 4 : 2.5;
@@ -481,8 +504,8 @@ export function SocialGraph({
       // Ambient glow for hovered / flashing nodes
       if ((isHov || isFlashing) && !isDimmed) {
         const glowColor = isHov
-          ? "#e8a43a"
-          : MOOD_COLORS[node.mood] || "#e8a43a";
+          ? "#a855f7"
+          : MOOD_COLORS[node.mood] || "#a855f7";
         const glowR = hovR + (isFlashing ? 10 + flashIntensity * 6 : 8);
         const glow = ctx.createRadialGradient(x, y, hovR, x, y, glowR);
         glow.addColorStop(0, `${glowColor}40`);
@@ -494,7 +517,7 @@ export function SocialGraph({
       }
 
       // Mood ring (outer arc segments instead of solid ring)
-      const moodColor = MOOD_COLORS[node.mood] || "#8a7a62";
+      const moodColor = MOOD_COLORS[node.mood] || "rgba(255,255,255,0.2)";
       ctx.strokeStyle = moodColor;
       ctx.lineWidth = 2;
       const segments = 6;
@@ -516,7 +539,7 @@ export function SocialGraph({
         y,
         hovR,
       );
-      const baseColor = politicalColor(node.political_leaning);
+      const baseColor = roleColor(node.role);
       const lighterColor = d3.interpolateRgb(baseColor, "#fff")(0.35);
       grad.addColorStop(0, lighterColor);
       grad.addColorStop(0.7, baseColor);
@@ -553,13 +576,13 @@ export function SocialGraph({
       }
 
       // Thin crisp border
-      ctx.strokeStyle = isHov ? "#f0e6d2" : "rgba(0,0,0,0.3)";
+      ctx.strokeStyle = isHov ? "rgba(168,85,247,0.8)" : "rgba(255,255,255,0.15)";
       ctx.lineWidth = isHov ? 1.5 : 0.5;
       ctx.stroke();
 
       // Label
-      ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)";
-      ctx.font = `${isHov ? "bold 9px" : "8px"} monospace`;
+      ctx.fillStyle = isDimmed ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)";
+      ctx.font = `${isHov ? "bold 10px" : "8px"} monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
 
@@ -810,12 +833,12 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
   const h = 105;
 
   // Background
-  ctx.globalAlpha = 0.88;
-  ctx.fillStyle = "#060010";
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(6,0,16,0.9)";
   ctx.beginPath();
   roundRect(ctx, x, y, w, h, 4);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+  ctx.strokeStyle = "rgba(168,85,247,0.3)";
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.globalAlpha = 1.0;
@@ -847,7 +870,7 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
     ctx.fillText(label, x + 24, y + 3);
     y += lh;
   }
@@ -860,7 +883,7 @@ function drawLegend(ctx: CanvasRenderingContext2D, canvasW: number) {
     ctx.fillStyle = politicalColor(t * 2 - 1);
     ctx.fillRect(x + 8 + i, y, 1, 5);
   }
-  ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
   ctx.font = "6px monospace";
   ctx.textAlign = "left";
   ctx.fillText("PROG", x + 6, y + 13);

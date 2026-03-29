@@ -24,7 +24,10 @@ async def parse_policy(state: SimState) -> dict[str, Any]:
     """Analyse raw policy text and extract sectors, stakeholders, and impacts."""
 
     logger.info("parse_policy: analysing %d chars of policy text …", len(state["policy_text"]))
-    prompt = PARSE_POLICY_PROMPT.format(policy_text=state["policy_text"])
+    prompt = PARSE_POLICY_PROMPT.format(
+        policy_text=state["policy_text"],
+        objective=state.get("objective", "") or "general economic and social impact",
+    )
     try:
         result = await invoke_llm_structured(prompt, PolicyAnalysis, max_tokens=4096)
         entities = result.model_dump()

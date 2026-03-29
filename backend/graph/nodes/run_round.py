@@ -289,6 +289,7 @@ async def _simulate_single_npc(
     npc_rels: list[tuple[str, str, float]],
     all_npcs: list[dict[str, Any]],
     name_to_id: dict[str, str],
+    objective: str = "",
 ) -> NPCRoundResult:
     """Full per-agent cognitive loop (Park et al. 2023):
     Retrieve → Reflect → Plan → Perceive/React/Act → Store memories.
@@ -337,6 +338,7 @@ async def _simulate_single_npc(
         npc_x=npc.get("x", 0),
         npc_y=npc.get("y", 0),
         policy_summary=policy_text,
+        objective=objective or "general economic and social impact",
         current_round=current_round + 1,
         max_rounds=max_rounds,
         round_context=round_context,
@@ -618,6 +620,7 @@ async def run_round(state: SimState) -> dict[str, Any]:
             npc_rels=npc_rels_map[npc_id],
             all_npcs=npcs,
             name_to_id=name_to_id,
+            objective=state.get("objective", ""),
         )
         tasks.append(asyncio.create_task(coro))
 

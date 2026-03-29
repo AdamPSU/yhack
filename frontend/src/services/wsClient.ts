@@ -23,14 +23,32 @@ export interface WSCallbacks {
 /**
  * POST to /simulate to create a new simulation, returns the simulation_id.
  */
+export async function extractFile(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/extract`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`Extraction failed: ${res.status}`);
+  const data = await res.json();
+  return data.text as string;
+}
+
 export async function startSimulation(
   policyText: string,
   numRounds?: number,
+  numNpcs?: number,
+  objective?: string,
+  mapId?: string,
 ): Promise<string> {
   const res = await fetch(`${API_BASE}/simulate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: policyText, num_rounds: numRounds ?? 15 }),
+    body: JSON.stringify({
+      text: policyText,
+      num_rounds: numRounds ?? 75,
+      num_npcs: numNpcs ?? 25,
+      objective: objective ?? "",
+      map_id: mapId ?? "ccity",
+    }),
   });
 
   if (!res.ok) {

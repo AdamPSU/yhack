@@ -94,19 +94,27 @@ async def _generate_relationships(npcs: list[dict], entities_json: str, llm: Cha
         f'{n["id"]}: {n.get("name", "?")} — {n.get("profession", "?")} x={n.get("x")}, y={n.get("y")}'
         for n in npcs
     ]
-    prompt = GENERATE_RELATIONSHIPS_PROMPT.format(npcs_summary="\n".join(summary_lines))
+    num_npcs = len(npcs)
+    # Target roughly 1.5 relationships per NPC, minimum 15.
+    target_rels = max(15, int(num_npcs * 1.5))
+    
+    prompt = GENERATE_RELATIONSHIPS_PROMPT.format(
+        npcs_summary="\n".join(summary_lines),
+        num_relationships=f"{target_rels}-{target_rels + 10}"
+    )
     response = await llm.ainvoke(prompt)
     data = parse_llm_json(response.content, fallback={"relationships": []})  # type: ignore[arg-type]
     return data.get("relationships", [])
 
 
 async def generate_npcs(state: SimState) -> dict:
-    logger.info("generate_npcs: starting — extracting characters …")
+    num_npcs = state.get("num_npcs", MAX_NPCS)
+    logger.info("generate_npcs: starting — extracting characters for %d NPCs …", num_npcs)
     llm = get_llm(max_tokens=4096)
     entities_json = json.dumps(state["entities"])
 
     extracted = await _extract_characters(state["policy_text"], entities_json, llm)
-    extracted = extracted[:MAX_NPCS]
+    extracted = extracted[:num_npcs]
     logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
 
     npcs: list[dict] = []
@@ -114,7 +122,7 @@ async def generate_npcs(state: SimState) -> dict:
         char["id"] = f"npc_{i + 1:02d}"
         npcs.append(_apply_defaults(char, i))
 
-    needed = MAX_NPCS - len(npcs)
+    needed = num_npcs - len(npcs)
     if needed > 0:
         logger.info("generate_npcs: generating %d random NPCs to fill roster …", needed)
         existing_names = [n["name"] for n in npcs]

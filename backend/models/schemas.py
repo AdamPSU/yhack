@@ -40,8 +40,11 @@ class SimEvent(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    text: str = Field(max_length=3000)
-    num_rounds: int = 15  # NUM_PHASES(3) × ROUNDS_PER_PHASE(5)
+    text: str = Field(max_length=10000)
+    num_rounds: int = 75
+    num_npcs: int = 25
+    objective: str = Field(default="", max_length=500)
+    map_id: str = Field(default="ccity")
 
 
 # --- Structured output response models for LLM calls ---

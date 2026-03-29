@@ -28,6 +28,10 @@ export class NPC extends Phaser.GameObjects.Sprite {
   /** Active bob tween, stopped on walk completion */
   private bobTween?: Phaser.Tweens.Tween;
 
+  private getMainCamera(): Phaser.Cameras.Scene2D.Camera | null {
+    return this.scene?.cameras?.main ?? null;
+  }
+
   constructor(
     scene: Phaser.Scene,
     id: string,
@@ -131,7 +135,9 @@ export class NPC extends Phaser.GameObjects.Sprite {
   }
 
   private emitHoverEvent() {
-    const cam = this.scene.cameras.main;
+    const cam = this.getMainCamera();
+    if (!cam) return;
+
     eventBridge.emitNPCHover({
       id: this.npcId,
       name: this.npcName,
@@ -158,8 +164,10 @@ export class NPC extends Phaser.GameObjects.Sprite {
   }
 
   /** Snapshot for EventBridge → React chat bubbles (camera-relative screen coords) */
-  toState(): NPCState {
-    const cam = this.scene.cameras.main;
+  toState(): NPCState | null {
+    const cam = this.getMainCamera();
+    if (!cam) return null;
+
     return {
       id: this.npcId,
       name: this.npcName,

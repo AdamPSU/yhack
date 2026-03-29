@@ -52,7 +52,9 @@ async def start_sim(sid: str, data: dict) -> None:
 
     initial_state: SimState = {
         "policy_text": policy.text,
+        "objective": policy.objective,
         "max_rounds": policy.num_rounds,
+        "num_npcs": policy.num_npcs,
         "entities": [],
         "npcs": [],
         "relationships": [],

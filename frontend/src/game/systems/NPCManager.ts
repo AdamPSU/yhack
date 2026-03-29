@@ -1,5 +1,5 @@
 import type * as Phaser from "phaser";
-import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
+import { getCoordScale, moodToSentiment } from "@/lib/adapter";
 import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
@@ -141,6 +141,29 @@ export class NPCManager {
             break;
           }
         }
+
+        // Last resort: use backend coords + snap to nearest road
+        if (tileX === -1) {
+          tileX = Math.max(
+            CENTER_BOUNDS.minCol,
+            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
+          );
+          tileY = Math.max(
+            CENTER_BOUNDS.minRow,
+            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
+          );
+          const snapped = this.findNearestTile(
+            tileX,
+            tileY,
+            (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+            10,
+          );
+          if (snapped) {
+            tileX = snapped.x;
+            tileY = snapped.y;
+          }
+        }
+
         if (tileX === -1) continue; // skip if no valid spawn found
 
         const car = new Car(this.scene, bn.id, bn.name, template, tileX, tileY);
@@ -188,11 +211,11 @@ export class NPCManager {
         if (tileX === -1) {
           tileX = Math.max(
             CENTER_BOUNDS.minCol,
-            Math.min(CENTER_BOUNDS.maxCol, bn.x * COORD_SCALE),
+            Math.min(CENTER_BOUNDS.maxCol, bn.x * getCoordScale()),
           );
           tileY = Math.max(
             CENTER_BOUNDS.minRow,
-            Math.min(CENTER_BOUNDS.maxRow, bn.y * COORD_SCALE),
+            Math.min(CENTER_BOUNDS.maxRow, bn.y * getCoordScale()),
           );
           const snapped = this.findNearestTile(
             tileX,
@@ -271,11 +294,17 @@ export class NPCManager {
     cam.setZoom(1.5);
   }
 
+  private emitNPCPosition(npc: NPC) {
+    const state = npc.toState();
+    if (!state) return;
+    eventBridge.emitNPCPosition(state);
+  }
+
   private onNPCMove(data: { npcId: string; toX: number; toY: number }) {
     const npc = this.npcs.get(data.npcId);
     if (!npc) return;
-    const targetX = data.toX * COORD_SCALE;
-    const targetY = data.toY * COORD_SCALE;
+    const targetX = data.toX * getCoordScale();
+    const targetY = data.toY * getCoordScale();
     this.stepToward(npc, targetX, targetY, 5);
   }
 
@@ -318,7 +347,7 @@ export class NPCManager {
     if (!npc) return;
 
     npc.message = message;
-    eventBridge.emitNPCPosition(npc.toState());
+    this.emitNPCPosition(npc);
 
     // Continuously emit position updates while message is active so React bubble follows NPC
     const posTimer = this.scene.time.addEvent({
@@ -326,10 +355,10 @@ export class NPCManager {
       callback: () => {
         if (!npc.message) {
           posTimer.destroy();
-          eventBridge.emitNPCPosition(npc.toState());
+          this.emitNPCPosition(npc);
           return;
         }
-        eventBridge.emitNPCPosition(npc.toState());
+        this.emitNPCPosition(npc);
       },
       loop: true,
     });

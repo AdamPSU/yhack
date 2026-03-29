@@ -19,6 +19,8 @@ type Listener = (...args: any[]) => void;
 class EventBridge {
   private static instance: EventBridge;
   private listeners = new Map<string, Set<{ fn: Listener; ctx: unknown }>>();
+  /** Buffered init-npcs payload — replayed to late subscribers (e.g. NPCManager not yet ready) */
+  private bufferedInitNPCs: unknown[] | null = null;
 
   private constructor() {}
 
@@ -34,6 +36,10 @@ class EventBridge {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add({ fn, ctx: context });
+    // Replay buffered init-npcs so NPCManager gets it even if Phaser booted after React emitted
+    if (event === "sim:init-npcs" && this.bufferedInitNPCs !== null) {
+      fn.apply(context, [this.bufferedInitNPCs]);
+    }
   }
 
   off(event: string, fn: Listener, context?: unknown) {
@@ -76,6 +82,7 @@ class EventBridge {
 
   // React → Phaser: initialize NPCs from backend
   emitInitNPCs(npcs: unknown[]) {
+    this.bufferedInitNPCs = npcs;
     this.emit("sim:init-npcs", npcs);
   }
 

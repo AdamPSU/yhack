@@ -57,8 +57,8 @@ function NPCTooltip({ info }: { info: NPCHoverInfo }) {
     <div
       className="pointer-events-none absolute z-50"
       style={{
-        left: info.x * SCALE_FACTOR + 16,
-        top: info.y * SCALE_FACTOR - 4,
+        left: info.x + 16,
+        top: info.y - 4,
       }}
     >
       <div className="rounded bg-[#1a1510]/95 border border-[#4a3c2a] px-2 py-1 shadow-lg">
@@ -99,6 +99,17 @@ export default function SimulatePage() {
     }
   }, []);
 
+  // Start simulation once policyText is loaded from sessionStorage (or immediately for mock mode)
+  const hasStartedRef = useRef(false);
+  useEffect(() => {
+    if (hasStartedRef.current) return;
+    const isMock = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
+    if (policyText || isMock) {
+      hasStartedRef.current = true;
+      sim.start();
+    }
+  }, [policyText, sim.start]);
+
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -111,8 +122,8 @@ export default function SimulatePage() {
               npcId: npc.id,
               agentName: npc.name,
               message: npc.message,
-              x: npc.x * SCALE_FACTOR,
-              y: npc.y * SCALE_FACTOR,
+              x: npc.x,
+              y: npc.y,
             });
           } else {
             next.delete(npc.id);

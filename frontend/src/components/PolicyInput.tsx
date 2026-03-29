@@ -3,19 +3,60 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { POLICY_PRESETS } from "@/mocks/mockData";
+import type { MapType } from "@/game/config";
+
+const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
+  { id: "ccity", label: "CCity", desc: "Large 80x60 modern city" },
+  { id: "pico8", label: "Pico-8 City", desc: "Compact 55x30 retro town" },
+  { id: "citypack", label: "Citypack", desc: "Infinite procedural city" },
+];
 
 export function PolicyInput() {
   const [text, setText] = useState("");
+  const [mapId, setMapId] = useState<MapType>("ccity");
   const router = useRouter();
 
   function handleSimulate() {
     if (text.trim().length < 20) return;
     sessionStorage.setItem("agora-policy", text);
-    router.push("/simulate");
+    router.push(`/simulate?map=${mapId}`);
   }
 
   return (
     <div className="w-full max-w-2xl space-y-4" data-testid="policy-input">
+      {/* Map selector */}
+      <div data-testid="map-selector">
+        <p className="mb-2 text-[10px] font-mono tracking-widest uppercase text-[#6a5a42]">
+          Select Map
+        </p>
+        <div className="flex gap-3">
+          {MAP_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setMapId(opt.id)}
+              data-testid={`map-${opt.id}`}
+              className={`rpg-panel flex-1 px-4 py-3 text-left transition-colors duration-150 active:translate-y-px ${
+                mapId === opt.id
+                  ? "border-[#e8a43a] bg-[#2a2218] shadow-[0_0_8px_rgba(232,164,58,0.15)]"
+                  : "hover:border-[#6a5a42]"
+              }`}
+            >
+              <span
+                className={`block text-sm font-mono font-bold ${
+                  mapId === opt.id ? "text-[#e8a43a]" : "text-[#d4c4a0]"
+                }`}
+              >
+                {opt.label}
+              </span>
+              <span className="block mt-0.5 text-[10px] font-mono text-[#8a7a62]">
+                {opt.desc}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Preset buttons */}
       <div className="flex flex-wrap gap-2" data-testid="preset-buttons">
         {POLICY_PRESETS.map((preset) => (

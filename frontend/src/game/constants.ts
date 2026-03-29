@@ -5,7 +5,7 @@ export const MAP_COLS = 80;
 export const MAP_ROWS = 60;
 export const GAME_WIDTH = MAP_COLS * TILE_SIZE; // 1280
 export const GAME_HEIGHT = MAP_ROWS * TILE_SIZE; // 960
-export const SCALE_FACTOR = 2; // render at 2x for crisp pixels
+export const SCALE_FACTOR = 1; // 1:1 — Phaser Scale.FIT handles display scaling
 
 // Per-map tile/grid constants
 export const MAP_CONFIGS = {

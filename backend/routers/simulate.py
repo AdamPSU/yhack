@@ -49,6 +49,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
         "relationships": [],
         "events": [],
         "current_round": 0,
+        "memory_streams": {},
     }
 
     try:
@@ -92,6 +93,7 @@ async def simulation_ws(websocket: WebSocket, simulation_id: str):
                         "round": round_num,
                         "events": update["events"],
                         "npcs": update["npcs"],
+                        "influence_events": update.get("influence_events", []),
                     }
                 )
 

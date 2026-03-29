@@ -10,7 +10,19 @@ import {
 import { generateMockSimulation } from "@/mocks/mockBackend";
 import { connectWebSocket, startSimulation } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
-import type { BackendNPC, WSRoundMsg } from "@/types/backend";
+import type {
+  BackendInfluenceEvent,
+  BackendNPC,
+  BackendRelationship,
+  WSRoundMsg,
+} from "@/types/backend";
+
+export interface GraphData {
+  relationships: BackendRelationship[];
+  npcs: BackendNPC[];
+  influenceEvents: BackendInfluenceEvent[];
+  version: number;
+}
 
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
 
@@ -78,12 +90,21 @@ export function useSimulation(policyText?: string) {
     latestEvent: null,
   });
 
+  const [graphData, setGraphData] = useState<GraphData>({
+    relationships: [],
+    npcs: [],
+    influenceEvents: [],
+    version: 0,
+  });
+
   const cleanupRef = useRef<(() => void) | null>(null);
   const npcLookupRef = useRef<Map<string, BackendNPC>>(new Map());
+  const relationshipsRef = useRef<BackendRelationship[]>([]);
+  const influenceLogRef = useRef<BackendInfluenceEvent[]>([]);
   const metricsAccRef = useRef<MetricsAccumulator>(createAccumulator());
   const eventQueueRef = useRef<SimEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxRoundsRef = useRef(75);
+  const maxRoundsRef = useRef(15);
   const lastPhaseRef = useRef(0);
 
   const drainQueue = useCallback(() => {
@@ -172,6 +193,19 @@ export function useSimulation(policyText?: string) {
         }
       }
 
+      if (msg.influence_events) {
+        influenceLogRef.current = [
+          ...influenceLogRef.current,
+          ...msg.influence_events,
+        ];
+      }
+      setGraphData((prev) => ({
+        relationships: relationshipsRef.current,
+        npcs: Array.from(npcLookupRef.current.values()),
+        influenceEvents: msg.influence_events || [],
+        version: prev.version + 1,
+      }));
+
       const newMetrics = updateMetrics(
         metricsAccRef.current,
         msg.npcs,
@@ -200,19 +234,32 @@ export function useSimulation(policyText?: string) {
       latestEvent: null,
     });
     npcLookupRef.current = new Map();
+    relationshipsRef.current = [];
+    influenceLogRef.current = [];
     metricsAccRef.current = createAccumulator();
     eventQueueRef.current = [];
     lastPhaseRef.current = 0;
+    setGraphData({ relationships: [], npcs: [], influenceEvents: [], version: 0 });
+
+    console.log("[sim] start() called — mode=%s, policyText=%d chars", USE_MOCK ? "MOCK" : "LIVE", (policyText || "").length);
 
     // ── Mock backend path ──────────────────────────────────
     if (USE_MOCK) {
       const mock = generateMockSimulation(maxRoundsRef.current);
+      console.log("[sim] mock generated — %d NPCs, %d rounds", mock.initMsg.npcs.length, mock.rounds.length);
 
-      // Init NPCs
+      // Init NPCs + relationships
       const lookup = npcLookupRef.current;
       for (const npc of mock.initMsg.npcs) {
         lookup.set(npc.id, npc);
       }
+      relationshipsRef.current = mock.initMsg.relationships;
+      setGraphData((prev) => ({
+        ...prev,
+        relationships: mock.initMsg.relationships,
+        npcs: mock.initMsg.npcs,
+        version: prev.version + 1,
+      }));
       getBridge().then(({ eventBridge }) => {
         eventBridge.emitInitNPCs(mock.initMsg.npcs);
       });
@@ -221,6 +268,7 @@ export function useSimulation(policyText?: string) {
       let i = 0;
       const feedNext = () => {
         if (i >= mock.rounds.length) {
+          console.log("[sim] mock complete — all %d rounds fed", mock.rounds.length);
           waitForQueueDrain(eventQueueRef, setState);
           return;
         }
@@ -236,31 +284,53 @@ export function useSimulation(policyText?: string) {
 
     // ── Real backend path ──────────────────────────────────
     const text = policyText || "";
-    if (!text) return;
+    if (!text) {
+      console.warn("[sim] no policy text — aborting");
+      setState((prev) => ({ ...prev, isRunning: false }));
+      return;
+    }
 
     try {
+      console.log("[sim] POST /simulate (%d chars)…", text.length);
       const simId = await startSimulation(text);
+      console.log("[sim] simulation created — id=%s, connecting WS…", simId);
 
       const cleanup = connectWebSocket(simId, {
-        onPolicyAnalysis: () => {},
+        onPolicyAnalysis: (msg) => {
+          console.log("[sim] policy_analysis received — %d entities", msg.entities?.length ?? 0);
+        },
 
         onInit: (msg) => {
+          console.log("[sim] init received — %d NPCs, %d relationships", msg.npcs.length, msg.relationships.length);
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {
             lookup.set(npc.id, npc);
           }
+          relationshipsRef.current = msg.relationships;
+          setGraphData((prev) => ({
+            ...prev,
+            relationships: msg.relationships,
+            npcs: msg.npcs,
+            version: prev.version + 1,
+          }));
 
           getBridge().then(({ eventBridge }) => {
             eventBridge.emitInitNPCs(msg.npcs);
           });
         },
 
-        onRound: (msg: WSRoundMsg) => processRound(msg),
+        onRound: (msg: WSRoundMsg) => {
+          console.log("[sim] round %d — %d events, %d NPCs", msg.round, msg.events.length, msg.npcs.length);
+          processRound(msg);
+        },
 
-        onDone: () => waitForQueueDrain(eventQueueRef, setState),
+        onDone: () => {
+          console.log("[sim] done — draining event queue (%d remaining)", eventQueueRef.current.length);
+          waitForQueueDrain(eventQueueRef, setState);
+        },
 
         onError: (message) => {
-          console.error("Simulation error:", message);
+          console.error("[sim] error:", message);
           setState((prev) => ({ ...prev, isRunning: false }));
         },
       });
@@ -279,8 +349,15 @@ export function useSimulation(policyText?: string) {
     };
   }, []);
 
+  const getNpc = useCallback(
+    (id: string) => npcLookupRef.current.get(id),
+    [],
+  );
+
   return {
     ...state,
     start,
+    graphData,
+    getNpc,
   };
 }

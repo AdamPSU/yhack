@@ -24,7 +24,7 @@ yhack/
 │   │   ├── layout.tsx       # RootLayout (Geist fonts)
 │   │   ├── page.tsx         # Main page (currently scaffold)
 │   │   └── globals.css      # Tailwind CSS + CSS vars
-│   ├── src/components/      # ChatBubble, Dashboard, EventFeed, GameCanvas, PolicyInput
+│   ├── src/components/      # ChatBubble, Dashboard, EventFeed, GameCanvas, NPCProfileModal, PolicyInput
 │   ├── src/game/
 │   │   ├── config.ts        # Phaser config
 │   │   ├── bridge/          # EventBridge singleton (React ↔ Phaser)
@@ -48,6 +48,7 @@ yhack/
 │   │   └── state.py         # LangGraph SimState TypedDict
 │   ├── graph/
 │   │   ├── builder.py       # StateGraph orchestrator
+│   │   ├── memory.py        # Memory stream, retrieval, reflection (Park et al. 2023)
 │   │   ├── prompts.py       # LLM prompt templates
 │   │   ├── llm.py           # ChatAnthropic factory
 │   │   ├── utils.py         # parse_llm_json helper
@@ -92,13 +93,19 @@ User → Policy Text → FastAPI POST /simulate → LangGraph Orchestrator
 1. **Phaser must be client-only**: Use `next/dynamic` with `ssr: false` — Phaser requires browser APIs (canvas, window). The wrapping page must be `"use client"`.
 2. **Programmatic pixel art**: BootScene generates textures via `this.make.graphics().generateTexture()` — no external asset files needed.
 3. **EventBridge pattern**: A singleton `Phaser.Events.EventEmitter` bridges React (WebSocket data) to Phaser (game rendering). React emits `sim:*` events, Phaser listens.
-4. **25 NPC agents**: Parallelized with `asyncio.gather()` in each simulation round. Each NPC follows Perceive → React → Act.
+4. **25 NPC agents**: Parallelized with `asyncio.gather()` in each simulation round. Each NPC follows Perceive → Retrieve → Reflect → Plan → Act (generative agents architecture, Park et al. 2023).
 5. **LangGraph `astream`**: Graph streams state updates per node; WebSocket handler forwards events to frontend.
 6. **Event queuing**: Frontend queues events with delays (500ms-1s) so simulation plays back cinematically.
 
 ## Agent Design (Core Loop per NPC)
-- **Perceive**: Read policy summary + nearby NPC info (with relationship annotations) + neighbor reactions from last round
-- **React**: LLM decides emotional/economic reaction based on persona
+Based on Park et al. (2023), "Generative Agents" ([arXiv:2304.03442](https://arxiv.org/abs/2304.03442)):
+
+- **Memory Stream**: Append-only log per NPC of observations, reflections, and plans (in `memory_streams` SimState field)
+- **Perceive**: Read policy summary + nearby NPC info + retrieved memories (top-K by recency × importance × relevance)
+- **Retrieve**: Score memories via 3-factor formula (recency decay 0.8/round, heuristic importance 1-10, Jaccard keyword relevance)
+- **Reflect**: When sum of recent importance scores exceeds threshold (25), NPC synthesizes 2-3 higher-level insights (stored back as reflection memories)
+- **Plan**: NPC forms initial plan on round 0, can revise each round; plan always injected into prompt
+- **React**: LLM decides emotional/economic reaction based on persona, memories, and plan
 - **Act**: Output action — chat message, movement, protest, price adjustment, discuss with neighbor
 - **Post-round influence**: Opinion dynamics applied after all NPCs act (see below)
 

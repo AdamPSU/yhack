@@ -145,9 +145,14 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 }}
 </output_format>"""
 
-NPC_ROUND_PROMPT = """\
-You are simulating the behavior of a single person in a small town reacting to a new economic policy. Stay in character and produce realistic, sometimes surprising reactions.
+# ---------------------------------------------------------------------------
+# Shared prompt fragments (used by NPC_ROUND_PROMPT_V2)
+# ---------------------------------------------------------------------------
 
+_NPC_PREAMBLE = """\
+You are simulating the behavior of a single person in a small town reacting to a new economic policy. Stay in character and produce realistic, sometimes surprising reactions."""
+
+_NPC_CHARACTER_BLOCK = """\
 <character>
 <name>{npc_name}</name>
 <gender>{npc_gender}</gender>
@@ -177,47 +182,99 @@ You are simulating the behavior of a single person in a small town reacting to a
 
 <distant_connections description="people you care about, not nearby">
 {social_targets}
-</distant_connections>
+</distant_connections>"""
 
-<last_round_events description="what nearby characters did last round">
-{neighbor_events}
-</last_round_events>
-
-<instructions>
-Think through three steps as this character:
-
-<step name="perceive">What stands out to you about the policy and what the people around you are doing? Pay attention to people you have relationships with — friends, family, and colleagues matter more than strangers.</step>
-
-<step name="react">How do you emotionally and economically respond? Consider your personality, income, political views, and social connections. If a friend or family member is nearby, you're more likely to engage with them. If someone you care about is far away, you might want to move toward them.</step>
-
-<step name="act">What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character. Prefer interacting with people you have relationships with over strangers. Your social connections act as a gravitational pull.</step>
-</instructions>
-
+_NPC_ACTION_TYPES = """\
 <action_types>
-<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). Prefer talking to friends, family, or colleagues over strangers when possible.</action>
-<action type="move">Walk one tile in any direction (you can only move 1 step per round). Consider moving toward people you care about who aren't nearby yet — check the distant_connections section for directions.</action>
-<action type="protest">Organize or join a protest. Describe the sign/chant.</action>
-<action type="price_change">If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason.</action>
-<action type="mood_shift">Your mood changes. Include old_mood, new_mood, and the trigger.</action>
+<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). Prefer talking to friends, family, or colleagues over strangers when possible. IMPORTANT: The "message" field must be the ACTUAL DIALOGUE — the exact words you say OUT LOUD, in first person, in your own voice and speech style. NOT a narration or summary. Write it like a line in a screenplay. Examples: "Hey Frank, you hear about these tariffs? Could mean overtime for us.", "I swear if they touch my pension I'm walking out.", "Mama, they're bringing jobs back to the mill!"</action>
+<action type="move">Move to any tile on the map (costs your round). Consider moving toward people you care about who aren't nearby yet — check the distant_connections section for directions. The "message" field should describe WHERE you're heading and WHY, e.g. "Heading over to the union hall to see what the guys think."</action>
+<action type="protest">Organize or join a protest. Describe the sign/chant. The "message" field should be vivid — what you're shouting, what your sign says.</action>
+<action type="price_change">If you're a business owner or shopkeeper, adjust your prices. Include item, old_price, new_price, and reason. The "message" field should explain the change in your own words.</action>
+<action type="mood_shift">Your mood changes. Include old_mood, new_mood, and the trigger. The "message" field should capture your inner monologue — what you're feeling, not a clinical description.</action>
 </action_types>
 
-<output_format>
-Respond ONLY with valid JSON (no markdown fences, no commentary):
-{{
-  "events": [
-    {{
-      "event_type": "chat|move|protest|price_change|mood_shift",
-      "message": "human-readable description of what happened",
-      "data": {{}}
-    }},
-    ...
-  ]
-}}
+<style_rules>
+CRITICAL: Never write the "message" field as a third-person summary like "X discusses Y with Z" or "X's mood shifts to hopeful." Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and speech patterns.
+</style_rules>"""
 
+_NPC_DATA_FIELDS = """\
 Data fields by event_type:
 - chat: {{"target_npc_id": "npc_XX", "dialogue": "what you say"}}
 - move: {{"from_x": ..., "from_y": ..., "to_x": ..., "to_y": ..., "destination": "place name"}}
 - protest: {{"location": "place", "sign_text": "what the sign says", "intensity": "peaceful|heated|volatile"}}
 - price_change: {{"item": "...", "old_price": ..., "new_price": ..., "reason": "..."}}
-- mood_shift: {{"old_mood": "...", "new_mood": "...", "trigger": "what caused the shift"}}
+- mood_shift: {{"old_mood": "...", "new_mood": "...", "trigger": "what caused the shift"}}"""
+
+# ---------------------------------------------------------------------------
+# Memory-augmented NPC prompt (Park et al. 2023 generative agents architecture)
+# ---------------------------------------------------------------------------
+
+NPC_ROUND_PROMPT_V2 = f"""\
+{_NPC_PREAMBLE}
+
+{_NPC_CHARACTER_BLOCK}
+
+<your_memories description="your most relevant memories from the simulation so far">
+{{retrieved_memories}}
+</your_memories>
+
+<your_current_plan>
+{{current_plan}}
+</your_current_plan>
+
+<instructions>
+Think through these steps as this character:
+
+<step name="perceive">What stands out to you about the current situation? Consider the policy, people around you, and your memories of what has happened so far. Reference specific memories when relevant.</step>
+
+<step name="react">How do you emotionally respond? Consider your personality, income, political views, social connections, and what you remember. Does anything unexpected conflict with your plan?</step>
+
+<step name="plan_check">Does anything that happened change your plans? If so, state your revised plan. If not, leave plan_update as null.</step>
+
+<step name="act">What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character and align with your current plan. Prefer interacting with people you have relationships with over strangers.</step>
+</instructions>
+
+{_NPC_ACTION_TYPES}
+
+<output_format>
+Respond ONLY with valid JSON (no markdown fences, no commentary):
+{{{{
+  "perception": "what you notice and think about the current situation",
+  "emotional_reaction": "your emotional and internal response",
+  "plan_update": null,
+  "events": [
+    {{{{
+      "event_type": "chat|move|protest|price_change|mood_shift",
+      "message": "human-readable description of what happened",
+      "data": {{{{}}}}
+    }}}}
+  ]
+}}}}
+
+Set plan_update to a string describing your revised plan, or null if your plan is unchanged.
+
+{_NPC_DATA_FIELDS}
+</output_format>"""
+
+REFLECTION_PROMPT = """\
+You are {npc_name}, a {npc_profession} in Millfield. Below are your recent memories and experiences from the policy simulation.
+
+<recent_memories>
+{recent_memories}
+</recent_memories>
+
+<task>
+Based on these experiences, generate 2-3 higher-level insights about:
+- How the policy is affecting you and people you care about
+- What you have learned about the people around you
+- How your feelings or position on the policy have evolved
+
+Each insight should synthesize multiple memories into a broader understanding. Be specific and personal.
+</task>
+
+<output_format>
+Respond ONLY with valid JSON (no markdown fences, no commentary):
+{{
+  "insights": ["insight 1", "insight 2", "insight 3"]
+}}
 </output_format>"""

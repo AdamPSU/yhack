@@ -5,8 +5,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
+import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
-import type { NPCHoverInfo, NPCState } from "@/types";
+import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
+
+const SocialGraph = dynamic(
+  () =>
+    import("@/components/SocialGraph").then((m) => ({
+      default: m.SocialGraph,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-[10px] font-mono text-[#5a4a32]">
+        Loading graph...
+      </div>
+    ),
+  },
+);
 
 // Mirror game/config constants here to avoid importing Phaser during SSR.
 // game/config.ts imports Phaser at top level which requires `window`.
@@ -88,9 +104,18 @@ export default function SimulatePage() {
   const [policyText, setPolicyText] = useState<string>("");
   const sim = useSimulation(policyText);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
+  const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
+
+  const handleEventClick = useCallback(
+    (event: SimEvent) => setSelectedNpcId(event.agentId),
+    [],
+  );
+
+  const selectedNpc = selectedNpcId ? sim.getNpc(selectedNpcId) : undefined;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
+  const [leftTab, setLeftTab] = useState<"events" | "graph">("events");
   // Load policy text from sessionStorage
   useEffect(() => {
     const stored = sessionStorage.getItem("agora-policy");
@@ -280,9 +305,47 @@ export default function SimulatePage() {
 
       {/* Main layout */}
       <div className="flex flex-1 gap-2 overflow-hidden p-2">
-        {/* Left: Event feed */}
-        <div className="shrink-0">
-          <EventFeed events={sim.events} />
+        {/* Left: Event feed / Social graph (tabbed) */}
+        <div className="rpg-panel flex h-full w-64 shrink-0 flex-col">
+          {/* Tab bar */}
+          <div className="flex border-b border-[#3a2e1e]">
+            <button
+              type="button"
+              onClick={() => setLeftTab("events")}
+              className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-colors ${
+                leftTab === "events"
+                  ? "text-[#e8a43a] bg-[#251e15]"
+                  : "text-[#5a4a32] hover:text-[#8a7a62]"
+              }`}
+            >
+              Event Log
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeftTab("graph")}
+              className={`flex-1 px-3 py-2 text-[10px] font-mono font-bold uppercase transition-colors ${
+                leftTab === "graph"
+                  ? "text-[#e8a43a] bg-[#251e15]"
+                  : "text-[#5a4a32] hover:text-[#8a7a62]"
+              }`}
+            >
+              Social Graph
+            </button>
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-hidden">
+            {leftTab === "events" ? (
+              <EventFeed events={sim.events} onEventClick={handleEventClick} />
+            ) : (
+              <SocialGraph
+                npcs={sim.graphData.npcs}
+                relationships={sim.graphData.relationships}
+                influenceEvents={sim.graphData.influenceEvents}
+                version={sim.graphData.version}
+              />
+            )}
+          </div>
         </div>
 
         {/* Center: Game canvas with chat bubble overlays */}
@@ -351,6 +414,14 @@ export default function SimulatePage() {
           />
         </div>
       </div>
+
+      {/* NPC Profile Modal */}
+      {selectedNpc && (
+        <NPCProfileModal
+          npc={selectedNpc}
+          onClose={() => setSelectedNpcId(null)}
+        />
+      )}
     </div>
   );
 }

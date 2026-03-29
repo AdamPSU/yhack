@@ -12,3 +12,4 @@ class SimState(TypedDict):
     events: Annotated[list[dict[str, Any]], operator.add]
     current_round: int
     max_rounds: int
+    memory_streams: dict[str, list[dict[str, Any]]]

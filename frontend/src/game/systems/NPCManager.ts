@@ -3,7 +3,7 @@ import { getCoordScale, moodToSentiment } from "@/lib/adapter";
 import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS, TILE_SIZE } from "../config";
+import { CENTER_BOUNDS, getMapConfig } from "../config";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
 import { type CarTemplate, CAR_TEMPLATES } from "../map/CarRegistry";
@@ -76,8 +76,9 @@ export class NPCManager {
 
   private ensureSpawnArea() {
     if (this.spawnAreaReady) return;
-    for (let row = CENTER_BOUNDS.minRow; row <= CENTER_BOUNDS.maxRow; row++) {
-      for (let col = CENTER_BOUNDS.minCol; col <= CENTER_BOUNDS.maxCol; col++) {
+    const mc = getMapConfig();
+    for (let row = 1; row < mc.rows - 1; row++) {
+      for (let col = 1; col < mc.cols - 1; col++) {
         if (this.isRoad(col, row) && this.isWalkable(col, row)) {
           this.roadTilesCache.push({ x: col, y: row });
         }
@@ -138,7 +139,6 @@ export class NPCManager {
     const zone = roleToZone(bn.role);
     this.npcZones.set(bn.id, zone);
     this.movement.startRoaming(npc, zone);
-    this.centerCameraOnNPCs();
   }
 
   private onInitNPCs(backendNPCs: unknown[]) {
@@ -321,7 +321,6 @@ export class NPCManager {
     }
 
     // Center camera on NPC cluster
-    this.centerCameraOnNPCs();
   }
 
   /** Check if position has minimum Manhattan distance from all placed NPCs */
@@ -353,23 +352,6 @@ export class NPCManager {
       }
     }
     return null;
-  }
-
-  /** Center camera on the centroid of all spawned NPCs */
-  private centerCameraOnNPCs() {
-    if (this.npcs.size === 0) return;
-    let sumX = 0;
-    let sumY = 0;
-    for (const npc of this.npcs.values()) {
-      sumX += npc.tileX;
-      sumY += npc.tileY;
-    }
-    const centroidX = (sumX / this.npcs.size) * TILE_SIZE + TILE_SIZE / 2;
-    const centroidY = (sumY / this.npcs.size) * TILE_SIZE + TILE_SIZE / 2;
-
-    const cam = this.scene.cameras.main;
-    cam.centerOn(centroidX, centroidY);
-    cam.setZoom(1.5);
   }
 
   private emitNPCPosition(npc: NPC) {

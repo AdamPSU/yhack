@@ -470,7 +470,7 @@ function SimulateContent() {
 
   return (
     <div
-      className="relative flex h-screen flex-col overflow-hidden"
+      className="relative flex h-screen flex-col overflow-clip"
       style={{ background: "#4a7a3b" }}
       data-testid="simulate-page"
     >

@@ -136,3 +136,12 @@ export type WSMessage =
   | WSNPCEventsMsg
   | WSDoneMsg
   | WSErrorMsg;
+
+export interface SavedSimulation {
+  version: 1;
+  savedAt: string;
+  policyText?: string;
+  maxRounds: number;
+  initMsg: WSInitMsg;
+  rounds: WSRoundMsg[];
+}

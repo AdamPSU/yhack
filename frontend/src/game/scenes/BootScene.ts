@@ -36,7 +36,12 @@ export class BootScene extends Phaser.Scene {
       this.load.image("pico8", "/assets/citymap_pico8/tilemap_packed.png");
       this.load.tilemapTiledJSON("city", "/assets/maps/pico8-city.json");
     } else if (selectedMap === "citypack") {
-      this.load.image("citypack", "/assets/maps/citypack.png");
+      this.load.spritesheet("citypack", "/assets/maps/citypack.png", {
+        frameWidth: 16,
+        frameHeight: 16,
+        margin: 0,
+        spacing: 0,
+      });
       if (!proceduralMap) {
         this.load.tilemapTiledJSON("citypack-city", "/assets/maps/citypack-city.json");
       }

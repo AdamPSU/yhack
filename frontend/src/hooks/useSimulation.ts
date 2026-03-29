@@ -14,7 +14,7 @@ import type {
   BackendInfluenceEvent,
   BackendNPC,
   BackendRelationship,
-  BackendSimEvent,
+  SavedSimulation,
   WSNPCEventsMsg,
   WSRoundMsg,
 } from "@/types/backend";
@@ -85,7 +85,7 @@ function waitForQueueDrain(
   tick();
 }
 
-export function useSimulation(simulationId?: string) {
+export function useSimulation(simulationId?: string, record = false) {
   const [state, setState] = useState<SimulationState>({
     events: [],
     metrics: { ...INITIAL_METRICS },
@@ -105,6 +105,7 @@ export function useSimulation(simulationId?: string) {
   });
 
   const cleanupRef = useRef<(() => void) | null>(null);
+  const recordingRef = useRef<SavedSimulation | null>(null);
   const npcLookupRef = useRef<Map<string, BackendNPC>>(new Map());
   const relationshipsRef = useRef<BackendRelationship[]>([]);
   const influenceLogRef = useRef<BackendInfluenceEvent[]>([]);
@@ -300,6 +301,15 @@ export function useSimulation(simulationId?: string) {
     // ── Mock backend path ──────────────────────────────────
     if (USE_MOCK) {
       const mock = generateMockSimulation(maxRoundsRef.current);
+      if (record) {
+        recordingRef.current = {
+          version: 1,
+          savedAt: new Date().toISOString(),
+          maxRounds: maxRoundsRef.current,
+          initMsg: mock.initMsg,
+          rounds: mock.rounds,
+        };
+      }
       const lookup = npcLookupRef.current;
       for (const npc of mock.initMsg.npcs) lookup.set(npc.id, npc);
       relationshipsRef.current = mock.initMsg.relationships;
@@ -334,6 +344,16 @@ export function useSimulation(simulationId?: string) {
       return;
     }
 
+    if (record) {
+      recordingRef.current = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        maxRounds: maxRoundsRef.current,
+        initMsg: { type: "init", npcs: [], relationships: [] },
+        rounds: [],
+      };
+    }
+
     console.log("[sim] start() called — connecting WS for sim=%s", simId);
 
     try {
@@ -351,6 +371,9 @@ export function useSimulation(simulationId?: string) {
             msg.npcs.length,
             msg.relationships.length,
           );
+          if (recordingRef.current) {
+            recordingRef.current.initMsg = msg;
+          }
           const lookup = npcLookupRef.current;
           for (const npc of msg.npcs) {
             lookup.set(npc.id, npc);
@@ -375,6 +398,13 @@ export function useSimulation(simulationId?: string) {
             msg.events.length,
             msg.npcs.length,
           );
+          if (recordingRef.current) {
+            recordingRef.current.rounds.push(msg);
+            recordingRef.current.maxRounds = Math.max(
+              recordingRef.current.maxRounds,
+              msg.round + 1,
+            );
+          }
           processRound(msg);
         },
 
@@ -401,7 +431,63 @@ export function useSimulation(simulationId?: string) {
       console.error("Failed to start simulation:", err);
       setState((prev) => ({ ...prev, isRunning: false }));
     }
-  }, [simulationId, processRound, processNPCEvents]);
+  }, [simulationId, record, processRound, processNPCEvents]);
+
+  const startFromRecording = useCallback(
+    (recording: SavedSimulation) => {
+      setState({
+        events: [],
+        metrics: { ...INITIAL_METRICS },
+        metricsHistory: [{ ...INITIAL_METRICS }],
+        phase: 0,
+        month: 0,
+        isRunning: true,
+        isComplete: false,
+        latestEvent: null,
+      });
+      npcLookupRef.current = new Map();
+      relationshipsRef.current = [];
+      influenceLogRef.current = [];
+      metricsAccRef.current = createAccumulator();
+      eventQueueRef.current = [];
+      lastPhaseRef.current = 0;
+      setGraphData({
+        relationships: [],
+        npcs: [],
+        influenceEvents: [],
+        version: 0,
+      });
+
+      maxRoundsRef.current = recording.maxRounds || recording.rounds.length;
+      const lookup = npcLookupRef.current;
+      for (const npc of recording.initMsg.npcs) lookup.set(npc.id, npc);
+      relationshipsRef.current = recording.initMsg.relationships;
+      setGraphData((prev) => ({
+        ...prev,
+        relationships: recording.initMsg.relationships,
+        npcs: recording.initMsg.npcs,
+        version: prev.version + 1,
+      }));
+      getBridge().then(({ eventBridge }) => {
+        eventBridge.emitInitNPCs(recording.initMsg.npcs);
+      });
+
+      let i = 0;
+      const feedNext = () => {
+        if (i >= recording.rounds.length) {
+          waitForQueueDrain(eventQueueRef, setState);
+          return;
+        }
+        processRound(recording.rounds[i++]);
+        const t = setTimeout(feedNext, 150 + Math.random() * 100);
+        cleanupRef.current = () => clearTimeout(t);
+      };
+      feedNext();
+    },
+    [processRound],
+  );
+
+  const getRecording = useCallback(() => recordingRef.current, []);
 
   useEffect(() => {
     return () => {
@@ -415,6 +501,8 @@ export function useSimulation(simulationId?: string) {
   return {
     ...state,
     start,
+    startFromRecording,
+    getRecording,
     graphData,
     getNpc,
   };

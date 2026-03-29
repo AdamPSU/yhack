@@ -51,7 +51,9 @@ export function connectSimulation(
 ): () => void {
   const socket: Socket = io(API_BASE, {
     transports: ["websocket"],
-    reconnection: false,
+    reconnection: true,
+    reconnectionAttempts: 3,
+    reconnectionDelay: 1000,
   });
 
   socket.on("connect", () => {

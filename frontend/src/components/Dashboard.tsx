@@ -91,7 +91,7 @@ export function Dashboard({
           severity={zeroOneSeverity(metrics.socialUnrest, true)}
         />
         <ArcGauge
-          label="Biz Survival"
+          label="Businesses Open"
           value={metrics.businessSurvival}
           formatValue={(v) => `${(v * 100).toFixed(0)}%`}
           severity={zeroOneSeverity(metrics.businessSurvival)}

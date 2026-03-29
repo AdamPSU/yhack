@@ -9,6 +9,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCProfileModal } from "@/components/NPCProfileModal";
 import { useSimulation } from "@/hooks/useSimulation";
+import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, NPCState, SimEvent } from "@/types";
 
 const SocialGraph = dynamic(
@@ -30,7 +31,7 @@ const SocialGraph = dynamic(
 // game/config.ts imports Phaser at top level which requires `window`.
 const GAME_WIDTH = 1280;
 const GAME_HEIGHT = 960;
-const SCALE_FACTOR = 2;
+const SCALE_FACTOR = 1; // game runs natively at 1280×960
 const BORDER_WIDTH = 2; // rpg-panel border
 
 // Phaser requires browser APIs — must be client-only
@@ -115,7 +116,9 @@ function SimulateContent() {
   const searchParams = useSearchParams();
   const isMock = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
   const simulationId = searchParams.get("id") || "";
-  const sim = useSimulation(simulationId || undefined);
+  const isReplay = searchParams.get("mode") === "replay";
+  const isRecording = searchParams.get("record") === "true";
+  const sim = useSimulation(simulationId || undefined, isRecording);
   const [bubbles, setBubbles] = useState<Map<string, BubbleState>>(new Map());
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
@@ -130,15 +133,25 @@ function SimulateContent() {
   const [hoverInfo, setHoverInfo] = useState<NPCHoverInfo | null>(null);
   const [showGraph, setShowGraph] = useState(false);
 
-  // Auto-start simulation once we have a simulation ID (or immediately in mock mode)
+  // Auto-start simulation once we have a simulation ID (or immediately in mock/replay mode)
   const hasStartedRef = useRef(false);
   useEffect(() => {
     if (hasStartedRef.current) return;
-    if (simulationId || isMock) {
+    if (isReplay) {
+      const data = getReplayData();
+      if (data) {
+        hasStartedRef.current = true;
+        clearReplayData();
+        sim.startFromRecording(data);
+      }
+    } else if (simulationId || isMock) {
       hasStartedRef.current = true;
       sim.start();
     }
-  }, [simulationId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      hasStartedRef.current = false;
+    };
+  }, [simulationId, isReplay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for NPC position updates from Phaser — only source for bubble positions
   useEffect(() => {
@@ -277,7 +290,7 @@ function SimulateContent() {
 
   const bubbleList = Array.from(bubbles.values());
 
-  if (!simulationId && !isMock) {
+  if (!simulationId && !isMock && !isReplay) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#1a1510] px-6">
         <div className="rpg-panel flex max-w-md flex-col items-center gap-4 p-8 text-center">
@@ -333,12 +346,41 @@ function SimulateContent() {
         </div>
 
         <div className="flex items-center gap-3">
-          {sim.isComplete && (
-            <span className="text-[10px] font-mono font-bold text-[#5ab85a]">
-              COMPLETE
+          {sim.isRunning && isRecording && (
+            <span className="text-[10px] font-mono font-bold text-[#d45050] animate-pulse">
+              REC
             </span>
           )}
-          {sim.isRunning && (
+          {sim.isComplete && (
+            <>
+              <span className="text-[10px] font-mono font-bold text-[#5ab85a]">
+                COMPLETE
+              </span>
+              {sim.getRecording() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recording = sim.getRecording();
+                    if (!recording) return;
+                    const blob = new Blob(
+                      [JSON.stringify(recording, null, 2)],
+                      { type: "application/json" },
+                    );
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `agora-sim-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-[10px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                >
+                  [Save JSON]
+                </button>
+              )}
+            </>
+          )}
+          {sim.isRunning && !isRecording && (
             <span className="text-[10px] font-mono text-[#8a7a62]">
               Simulating...
             </span>

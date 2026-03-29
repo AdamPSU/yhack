@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { MapType } from "@/game/config";
+import { setReplayData } from "@/lib/replayStore";
 import { POLICY_PRESETS } from "@/mocks/mockData";
 import { startSimulation } from "@/services/wsClient";
+import type { SavedSimulation } from "@/types/backend";
 
 const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
   { id: "ccity", label: "CCity", desc: "Large 80x60 modern city" },
@@ -17,19 +19,48 @@ export function PolicyInput() {
   const [mapId, setMapId] = useState<MapType>("ccity");
   const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [record, setRecord] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  function handleLoadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string) as SavedSimulation;
+        if (!parsed.initMsg || !Array.isArray(parsed.rounds)) {
+          console.error("Invalid simulation file: missing initMsg or rounds");
+          return;
+        }
+        const proceduralParam =
+          mapId === "citypack" && procedural ? "&procedural=true" : "";
+        setReplayData(parsed);
+        router.push(`/simulate?mode=replay&map=${mapId}${proceduralParam}`);
+      } catch (err) {
+        console.error("Failed to parse simulation file:", err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
 
   async function handleSimulate() {
     if (text.trim().length < 20 || loading) return;
-    const proceduralParam = mapId === "citypack" && procedural ? "&procedural=true" : "";
+    const proceduralParam =
+      mapId === "citypack" && procedural ? "&procedural=true" : "";
+    const recordParam = record ? "&record=true" : "";
     if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
-      router.push(`/simulate?map=${mapId}${proceduralParam}`);
+      router.push(`/simulate?map=${mapId}${proceduralParam}${recordParam}`);
       return;
     }
     setLoading(true);
     try {
       const simId = await startSimulation(text);
-      router.push(`/simulate?id=${simId}&map=${mapId}${proceduralParam}`);
+      router.push(
+        `/simulate?id=${simId}&map=${mapId}${proceduralParam}${recordParam}`,
+      );
     } catch (err) {
       console.error("Failed to start simulation:", err);
       setLoading(false);
@@ -67,13 +98,24 @@ export function PolicyInput() {
                 {opt.desc}
               </span>
               {opt.id === "citypack" && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setProcedural(p => !p); }}
-                  className="mt-1 text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors"
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProcedural((p) => !p);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      setProcedural((p) => !p);
+                    }
+                  }}
+                  className="mt-1 block text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors cursor-pointer"
                 >
-                  [{procedural ? "■" : "□"}] Procedural: {procedural ? "ON" : "OFF"}
-                </button>
+                  [{procedural ? "■" : "□"}] Procedural:{" "}
+                  {procedural ? "ON" : "OFF"}
+                </span>
               )}
             </button>
           ))}
@@ -110,16 +152,52 @@ export function PolicyInput() {
         </span>
       </div>
 
-      {/* Simulate button */}
+      {/* Record toggle + Simulate button */}
+      <div className="flex gap-3 items-stretch">
+        <button
+          type="button"
+          onClick={() => setRecord((r) => !r)}
+          data-testid="record-toggle"
+          className={`rpg-panel px-4 py-3 text-xs font-mono transition-all duration-150 active:translate-y-px shrink-0 ${
+            record
+              ? "border-[#d45050] bg-[#2a1515] text-[#d45050] shadow-[0_0_8px_rgba(212,80,80,0.2)]"
+              : "text-[#5a4a32] hover:border-[#6a5a42] hover:text-[#8a7a62]"
+          }`}
+          title={
+            record
+              ? "Recording enabled — simulation will be saved to JSON"
+              : "Enable recording to save simulation as JSON"
+          }
+        >
+          [{record ? "REC" : "OFF"}]
+        </button>
+        <button
+          type="button"
+          onClick={handleSimulate}
+          disabled={text.trim().length < 20 || loading}
+          suppressHydrationWarning
+          data-testid="simulate-button"
+          className="rpg-panel flex-1 px-6 py-3 text-sm font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px"
+        >
+          {loading ? ">> Starting... <<" : ">> Run Simulation <<"}
+        </button>
+      </div>
+
+      {/* Load saved simulation */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleLoadFile}
+        className="hidden"
+      />
       <button
         type="button"
-        onClick={handleSimulate}
-        disabled={text.trim().length < 20 || loading}
-        suppressHydrationWarning
-        data-testid="simulate-button"
-        className="rpg-panel w-full px-6 py-3 text-sm font-mono font-bold text-[#e8a43a] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#e8a43a] hover:shadow-[0_0_8px_rgba(232,164,58,0.2)] disabled:opacity-30 disabled:cursor-not-allowed active:translate-y-px"
+        onClick={() => fileInputRef.current?.click()}
+        data-testid="load-simulation-button"
+        className="rpg-panel w-full px-6 py-2 text-xs font-mono text-[#8a7a62] transition-all duration-150 hover:bg-[#2a2218] hover:border-[#6a5a42] hover:text-[#d4c4a0] active:translate-y-px"
       >
-        {loading ? ">> Starting... <<" : ">> Run Simulation <<"}
+        {">> Load Saved Simulation <<"}
       </button>
     </div>
   );

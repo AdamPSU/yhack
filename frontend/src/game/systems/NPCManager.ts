@@ -3,7 +3,7 @@ import { COORD_SCALE, moodToSentiment } from "@/lib/adapter";
 import type { BuildingPositions } from "@/types";
 import type { BackendNPC } from "@/types/backend";
 import { eventBridge } from "../bridge/EventBridge";
-import { CENTER_BOUNDS } from "../config";
+import { CENTER_BOUNDS, TILE_SIZE } from "../config";
 import { Car } from "../entities/Car";
 import { NPC } from "../entities/NPC";
 import { CAR_TEMPLATES } from "../map/CarRegistry";
@@ -27,15 +27,15 @@ function roleToZone(role: string): string {
   }
 }
 
+const MIN_SPAWN_SPACING = 4;
+
 export class NPCManager {
   private scene: Phaser.Scene;
   private npcs: Map<string, NPC> = new Map();
   private movement: MovementSystem;
   private buildingPositions: BuildingPositions;
   private isWalkable: (col: number, row: number) => boolean;
-  private groundGrid: number[][];
-  private gridRowOffset: number;
-  private gridColOffset: number;
+  private isRoad: (col: number, row: number) => boolean;
   private occupancy: OccupancyGrid;
   /** Track assigned zone per NPC for releaseNPC */
   private npcZones: Map<string, string> = new Map();
@@ -44,24 +44,18 @@ export class NPCManager {
     scene: Phaser.Scene,
     buildingPositions: BuildingPositions,
     isWalkable: (col: number, row: number) => boolean,
-    groundGrid: number[][],
-    gridRowOffset = 0,
-    gridColOffset = 0,
+    isRoad: (col: number, row: number) => boolean,
   ) {
     this.scene = scene;
     this.buildingPositions = buildingPositions;
     this.isWalkable = isWalkable;
-    this.groundGrid = groundGrid;
-    this.gridRowOffset = gridRowOffset;
-    this.gridColOffset = gridColOffset;
+    this.isRoad = isRoad;
     this.occupancy = new OccupancyGrid();
     this.movement = new MovementSystem(
       scene,
       isWalkable,
-      groundGrid,
+      isRoad,
       this.occupancy,
-      gridRowOffset,
-      gridColOffset,
     );
 
     // Listen for dynamic NPC init from backend via EventBridge
@@ -84,33 +78,72 @@ export class NPCManager {
     this.movement = new MovementSystem(
       this.scene,
       this.isWalkable,
-      this.groundGrid,
+      this.isRoad,
       this.occupancy,
-      this.gridRowOffset,
-      this.gridColOffset,
     );
 
     const npcs = backendNPCs as BackendNPC[];
 
+    // Collect all road+walkable tiles for spread-out spawning
+    const roadTiles: { x: number; y: number }[] = [];
+    for (let row = CENTER_BOUNDS.minRow; row <= CENTER_BOUNDS.maxRow; row++) {
+      for (let col = CENTER_BOUNDS.minCol; col <= CENTER_BOUNDS.maxCol; col++) {
+        if (this.isRoad(col, row) && this.isWalkable(col, row)) {
+          roadTiles.push({ x: col, y: row });
+        }
+      }
+    }
+
+    // Shuffle for random distribution
+    for (let i = roadTiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [roadTiles[i], roadTiles[j]] = [roadTiles[j], roadTiles[i]];
+    }
+
     for (let i = 0; i < npcs.length; i++) {
       const bn = npcs[i];
 
-      let tileX = bn.x * COORD_SCALE;
-      let tileY = bn.y * COORD_SCALE;
+      // Find a road tile with adequate spacing from other NPCs
+      let tileX = -1;
+      let tileY = -1;
 
-      // Clamp to center bounds so NPCs stay in the demo-visible area
-      tileX = Math.max(
-        CENTER_BOUNDS.minCol,
-        Math.min(CENTER_BOUNDS.maxCol, tileX),
-      );
-      tileY = Math.max(
-        CENTER_BOUNDS.minRow,
-        Math.min(CENTER_BOUNDS.maxRow, tileY),
-      );
+      // Try with spacing constraint first
+      for (const candidate of roadTiles) {
+        if (this.occupancy.isOccupied(candidate.x, candidate.y)) continue;
+        if (this.hasMinSpacing(candidate.x, candidate.y, MIN_SPAWN_SPACING)) {
+          tileX = candidate.x;
+          tileY = candidate.y;
+          break;
+        }
+      }
 
-      // Snap to nearest walkable tile if landed on a building
-      if (!this.isWalkable(tileX, tileY)) {
-        const snapped = this.findNearestWalkable(tileX, tileY);
+      // Fallback: relax spacing, just find any unoccupied road tile
+      if (tileX === -1) {
+        for (const candidate of roadTiles) {
+          if (!this.occupancy.isOccupied(candidate.x, candidate.y)) {
+            tileX = candidate.x;
+            tileY = candidate.y;
+            break;
+          }
+        }
+      }
+
+      // Last resort: use backend coords + snap to nearest road
+      if (tileX === -1) {
+        tileX = Math.max(
+          CENTER_BOUNDS.minCol,
+          Math.min(CENTER_BOUNDS.maxCol, bn.x * COORD_SCALE),
+        );
+        tileY = Math.max(
+          CENTER_BOUNDS.minRow,
+          Math.min(CENTER_BOUNDS.maxRow, bn.y * COORD_SCALE),
+        );
+        const snapped = this.findNearestTile(
+          tileX,
+          tileY,
+          (c, r) => this.isRoad(c, r) && this.isWalkable(c, r),
+          10,
+        );
         if (snapped) {
           tileX = snapped.x;
           tileY = snapped.y;
@@ -142,6 +175,57 @@ export class NPCManager {
         this.movement.startRoaming(npc, zone);
       }
     }
+
+    // Center camera on NPC cluster
+    this.centerCameraOnNPCs();
+  }
+
+  /** Check if position has minimum Manhattan distance from all placed NPCs */
+  private hasMinSpacing(x: number, y: number, minDist: number): boolean {
+    for (const npc of this.npcs.values()) {
+      if (Math.abs(npc.tileX - x) + Math.abs(npc.tileY - y) < minDist) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Search outward in rings for a tile matching `predicate` */
+  private findNearestTile(
+    x: number,
+    y: number,
+    predicate: (col: number, row: number) => boolean,
+    maxRadius = 5,
+  ): { x: number; y: number } | null {
+    for (let r = 0; r <= maxRadius; r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (predicate(nx, ny) && !this.occupancy.isOccupied(nx, ny)) {
+            return { x: nx, y: ny };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Center camera on the centroid of all spawned NPCs */
+  private centerCameraOnNPCs() {
+    if (this.npcs.size === 0) return;
+    let sumX = 0;
+    let sumY = 0;
+    for (const npc of this.npcs.values()) {
+      sumX += npc.tileX;
+      sumY += npc.tileY;
+    }
+    const centroidX = (sumX / this.npcs.size) * TILE_SIZE + TILE_SIZE / 2;
+    const centroidY = (sumY / this.npcs.size) * TILE_SIZE + TILE_SIZE / 2;
+
+    const cam = this.scene.cameras.main;
+    cam.centerOn(centroidX, centroidY);
+    cam.setZoom(1.5);
   }
 
   private onNPCMove(data: { npcId: string; toX: number; toY: number }) {
@@ -156,24 +240,6 @@ export class NPCManager {
     const npc = this.npcs.get(data.npcId);
     if (!npc) return;
     npc.sentiment = moodToSentiment(data.mood);
-  }
-
-  private findNearestWalkable(
-    x: number,
-    y: number,
-  ): { x: number; y: number } | null {
-    for (let r = 1; r <= 5; r++) {
-      for (let dx = -r; dx <= r; dx++) {
-        for (let dy = -r; dy <= r; dy++) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (this.isWalkable(nx, ny) && !this.occupancy.isOccupied(nx, ny)) {
-            return { x: nx, y: ny };
-          }
-        }
-      }
-    }
-    return null;
   }
 
   getNPC(id: string): NPC | undefined {
@@ -282,7 +348,9 @@ export class NPCManager {
     let goalX = targetX;
     let goalY = targetY;
     if (!this.isWalkable(goalX, goalY)) {
-      const snapped = this.findNearestWalkable(goalX, goalY);
+      const snapped = this.findNearestTile(goalX, goalY, (c, r) =>
+        this.isWalkable(c, r),
+      );
       if (!snapped) return;
       goalX = snapped.x;
       goalY = snapped.y;

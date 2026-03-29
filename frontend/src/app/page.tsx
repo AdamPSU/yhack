@@ -88,7 +88,25 @@ function Star({
   );
 }
 
-/* ── Pixel-art cloud (multi-blob) ────────────────────────────────── */
+/* ── Pixel-art cloud (fine grid, fluffy) ──────────────────────────── */
+const CLOUD_ROWS = [
+  "          ########              ",
+  "        ############            ",
+  "       ##############    ####   ",
+  "      ################  ######  ",
+  "     ########################## ",
+  "    ############################",
+  "   #############################",
+  "  ##############################",
+  " ###############################",
+  " ###############################",
+  "################################",
+  "################################",
+  "################################",
+  " ############################## ",
+  "  ############################  ",
+];
+
 function PixelCloud({
   y,
   delay,
@@ -100,8 +118,12 @@ function PixelCloud({
   duration: number;
   scale?: number;
 }) {
-  const w = 160 * scale;
-  const h = 60 * scale;
+  const PX = 2;
+  const cols = CLOUD_ROWS[0].length;
+  const rows = CLOUD_ROWS.length;
+  const w = cols * PX * scale;
+  const h = rows * PX * scale;
+
   return (
     <motion.div
       className="absolute"
@@ -118,38 +140,79 @@ function PixelCloud({
       <svg
         width={w}
         height={h}
-        viewBox="0 0 160 60"
+        viewBox={`0 0 ${cols * PX} ${rows * PX}`}
+        className="pixel-crisp"
+        shapeRendering="crispEdges"
+      >
+        {CLOUD_ROWS.flatMap((row, r) =>
+          [...row].map((ch, c) =>
+            ch === "#" ? (
+              <rect
+                key={`${r}-${c}`}
+                x={c * PX}
+                y={r * PX}
+                width={PX}
+                height={PX}
+                fill={
+                  r <= 2 ? "#FFFFFF" : r >= rows - 2 ? "#E0EAF0" : "#F6F6F6"
+                }
+                opacity={r >= rows - 1 ? 0.85 : 0.94}
+              />
+            ) : null,
+          ),
+        )}
+      </svg>
+    </motion.div>
+  );
+}
+
+/* ── Flying bird ─────────────────────────────────────────────────── */
+function Bird({
+  y,
+  delay,
+  duration,
+  size = 1,
+}: {
+  y: string;
+  delay: number;
+  duration: number;
+  size?: number;
+}) {
+  const w = 20 * size;
+  return (
+    <motion.div
+      className="absolute"
+      style={{ top: y }}
+      initial={{ right: `-${w * 2}px` }}
+      animate={{ right: "110%" }}
+      transition={{
+        duration,
+        repeat: Number.POSITIVE_INFINITY,
+        delay,
+        ease: "linear",
+      }}
+    >
+      <motion.svg
+        width={w}
+        height={w * 0.5}
+        viewBox="0 0 20 10"
         fill="none"
         className="pixel-crisp"
+        animate={{ scaleY: [1, 0.4, 1] }}
+        transition={{
+          duration: 0.6,
+          repeat: Number.POSITIVE_INFINITY,
+          ease: "easeInOut",
+        }}
       >
-        {/* Main body */}
-        <rect
-          x="20"
-          y="24"
-          width="120"
-          height="28"
-          rx="14"
-          fill="white"
-          opacity="0.92"
+        <path
+          d="M0 3 Q5 0 10 4 Q15 0 20 3"
+          stroke="#1a1a2e"
+          strokeWidth="1.5"
+          fill="none"
+          strokeLinecap="round"
         />
-        {/* Top bumps */}
-        <ellipse cx="55" cy="22" rx="28" ry="20" fill="white" opacity="0.92" />
-        <ellipse cx="95" cy="18" rx="24" ry="18" fill="white" opacity="0.92" />
-        <ellipse cx="120" cy="26" rx="18" ry="14" fill="white" opacity="0.92" />
-        <ellipse cx="35" cy="30" rx="16" ry="12" fill="white" opacity="0.92" />
-        {/* Highlight */}
-        <ellipse cx="60" cy="16" rx="16" ry="10" fill="white" opacity="0.35" />
-        {/* Shadow underside */}
-        <rect
-          x="28"
-          y="40"
-          width="104"
-          height="10"
-          rx="5"
-          fill="#C8DFF0"
-          opacity="0.35"
-        />
-      </svg>
+      </motion.svg>
     </motion.div>
   );
 }
@@ -236,6 +299,15 @@ export default function Home() {
             <PixelCloud y="18%" delay={35} duration={90} scale={1.2} />
             <PixelCloud y="38%" delay={55} duration={110} scale={0.8} />
             <PixelCloud y="26%" delay={45} duration={95} scale={1.1} />
+          </div>
+
+          {/* ── Flying birds ──────────────────────────────────────── */}
+          <div className="absolute inset-0 z-[3] pointer-events-none overflow-hidden">
+            <Bird y="15%" delay={2} duration={18} size={1.0} />
+            <Bird y="12%" delay={5} duration={20} size={0.8} />
+            <Bird y="18%" delay={9} duration={16} size={1.2} />
+            <Bird y="10%" delay={14} duration={22} size={0.7} />
+            <Bird y="22%" delay={7} duration={19} size={0.9} />
           </div>
 
           {/* ── Wooden Sign Title ────────────────────────────────── */}
@@ -344,6 +416,24 @@ export default function Home() {
               </motion.p>
             </div>
 
+            {/* Chicken sitting on top of sign */}
+            <motion.img
+              src="/White_Chicken.png"
+              alt=""
+              width={40}
+              height={40}
+              className="absolute z-20 pixel-crisp"
+              style={{ top: -36, right: "28%" }}
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{
+                delay: 1.5,
+                duration: 0.6,
+                type: "spring",
+                stiffness: 120,
+              }}
+            />
+
             {/* Rope hangers — pixel style */}
             <div
               className="absolute -top-6 left-[20%] w-[4px] h-8"
@@ -362,7 +452,7 @@ export default function Home() {
             transition={{ delay: 1.0, duration: 0.8 }}
             className="relative z-[10] flex gap-5"
           >
-            {/* PLAY button — pixelated */}
+            {/* PLAY button */}
             <motion.button
               type="button"
               onClick={handlePlay}
@@ -371,7 +461,7 @@ export default function Home() {
               transition={{ delay: 1.2, duration: 0.5 }}
               whileHover={{ y: -3 }}
               whileTap={{ y: 2 }}
-              className="flex flex-col items-center gap-2 px-8 py-5 cursor-pointer pixel-crisp"
+              className="flex items-center justify-center px-14 py-5 cursor-pointer pixel-crisp"
               style={{
                 background: "#D4A044",
                 border: "4px solid #5B3010",
@@ -381,11 +471,8 @@ export default function Home() {
                 minWidth: "120px",
               }}
             >
-              <span className="text-[20px]" style={{ color: "#5B3010" }}>
-                {"\u25B6"}
-              </span>
               <span
-                className="text-[11px] font-pixel uppercase tracking-wide"
+                className="text-[14px] font-pixel uppercase tracking-wide"
                 style={{
                   color: "#5B3010",
                   textShadow: "2px 2px 0 #C89038",
@@ -395,7 +482,7 @@ export default function Home() {
               </span>
             </motion.button>
 
-            {/* LOAD button — pixelated */}
+            {/* LOAD button */}
             <motion.button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -404,7 +491,7 @@ export default function Home() {
               transition={{ delay: 1.35, duration: 0.5 }}
               whileHover={{ y: -3 }}
               whileTap={{ y: 2 }}
-              className="flex flex-col items-center gap-2 px-8 py-5 cursor-pointer pixel-crisp"
+              className="flex items-center justify-center px-14 py-5 cursor-pointer pixel-crisp"
               style={{
                 background: "#D4A044",
                 border: "4px solid #5B3010",
@@ -414,11 +501,8 @@ export default function Home() {
                 minWidth: "120px",
               }}
             >
-              <span className="text-[20px]" style={{ color: "#5B3010" }}>
-                {"\uD83D\uDCC2"}
-              </span>
               <span
-                className="text-[11px] font-pixel uppercase tracking-wide"
+                className="text-[14px] font-pixel uppercase tracking-wide"
                 style={{
                   color: "#5B3010",
                   textShadow: "2px 2px 0 #C89038",

@@ -2,15 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import type { MapType } from "@/game/config";
 import { setReplayData } from "@/lib/replayStore";
 import { POLICY_PRESETS } from "@/mocks/mockData";
 import { startSimulation } from "@/services/wsClient";
 import type { SavedSimulation } from "@/types/backend";
-
-const MAP_OPTIONS: { id: MapType; label: string; desc: string }[] = [
-  { id: "citypack", label: "Citypack", desc: "Infinite procedural city" },
-];
 
 function isSavedSimulation(data: unknown): data is SavedSimulation {
   if (!data || typeof data !== "object") return false;
@@ -24,23 +19,15 @@ function isSavedSimulation(data: unknown): data is SavedSimulation {
 
 export function PolicyInput() {
   const [text, setText] = useState("");
-  const [mapId, setMapId] = useState<MapType>("citypack");
-  const [procedural, setProcedural] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCustomRun, setLoadingCustomRun] = useState(false);
   const [record, setRecord] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  function loadReplay(
-    data: SavedSimulation,
-    replayMapId: MapType,
-    replayProcedural = false,
-  ) {
-    const proceduralParam =
-      replayMapId === "citypack" && replayProcedural ? "&procedural=true" : "";
+  function loadReplay(data: SavedSimulation) {
     setReplayData(data);
-    router.push(`/simulate?mode=replay&map=${replayMapId}${proceduralParam}`);
+    router.push("/simulate?mode=replay&map=citypack");
   }
 
   function handleLoadFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -54,7 +41,7 @@ export function PolicyInput() {
           console.error("Invalid simulation file: missing initMsg or rounds");
           return;
         }
-        loadReplay(parsed, mapId, procedural);
+        loadReplay(parsed);
       } catch (err) {
         console.error("Failed to parse simulation file:", err);
       }
@@ -74,7 +61,7 @@ export function PolicyInput() {
         setLoadingCustomRun(false);
         return;
       }
-      loadReplay(bundledReplay, "citypack");
+      loadReplay(bundledReplay);
     } catch (err) {
       console.error("Failed to load bundled custom run:", err);
       setLoadingCustomRun(false);
@@ -83,19 +70,15 @@ export function PolicyInput() {
 
   async function handleSimulate() {
     if (text.trim().length < 20 || loading) return;
-    const proceduralParam =
-      mapId === "citypack" && procedural ? "&procedural=true" : "";
     const recordParam = record ? "&record=true" : "";
     if (process.env.NEXT_PUBLIC_MOCK_BACKEND === "true") {
-      router.push(`/simulate?map=${mapId}${proceduralParam}${recordParam}`);
+      router.push(`/simulate?map=citypack${recordParam}`);
       return;
     }
     setLoading(true);
     try {
       const simId = await startSimulation(text);
-      router.push(
-        `/simulate?id=${simId}&map=${mapId}${proceduralParam}${recordParam}`,
-      );
+      router.push(`/simulate?id=${simId}&map=citypack${recordParam}`);
     } catch (err) {
       console.error("Failed to start simulation:", err);
       setLoading(false);
@@ -104,89 +87,6 @@ export function PolicyInput() {
 
   return (
     <div className="w-full max-w-2xl space-y-4" data-testid="policy-input">
-      {/* Map selector */}
-      <div data-testid="map-selector">
-        <p className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase text-[#6a5a42]">
-          /// Select Map
-        </p>
-        <div className="flex gap-3">
-          {MAP_OPTIONS.map((opt) => {
-            const isSelected = mapId === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setMapId(opt.id)}
-                data-testid={`map-${opt.id}`}
-                className={`rpg-panel grid-dot-bg flex-1 px-4 py-3 text-left transition-all duration-150 active:translate-y-px ${
-                  isSelected
-                    ? "border-[#e8a43a] bg-[#2a2218] shadow-[0_0_12px_rgba(232,164,58,0.15)]"
-                    : "hover:border-[#6a5a42]"
-                }`}
-              >
-                {/* Mini tile swatch preview */}
-                <div className="flex gap-0.5 mb-1.5">
-                  {opt.id === "ccity" && (
-                    <>
-                      <div className="h-2 w-2" style={{ background: "#4a4a4a" }} />
-                      <div className="h-2 w-2" style={{ background: "#6aaa4a" }} />
-                      <div className="h-2 w-2" style={{ background: "#c87040" }} />
-                      <div className="h-2 w-2" style={{ background: "#5080c0" }} />
-                    </>
-                  )}
-                  {opt.id === "pico8" && (
-                    <>
-                      <div className="h-2 w-2" style={{ background: "#ff77a8" }} />
-                      <div className="h-2 w-2" style={{ background: "#00e436" }} />
-                      <div className="h-2 w-2" style={{ background: "#29adff" }} />
-                      <div className="h-2 w-2" style={{ background: "#ffec27" }} />
-                    </>
-                  )}
-                  {opt.id === "citypack" && (
-                    <>
-                      <div className="h-2 w-2" style={{ background: "#3a3a3a" }} />
-                      <div className="h-2 w-2" style={{ background: "#5ab85a" }} />
-                      <div className="h-2 w-2" style={{ background: "#d4a040" }} />
-                      <div className="h-2 w-2" style={{ background: "#8060a0" }} />
-                    </>
-                  )}
-                </div>
-                <span
-                  className={`block text-sm font-mono font-bold ${
-                    isSelected ? "text-[#e8a43a]" : "text-[#d4c4a0]"
-                  }`}
-                >
-                  {opt.label}
-                </span>
-                <span className="block mt-0.5 text-[10px] font-mono text-[#6a5a42]">
-                  {opt.desc}
-                </span>
-                {opt.id === "citypack" && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setProcedural((p) => !p);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        setProcedural((p) => !p);
-                      }
-                    }}
-                    className="mt-1 block text-[9px] font-mono text-[#5a4a32] hover:text-[#e8a43a] transition-colors cursor-pointer"
-                  >
-                    [{procedural ? "■" : "□"}] Procedural:{" "}
-                    {procedural ? "ON" : "OFF"}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Preset buttons */}
       <div>
         <p className="mb-2 text-[9px] font-mono tracking-[0.2em] uppercase text-[#6a5a42]">

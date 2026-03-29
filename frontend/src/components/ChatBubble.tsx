@@ -20,8 +20,8 @@ export function ChatBubble({ agentName, message, x, y, color = "orange" }: ChatB
   const p = PALETTES[color];
   return (
     <div
-      className="pointer-events-none absolute z-30 max-w-[180px] -translate-x-1/2 -translate-y-full animate-[fadeInUp_0.3s_ease-out] transition-[left,top] duration-100 ease-linear"
-      style={{ left: x, top: y - 8 }}
+      className="pointer-events-none absolute z-30 max-w-[180px] -translate-x-1/2 -translate-y-full animate-[fadeInUp_0.3s_ease-out]"
+      style={{ left: x, top: y }}
       data-testid="chat-bubble"
     >
       <div className="rpg-panel px-2.5 py-1.5" style={{ borderColor: p.border }}>

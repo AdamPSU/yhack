@@ -127,12 +127,13 @@ export class Car extends Phaser.GameObjects.Container {
 
   toState(): NPCState {
     const cam = this.scene.cameras.main;
+    const halfHeight = (this.template.rows * TILE_SIZE) / 2;
     return {
       id: this.npcId,
       name: this.npcName,
       role: this.role,
       x: (this.x - cam.scrollX) * cam.zoom,
-      y: (this.y - cam.scrollY) * cam.zoom,
+      y: (this.y - halfHeight - cam.scrollY) * cam.zoom,
       direction: this.direction,
       state: this.npcState,
       message: this.message,

@@ -8,9 +8,9 @@ Given the policy text below, perform a thorough analysis and extract structured 
 </task>
 
 <dimensions>
-<dimension name="affected_economic_sectors">Identify every industry, market, or sector that would feel direct or indirect effects.</dimension>
-<dimension name="key_stakeholders">People, groups, or institutions impacted. Include a mix of powerful actors (corporations, government bodies) and everyday people (workers, consumers, small business owners).</dimension>
-<dimension name="expected_economic_impacts">Be specific. Think about employment, prices, trade, investment, innovation, housing, wages, and inequality. Include both intended and unintended consequences.</dimension>
+<dimension name="sectors">Identify every industry, market, or sector that would feel direct or indirect effects.</dimension>
+<dimension name="stakeholders">People, groups, or institutions impacted. Include a mix of powerful actors (corporations, government bodies) and everyday people (workers, consumers, small business owners).</dimension>
+<dimension name="economic_impacts">Be specific. Think about employment, prices, trade, investment, innovation, housing, wages, and inequality. Include both intended and unintended consequences.</dimension>
 <dimension name="controversy_level">How politically divisive is this policy? Consider who wins and who loses.</dimension>
 </dimensions>
 
@@ -32,18 +32,13 @@ Tailor your analysis to surface insights most relevant to this objective. If no 
 </user_objective>
 
 <output_format>
+Output a single JSON object — not an array.
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
-  "sectors": ["sector1", "sector2", ...],
-  "stakeholders": [
-    {{"name": "descriptive name", "type": "individual|group|institution", "impact": "brief description of how they are affected"}},
-    ...
-  ],
-  "economic_impacts": [
-    {{"description": "specific impact description", "direction": "positive|negative", "magnitude": "low|medium|high", "timeframe": "immediate|short-term|long-term"}},
-    ...
-  ],
-  "controversy_level": "low|medium|high"
+  "sectors": ["Manufacturing", "Retail", "Agriculture"],
+  "stakeholders": ["Factory workers face job displacement", "Small business owners bear higher input costs", "Consumers see rising prices"],
+  "economic_impacts": ["Consumer prices rise 5-10% in the short term", "Domestic manufacturing employment grows long-term", "Trade deficits narrow as imports become more expensive"],
+  "controversy_level": "high"
 }}
 </output_format>"""
 
@@ -63,6 +58,7 @@ Read the source text carefully. Extract every named individual person that has e
 </policy_context>
 
 <output_format>
+Output a single JSON object — not an array.
 Respond ONLY with valid JSON (no markdown fences, no commentary).
 Omit any field you cannot reasonably infer — only include fields with real signal from the text:
 {{
@@ -106,6 +102,7 @@ BE SPECIFIC. Avoid generic traits. Give them unique, potentially polarizing beli
 </task>
 
 <output_format>
+Output a single JSON object — not an array.
 Respond ONLY with valid JSON (no markdown fences, no commentary):
 {{
   "category": "short social/economic role label, e.g. 'factory worker', 'small business owner', 'retiree'",
@@ -120,184 +117,78 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 </output_format>"""
 
 GENERATE_RELATIONSHIPS_PROMPT = """\
-You are a social network designer for a small-town simulation.
+Generate {num_relationships} social relationships between the NPCs listed below. Include coworker bonds, neighbor ties, and a few unlikely friendships. Each NPC must appear at least once.
 
-<task>
-Given the list of NPCs below, generate a realistic set of relationships (approximately {num_relationships} in total) that form a believable social fabric — family clusters, coworker bonds, neighborhood ties, and a few unlikely friendships.
-</task>
-
-<npcs>
+NPCs:
 {npcs_summary}
-</npcs>
 
-<requirements>
-<req>Each NPC should have at least 1 relationship</req>
-<req>Cluster by profession/industry for potential coworker ties, by proximity for potential neighbor ties</req>
-</requirements>
+<think>Plan your relationship pairs here.</think>
 
-<output_format>
-Respond ONLY with valid JSON (no markdown fences, no commentary):
+Output ONLY valid JSON after your think block, no markdown, no commentary:
 {{
   "relationships": [
-    {{
-      "source_id": "npc_01",
-      "target_id": "npc_02"
-    }}
+    {{"source_id": "npc_01", "target_id": "npc_02"}},
+    {{"source_id": "npc_02", "target_id": "npc_03"}}
   ]
-}}
-</output_format>"""
+}}"""
 
-# ---------------------------------------------------------------------------
-# Shared prompt fragments (used by NPC_ROUND_PROMPT_V2)
-# ---------------------------------------------------------------------------
-
-_NPC_PREAMBLE = """\
-You are simulating the behavior of a single person in a small town reacting to a new economic policy. Stay in character and produce realistic, sometimes surprising reactions."""
-
-_MBTI_ARCHETYPES = """
-<mbti_guidelines>
-- INTJ (Architect): Strategic, logical, uses complex vocabulary, skeptical of inefficient ideas.
-- INTP (Logician): Analytical, detached, focuses on theory and data, precise in speech.
-- ENTJ (Commander): Decisive, assertive, uses business/leadership terms, focused on results.
-- ENTP (Debater): Provocative, quick-witted, enjoys playing devil's advocate, uses humor/irony.
-- INFJ (Advocate): Idealistic, metaphorical, focuses on deeper meaning and human potential.
-- INFP (Mediator): Values-driven, poetic, highly empathetic, focuses on authenticity and harmony.
-- ENFJ (Protagonist): Charismatic, persuasive, focuses on community and collective growth.
-- ENFP (Campaigner): Enthusiastic, imaginative, uses expressive language, focuses on new possibilities.
-- ISTJ (Logistician): Practical, factual, uses precise details, values tradition and reliability.
-- ISFJ (Defender): Supportive, detailed, focuses on practical help and maintaining stability.
-- ESTJ (Executive): Organized, direct, uses clear instructions, values rules and efficiency.
-- ESFJ (Consul): Social, cooperative, focuses on social harmony and following group norms.
-- ISTP (Virtuoso): Action-oriented, brief, focuses on mechanics and problem-solving, pragmatic.
-- ISFP (Adventurer): Sensitive, quiet, focuses on personal values and aesthetic/sensory details.
-- ESTP (Entrepreneur): Energetic, bold, uses slang/colloquialisms, focuses on immediate action.
-- ESFP (Entertainer): Spontaneous, playful, uses lively language, focuses on social engagement.
-</mbti_guidelines>"""
-
-_NPC_CHARACTER_BLOCK = f"""\
-<character>
-<name>{{npc_name}}</name>
-<gender>{{npc_gender}}</gender>
-<profession>{{npc_profession}}</profession>
-<country>{{npc_country}}</country>
-<mbti>{{npc_mbti}}</mbti>
-{_MBTI_ARCHETYPES}
-<bio>{{npc_bio}}</bio>
-<beliefs>{{npc_beliefs}}</beliefs>
-<controversial_ideas>{{npc_controversial_ideas}}</controversial_ideas>
-<persona>{{npc_persona}}</persona>
-<interested_topics>{{npc_interested_topics}}</interested_topics>
-<income_level>{{npc_income}}</income_level>
-<political_leaning description="-1 = far left, 1 = far right">{{npc_leaning}}</political_leaning>
-<reputation description="0 = pariah, 1 = town hero">{{npc_reputation}}</reputation>
-<position x="{{npc_x}}" y="{{npc_y}}"/>
-</character>
-
-<policy>
-{{policy_summary}}
-</policy>
-
-<simulation_focus>
-The simulation is examining: {{objective}}
-Let this shape what you pay attention to and what you talk about, if relevant to your character.
-</simulation_focus>
-
-<simulation_state>
-<round current="{{current_round}}" max="{{max_rounds}}"/>
-{{round_context}}
-</simulation_state>
-
-<nearby_characters description="within 2 tiles of you">
-{{nearby_npcs}}
-</nearby_characters>
-
-<distant_connections description="people you care about, not nearby">
-{{social_targets}}
-</distant_connections>"""
-
-_NPC_ACTION_TYPES = """\
-<action_types>
-<action type="chat">Say something to a specific nearby character (must be within 2 tiles of you). You must set target_npc_id to their ID (shown in brackets like [npc_XX]). 
-- The "message" field must be the ACTUAL DIALOGUE — the exact words you say OUT LOUD, in first person.
-- DIALOGUE RULES:
-  - Stay strictly in character according to your MBTI, persona, and bio.
-  - If you have controversial ideas or strong beliefs, let them leak into your speech if you trust the person, or hide them if you are protecting your reputation.
-  - Your reputation (0-1) dictates how confident or deferential you are. High reputation = authoritative/respected. Low reputation = defensive/ignored.
-  - Use specific vocabulary related to your profession and interests.
-</action>
-<action type="move">Move to any tile on the map. Description in FIRST PERSON, e.g. "I'm heading to the mill to check on the night shift."</action>
-<action type="protest">Join/organize a protest. Describe FIRST PERSON: "I'm holding my sign high, shouting 'No more cuts!'"</action>
-<action type="price_change">Business owners only. Describe FIRST PERSON: "I'm marking up the bread by 50 cents, it's getting too expensive to bake."</action>
-<action type="mood_shift">Internal shift. Describe FIRST PERSON: "I feel a weight lifting as I realize I'm not alone in this."</action>
-</action_types>
-
-<style_rules>
-CRITICAL: Every message must be FIRST PERSON — your actual words, thoughts, or inner monologue. You are this character. Speak as them. Be specific, colorful, and true to your persona and MBTI speech patterns.
-Set is_controversial to true ONLY if you are expressing an idea that is likely to polarize others, challenge the status quo, or damage your reputation in some circles.
-</style_rules>"""
-
-_NPC_DATA_FIELDS = """\
-Data fields by event_type:
-- chat: {{"target_npc_id": "npc_XX", "dialogue": "what you say"}}
-- move: {{"from_x": ..., "from_y": ..., "to_x": ..., "to_y": ..., "destination": "place name"}}
-- protest: {{"location": "place", "sign_text": "what the sign says", "intensity": "peaceful|heated|volatile"}}
-- price_change: {{"item": "...", "old_price": ..., "new_price": ..., "reason": "..."}}
-- mood_shift: {{"old_mood": "...", "new_mood": "...", "trigger": "what caused the shift"}}"""
+# One-line personality descriptions keyed by MBTI type.
+# Used by both NPC_ROUND_PROMPT_V2 and NPC_CHAT_PROMPT via {npc_mbti_style}.
+MBTI_DESC: dict[str, str] = {
+    "INTJ": "Strategic, logical, skeptical of inefficiency",
+    "INTP": "Analytical, detached, precise, theory-focused",
+    "ENTJ": "Decisive, assertive, results-driven",
+    "ENTP": "Provocative, quick-witted, plays devil's advocate",
+    "INFJ": "Idealistic, metaphorical, focused on human potential",
+    "INFP": "Values-driven, empathetic, poetic, seeks authenticity",
+    "ENFJ": "Charismatic, persuasive, community-focused",
+    "ENFP": "Enthusiastic, imaginative, expressive",
+    "ISTJ": "Practical, factual, detail-oriented, values tradition",
+    "ISFJ": "Supportive, helpful, stability-focused",
+    "ESTJ": "Organized, direct, values rules and efficiency",
+    "ESFJ": "Social, cooperative, harmony-seeking",
+    "ISTP": "Action-oriented, brief, pragmatic, mechanical",
+    "ISFP": "Sensitive, quiet, values-driven, aesthetic",
+    "ESTP": "Energetic, bold, uses slang, immediate action",
+    "ESFP": "Spontaneous, playful, lively, socially engaged",
+}
 
 # ---------------------------------------------------------------------------
 # Memory-augmented NPC prompt (Park et al. 2023 generative agents architecture)
 # ---------------------------------------------------------------------------
 
-NPC_ROUND_PROMPT_V2 = f"""\
-{_NPC_PREAMBLE}
+NPC_ROUND_PROMPT_V2 = """\
+You are {npc_name}, {npc_profession} in a small American town.
+{npc_bio}
+Personality ({npc_mbti}): {npc_mbti_style}. Beliefs: {npc_beliefs}.
+Income: {npc_income} | Politics: {npc_leaning} | Reputation: {npc_reputation}/1.0 | Position: ({npc_x}, {npc_y})
 
-{_NPC_CHARACTER_BLOCK}
+Policy affecting your town: {policy_summary}
+Round {current_round}/{max_rounds}. {round_context}
 
-<your_memories description="your most relevant memories from the simulation so far">
-{{retrieved_memories}}
-</your_memories>
+Nearby people (within 2 tiles):
+{nearby_npcs}
 
-<your_current_plan>
-{{current_plan}}
-</your_current_plan>
+People you know (not nearby):
+{social_targets}
 
-<instructions>
-Think through these steps as this character:
+Your memories:
+{retrieved_memories}
 
-<step name="perceive">
-- What stands out to you about the current situation? 
-- How do you emotionally respond? 
-- What is your social strategy? Consider your reputation and the people nearby (who do you like/trust?). 
-- Is it better to be honest and risk your reputation, or lie/pander to gain social capital?
-- Reference specific memories when relevant.
-</step>
+Your current plan: {current_plan}
 
-<step name="plan_check">Does anything that happened change your plans? If so, state your revised plan. If not, leave plan_update as null.</step>
-
-<step name="act">What concrete action(s) do you take this round? Choose 1-3 actions that feel authentic for your character and align with your current plan. Prefer interacting with people you have relationships with over strangers. Your dialogue MUST match your MBTI guidelines, personal beliefs, and social standing.</step>
-</instructions>
-
-{_NPC_ACTION_TYPES}
-
-<output_format>
-Respond ONLY with valid JSON (no markdown fences, no commentary):
-{{{{
-  "perception": "your perception of the situation, your emotional reaction, and your social strategy",
-  "plan_update": null,
+Output ONLY valid JSON, no markdown, no commentary:
+{{
+  "perception": "one sentence about how you feel right now",
   "events": [
-    {{{{
-      "event_type": "chat|move|protest|price_change|mood_shift",
-      "message": "human-readable description of what happened",
-      "is_controversial": false,
-      "data": {{{{}}}}
-    }}}}
+    {{"event_type": "chat", "message": "I walk over and say something.", "target_npc_id": "npc_01", "dialogue": "exact words you speak aloud"}},
+    {{"event_type": "move", "message": "I head toward the factory.", "to_x": 5, "to_y": 3}},
+    {{"event_type": "protest", "message": "I join the crowd outside city hall."}},
+    {{"event_type": "mood_shift", "message": "I feel a surge of anger.", "new_mood": "angry"}},
+    {{"event_type": "price_change", "message": "I raise bread prices by 20 cents."}}
   ]
-}}}}
-
-Set plan_update to a string describing your revised plan, or null if your plan is unchanged.
-
-{_NPC_DATA_FIELDS}
-</output_format>"""
+}}
+Choose 1-3 events. new_mood must be one of: angry, anxious, worried, skeptical, neutral, determined, hopeful, excited. Chat targets must be in the Nearby list. Stay in character."""
 
 REFLECTION_PROMPT = """\
 You are {npc_name}, a {npc_profession} in Millfield. Below are your recent memories and experiences from the policy simulation.
@@ -381,50 +272,19 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 # NPC Chat Prompt (ephemeral 1:1 conversation with user)
 # ---------------------------------------------------------------------------
 
-NPC_CHAT_PROMPT = f"""\
-You are {{npc_name}}, a {{npc_profession}} living in Millfield.
+NPC_CHAT_PROMPT = """\
+You are {npc_name}, {npc_profession} in Millfield.
+{npc_bio}
+Personality ({npc_mbti}): {npc_mbti_style}. Mood: {npc_mood}. Beliefs: {npc_beliefs}.
 
-<character>
-<name>{{npc_name}}</name>
-<gender>{{npc_gender}}</gender>
-<profession>{{npc_profession}}</profession>
-<mbti>{{npc_mbti}}</mbti>
-{_MBTI_ARCHETYPES}
-<bio>{{npc_bio}}</bio>
-<beliefs>{{npc_beliefs}}</beliefs>
-<persona>{{npc_persona}}</persona>
-<political_leaning description="-1 = far left, 1 = far right">{{npc_leaning}}</political_leaning>
-<current_mood>{{npc_mood}}</current_mood>
-</character>
+Policy context: {policy_summary}
 
-<your_memories description="your most relevant memories from the simulation so far">
-{{retrieved_memories}}
-</your_memories>
+Your memories:
+{retrieved_memories}
 
-<your_current_plan>
-{{current_plan}}
-</your_current_plan>
+Conversation so far:
+{conversation_history}
 
-<policy_context>
-{{policy_summary}}
-</policy_context>
+Someone says to you: "{user_message}"
 
-<conversation_so_far>
-{{conversation_history}}
-</conversation_so_far>
-
-A stranger approaches you and says: "{{user_message}}"
-
-<instructions>
-Respond naturally and stay completely in character. Consider:
-- Your personality, beliefs, MBTI type, and current mood
-- Your memories and what you've experienced in the simulation
-- Whether you trust this stranger or are guarded
-- Your speech patterns and mannerisms from your persona
-
-Be conversational. Keep responses concise (1-3 sentences) unless deeper discussion is warranted.
-You may be friendly, suspicious, evasive, or open depending on who you are and what they're asking.
-</instructions>
-
-Respond with ONLY your spoken words — no narration, no action descriptions, no "I say". Just what you actually say out loud.
-"""
+Stay in character. Respond with ONLY your spoken words — no narration, no "I say". 1-3 sentences."""

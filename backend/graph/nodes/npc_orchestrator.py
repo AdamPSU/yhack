@@ -10,14 +10,13 @@ import random
 from langchain_openai import ChatOpenAI
 
 from config import GRID_HEIGHT, GRID_WIDTH, MAX_NPCS, MAX_X, MAX_Y
-from graph.llm import get_llm
+from graph.llm import get_llm, invoke_llm_json
 from graph.names import FIRST_NAMES_F, FIRST_NAMES_M, LAST_NAMES
 from graph.prompts import (
     EXTRACT_CHARACTERS_PROMPT,
     GENERATE_NPC_PERSONALITY_PROMPT,
     GENERATE_RELATIONSHIPS_PROMPT,
 )
-from graph.utils import parse_llm_json
 from models.state import SimState
 
 logger = logging.getLogger(__name__)
@@ -150,8 +149,7 @@ async def _extract_characters(
         source_text=source_text[:4000],
         entities_json=entities_json,
     )
-    response = await llm.ainvoke(prompt)
-    data = parse_llm_json(response.content, fallback={"characters": []})  # type: ignore[arg-type]
+    data = await invoke_llm_json(prompt, llm=llm)
     return data.get("characters", [])
 
 
@@ -167,8 +165,7 @@ async def _generate_personality(
         mbti=base["mbti"],
         entities_json=entities_json,
     )
-    response = await llm.ainvoke(prompt)
-    data = parse_llm_json(response.content, fallback={})  # type: ignore[arg-type]
+    data = await invoke_llm_json(prompt, llm=llm)
     return {**base, **data}
 
 
@@ -180,13 +177,15 @@ async def _generate_relationships(
         f"{n['id']}: {n.get('name', '?')} — {n.get('profession', '?')} x={n.get('x')}, y={n.get('y')}"
         for n in npcs
     ]
-    target_rels = max(15, int(len(npcs) * 1.5))
+    n = len(npcs)
+    max_unique = n * (n - 1) // 2
+    target_rels = min(max(n, int(n * 1.5)), max_unique)
     prompt = GENERATE_RELATIONSHIPS_PROMPT.format(
         npcs_summary="\n".join(summary_lines),
-        num_relationships=f"{target_rels}-{target_rels + 10}",
+        num_relationships=str(target_rels),
     )
-    response = await llm.ainvoke(prompt)
-    data = parse_llm_json(response.content, fallback={"relationships": []})  # type: ignore[arg-type]
+    # Relationships prompt triggers heavy K2 reasoning — give it room to finish
+    data = await invoke_llm_json(prompt, llm=get_llm(max_tokens=8192))
     return data.get("relationships", [])
 
 
@@ -211,7 +210,7 @@ def _initial_reputation(npc: dict) -> float:
 async def generate_npcs(state: SimState) -> dict:
     num_npcs = state.get("num_npcs", MAX_NPCS)
     logger.info("generate_npcs: starting for %d NPCs …", num_npcs)
-    llm = get_llm(max_tokens=1024, tier="fast")
+    llm = get_llm(max_tokens=8192)
     entities_json = json.dumps(state["entities"])
     callback = state.get("npc_added_callback")
 
@@ -243,42 +242,27 @@ async def generate_npcs(state: SimState) -> dict:
             [_random_base(len(npc_bases) + i, used_names) for i in range(needed)]
         )
 
+    # Pre-assign IDs before launching tasks so IDs are deterministic regardless of completion order.
+    for i, base in enumerate(npc_bases):
+        base["id"] = f"npc_{i + 1:02d}"
+
     logger.info("generate_npcs: generating personalities for %d NPCs …", len(npc_bases))
     tasks = [
-        asyncio.ensure_future(_generate_personality(b, entities_json, llm))
+        asyncio.create_task(_generate_personality(b, entities_json, llm))
         for b in npc_bases
     ]
 
     npcs: list[dict] = []
-    # Using enumerate with as_completed results in unordered IDs, which is fine, but we should make sure they are unique
-    for i, future in enumerate(asyncio.as_completed(tasks)):
+    for future in asyncio.as_completed(tasks):
         npc = await future
-        npc["id"] = f"npc_{i + 1:02d}"
-        npc.setdefault("country", "USA")
         npc["role"] = _infer_role(npc)
-        npc.setdefault("profession", "local resident")
-        npc.setdefault("interested_topics", ["local economy"])
-        # Ensure LLM-provided beliefs and controversial ideas are captured, fallback only if missing
-        if not npc.get("beliefs"):
-            npc["beliefs"] = ["Community matters.", "Economic stability is key."]
-        if not npc.get("controversial_ideas"):
-            npc["controversial_ideas"] = []
-        npc.setdefault("category", "resident")
         npc["reputation"] = _initial_reputation(npc)
         npcs.append(npc)
         if callback:
             await callback(npc)
 
     logger.info("generate_npcs: generating relationships …")
-    rel_llm = get_llm(max_tokens=2048, tier="fast")
-    relationships = await _generate_relationships(npcs, entities_json, rel_llm)
-
-    # Ensure all relationships have affinity and trust
-    for rel in relationships:
-        rel.setdefault(
-            "affinity", round(random.uniform(-0.1, 0.3), 2)
-        )  # Default slightly positive/neutral
-        rel.setdefault("trust", round(random.uniform(0.3, 0.7), 2))
+    relationships = await _generate_relationships(npcs, entities_json, llm)
 
     logger.info("generate_npcs: created %d relationships", len(relationships))
 

@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from langchain_openai import ChatOpenAI
 
-from config import MEMORY_TOP_K, RECENCY_DECAY, REFLECTION_MAX_PER_ROUND, REFLECTION_THRESHOLD
+from config import MEMORY_TOP_K, RECENCY_DECAY, REFLECTION_THRESHOLD
 from graph.llm import invoke_llm_structured
 from graph.prompts import REFLECTION_PROMPT
 from models.schemas import MemType, ReflectionResponse
@@ -188,12 +188,8 @@ async def maybe_reflect(
         recent_memories=mem_text,
     )
 
-    try:
-        result = await invoke_llm_structured(prompt, ReflectionResponse, llm=llm)
-        insights = result.insights[:3]
-    except Exception:
-        logger.warning("Reflection failed for %s, skipping", npc_name)
-        return []
+    result = await invoke_llm_structured(prompt, ReflectionResponse, llm=llm)
+    insights = result.insights[:3]
 
     new_memories: list[dict[str, Any]] = []
     for insight in insights:
@@ -211,48 +207,3 @@ async def maybe_reflect(
     return new_memories
 
 
-async def run_reflections(
-    memory_streams: dict[str, list[dict[str, Any]]],
-    npcs: list[dict[str, Any]],
-    current_round: int,
-    llm: ChatOpenAI,
-) -> dict[str, list[dict[str, Any]]]:
-    """Check all NPCs for reflection, run up to REFLECTION_MAX_PER_ROUND."""
-    import asyncio
-
-    candidates: list[tuple[int, dict[str, Any]]] = []
-    for npc in npcs:
-        npc_id = npc.get("id", "")
-        mems = memory_streams.get(npc_id, [])
-        should, recent = _should_reflect(mems)
-        if should:
-            total = sum(m["importance"] for m in recent)
-            candidates.append((total, npc))
-
-    # Prioritize NPCs furthest over threshold.
-    candidates.sort(key=lambda t: t[0], reverse=True)
-    to_reflect = candidates[:REFLECTION_MAX_PER_ROUND]
-
-    if not to_reflect:
-        return memory_streams
-
-    logger.info("Reflecting %d NPCs this round", len(to_reflect))
-
-    tasks = [
-        maybe_reflect(
-            npc_id=npc.get("id", ""),
-            npc_name=npc.get("name", ""),
-            npc_profession=npc.get("profession", ""),
-            memories=memory_streams.get(npc.get("id", ""), []),
-            current_round=current_round,
-            llm=llm,
-        )
-        for _, npc in to_reflect
-    ]
-    results = await asyncio.gather(*tasks)
-
-    for (_, npc), new_mems in zip(to_reflect, results):
-        npc_id = npc.get("id", "")
-        memory_streams.setdefault(npc_id, []).extend(new_mems)
-
-    return memory_streams

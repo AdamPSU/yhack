@@ -101,6 +101,12 @@ export function adaptEvent(
 
   // Extract target_npc_id from event data (for chat events)
   const targetNpcId = backendEvent.data?.target_npc_id as string | undefined;
+  // For chat events, prefer the actual spoken dialogue over the action narration.
+  const dialogue = backendEvent.data?.dialogue as string | undefined;
+  const message =
+    backendEvent.event_type === "chat" && dialogue
+      ? dialogue
+      : backendEvent.message;
 
   return {
     id: `${backendEvent.npc_id}-${round}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -108,7 +114,7 @@ export function adaptEvent(
     agentId: backendEvent.npc_id,
     agentName: npc.name,
     agentCategory: npc.category,
-    message: backendEvent.message,
+    message,
     phase,
     round,
     maxRounds,

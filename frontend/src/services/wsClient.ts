@@ -22,6 +22,7 @@ export interface WSCallbacks {
   onRound: (msg: WSRoundMsg) => void;
   onNPCEvents?: (msg: WSNPCEventsMsg) => void;
   onDone: () => void;
+  onEconomicReport?: (report: EconomicReport) => void;
   onError: (message: string) => void;
 }
 
@@ -155,6 +156,10 @@ export function connectSimulation(
 
   socket.on("done", () => {
     callbacks.onDone();
+  });
+
+  socket.on("economic_report", (data: EconomicReport) => {
+    callbacks.onEconomicReport?.(data);
   });
 
   socket.on("sim_error", (data: { message: string }) => {

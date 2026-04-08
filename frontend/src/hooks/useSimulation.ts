@@ -8,7 +8,7 @@ import {
   updateMetrics,
 } from "@/lib/metricsEngine";
 import { generateMockSimulation } from "@/mocks/mockBackend";
-import { connectSimulation, fetchEconomicReport } from "@/services/wsClient";
+import { connectSimulation } from "@/services/wsClient";
 import type { SimEvent, SimMetrics } from "@/types";
 import type {
   BackendInfluenceEvent,
@@ -511,6 +511,14 @@ export function useSimulation(simulationId?: string, record = false) {
           waitForQueueDrain(eventQueueRef, setState);
         },
 
+        onEconomicReport: (report) => {
+          console.log("[sim] economic_report received");
+          setReport(report);
+          setReportLoading(false);
+          setReportError(null);
+          reportRequestedRef.current = true;
+        },
+
         onError: (message) => {
           console.error("[sim] error:", message);
           setState((prev) => ({ ...prev, isRunning: false, error: message }));
@@ -598,32 +606,8 @@ export function useSimulation(simulationId?: string, record = false) {
     };
   }, []);
 
-  useEffect(() => {
-    if (
-      !simulationId ||
-      USE_MOCK ||
-      !state.isComplete ||
-      reportRequestedRef.current
-    ) {
-      return;
-    }
-
-    reportRequestedRef.current = true;
-    setReportLoading(true);
-    setReportError(null);
-
-    fetchEconomicReport(simulationId)
-      .then((data) => {
-        setReport(data);
-      })
-      .catch((error: Error) => {
-        console.error("[sim] economic report error:", error);
-        setReportError(error.message);
-      })
-      .finally(() => {
-        setReportLoading(false);
-      });
-  }, [simulationId, state.isComplete]);
+  // Economic report is now delivered via the "economic_report" Socket.IO event
+  // (handled in onEconomicReport callback above). No HTTP fetch needed.
 
   const getNpc = useCallback((id: string) => npcLookupRef.current.get(id), []);
 

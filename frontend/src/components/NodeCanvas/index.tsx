@@ -113,8 +113,8 @@ const FIT_MAX_ZOOM = 1;
 export default function NodeCanvas({ onSimulateStart }: NodeCanvasProps) {
   const router = useRouter();
   const [notesText, setNotesText] = useState("");
-  const [numNpcs, setNumNpcs] = useState(25);
-  const [numRounds, setNumRounds] = useState(5);
+  const [numNpcs, setNumNpcs] = useState(5);
+  const [numRounds, setNumRounds] = useState(3);
   const [objective, setObjective] = useState("");
   const mapId: MapType = "citypack";
   const setMapId = useCallback((_: MapType) => {}, []);

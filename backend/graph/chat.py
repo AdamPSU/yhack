@@ -13,7 +13,7 @@ from typing import Any
 
 from graph.llm import get_llm
 from graph.memory import format_memories_for_prompt, get_current_plan, retrieve_memories
-from graph.prompts import NPC_CHAT_PROMPT
+from graph.prompts import MBTI_DESC, NPC_CHAT_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -81,18 +81,16 @@ async def generate_npc_chat_response(
     history_str = _format_conversation_history(conversation_history)
 
     # Build the prompt
+    mbti = npc.get("mbti", "")
     prompt = NPC_CHAT_PROMPT.format(
         npc_name=npc.get("name", "Unknown"),
-        npc_gender=npc.get("gender", "unknown"),
         npc_profession=npc.get("profession", "resident"),
-        npc_mbti=npc.get("mbti", "ISFJ"),
+        npc_mbti=mbti,
+        npc_mbti_style=MBTI_DESC.get(mbti, mbti),
         npc_bio=npc.get("bio", "A resident of Millfield."),
         npc_beliefs=", ".join(npc.get("beliefs", [])) or "None stated",
-        npc_persona=npc.get("persona", "A typical town resident."),
-        npc_leaning=f"{npc.get('political_leaning', 0.0):.1f}",
         npc_mood=npc.get("mood", "neutral"),
         retrieved_memories=memories_str,
-        current_plan=current_plan,
         policy_summary=policy_context[:800] if policy_context else "No policy context.",
         conversation_history=history_str,
         user_message=user_message,

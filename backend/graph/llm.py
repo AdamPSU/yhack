@@ -1,4 +1,4 @@
-"""Shared LLM client factory for graph nodes with modular provider support."""
+"""Shared LLM client factory using K2-Think-v2."""
 
 from __future__ import annotations
 
@@ -10,74 +10,47 @@ from typing import Any, TypeVar
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
-from config import settings
+from config import K2_API_KEY, K2_BASE_URL, K2_MODEL
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
 
-def get_llm(
-    max_tokens: int = 4096,
-    tier: str = "default",
-    model: str | None = None,
-) -> ChatOpenAI:
-    """Create a ChatOpenAI instance for the active provider.
+def get_llm(max_tokens: int | None = None, **_kwargs: Any) -> ChatOpenAI:
+    """Create a ChatOpenAI instance pointed at K2-Think-v2."""
+    kwargs: dict[str, Any] = {"model": K2_MODEL, "api_key": K2_API_KEY, "base_url": K2_BASE_URL}
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    return ChatOpenAI(**kwargs)  # pyright: ignore[reportCallIssue]
 
-    Args:
-        max_tokens: Maximum tokens for the response
-        tier: Model tier - "default", "fast", or "reasoning"
-        model: Optional explicit model override (ignores tier)
 
-    Returns:
-        Configured ChatOpenAI instance
+def _extract_json_from_response(content: str) -> Any:
+    """Extract and parse JSON from LLM response (strips <think> tags and markdown fences).
+
+    Returns the parsed Python object, or raises json.JSONDecodeError if nothing found.
     """
-    model_name = model or settings.get_model(tier)
-
-    logger.debug(
-        "Creating LLM: provider=%s tier=%s model=%s",
-        settings.provider.value,
-        tier,
-        model_name,
-    )
-
-    return ChatOpenAI(
-        model=model_name,
-        api_key=settings.api_key,
-        base_url=settings.base_url,
-        max_tokens=max_tokens,  # pyright: ignore[reportCallIssue]
-    )
-
-
-def _extract_json_from_response(content: str) -> str:
-    """Extract JSON from LLM response that may contain markdown or thinking tags.
-
-    Handles:
-    - ```json ... ``` code blocks
-    - <think>...</think> tags (K2 reasoning)
-    - Raw JSON
-    """
-    # Remove <think>...</think> blocks (K2 reasoning output)
+    original = content
+    # K2 sometimes omits the opening <think> tag, outputting reasoning directly up to </think>
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    content = re.sub(r"^.*?</think>", "", content, flags=re.DOTALL)
 
-    # Try to extract from ```json code block
     json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", content)
     if json_match:
-        return json_match.group(1).strip()
+        fence_content = json_match.group(1).strip()
+        if fence_content:
+            return json.loads(fence_content)
 
     def _balanced_json_slice(text: str, start: int) -> str | None:
         open_char = text[start]
         if open_char not in "[{":
             return None
-
         close_char = "}" if open_char == "{" else "]"
         stack: list[str] = [close_char]
         in_string = False
         escaped = False
-
         for i in range(start + 1, len(text)):
             ch = text[i]
-
             if in_string:
                 if escaped:
                     escaped = False
@@ -86,11 +59,9 @@ def _extract_json_from_response(content: str) -> str:
                 elif ch == '"':
                     in_string = False
                 continue
-
             if ch == '"':
                 in_string = True
                 continue
-
             if ch == "{":
                 stack.append("}")
             elif ch == "[":
@@ -101,32 +72,51 @@ def _extract_json_from_response(content: str) -> str:
                 stack.pop()
                 if not stack:
                     return text[start : i + 1]
-
         return None
 
-    content = content.strip()
+    def _scan(text: str) -> list[tuple[int, Any]]:
+        results: list[tuple[int, Any]] = []
+        for i, ch in enumerate(text):
+            if ch not in "[{":
+                continue
+            candidate = _balanced_json_slice(text, i)
+            if not candidate:
+                continue
+            try:
+                results.append((i, json.loads(candidate)))
+            except json.JSONDecodeError:
+                continue
+        return results
 
-    # Try exact JSON first.
+    content = content.strip()
     try:
-        json.loads(content)
-        return content
+        return json.loads(content)
     except json.JSONDecodeError:
         pass
 
-    # Try scanning for first valid JSON object/array anywhere in the text.
-    for i, ch in enumerate(content):
-        if ch not in "[{":
-            continue
-        candidate = _balanced_json_slice(content, i)
-        if not candidate:
-            continue
-        try:
-            json.loads(candidate)
-            return candidate
-        except json.JSONDecodeError:
-            continue
+    # Scan right-to-left: K2 outputs reasoning first, actual JSON last.
+    candidates = _scan(content)
 
-    return content
+    # K2 sometimes embeds JSON inside <think> blocks — fall back to scanning original.
+    if not candidates:
+        candidates = _scan(original)
+
+    if candidates:
+        # Prefer largest dict by serialized size (catches container dicts with list values
+        # over small inner dicts that happen to have more keys)
+        dicts = [v for _, v in candidates if isinstance(v, dict) and v]
+        if dicts:
+            return max(dicts, key=lambda d: len(json.dumps(d)))
+        return candidates[-1][1]
+
+    raise json.JSONDecodeError("No JSON found", content, 0)
+
+
+def _unwrap_k2_array(parsed: Any) -> Any:
+    """K2 sometimes wraps a single object in an array — return the first dict found."""
+    if isinstance(parsed, list):
+        return next((x for x in parsed if isinstance(x, dict)), {})
+    return parsed
 
 
 async def invoke_llm_structured(
@@ -134,101 +124,47 @@ async def invoke_llm_structured(
     response_model: type[T],
     max_tokens: int = 4096,
     llm: ChatOpenAI | None = None,
-    tier: str = "default",
+    **_kwargs: Any,
 ) -> T:
-    """Invoke the LLM with Pydantic structured output.
-
-    Uses native structured output for providers that support it,
-    falls back to JSON-in-prompt for others (e.g., K2).
-
-    Args:
-        prompt: The prompt to send
-        response_model: Pydantic model for the expected response
-        max_tokens: Maximum tokens for the response
-        llm: Optional pre-configured LLM instance
-        tier: Model tier if llm not provided
-
-    Returns:
-        Parsed response matching response_model
-    """
+    """Invoke K2 and parse the response into a Pydantic model."""
     if llm is None:
-        llm = get_llm(max_tokens=max_tokens, tier=tier)
+        llm = get_llm(max_tokens=max_tokens)
 
     logger.info(
-        "LLM structured call → %s (prompt %d chars, provider=%s)",
+        "LLM structured call → %s (prompt %d chars)",
         response_model.__name__,
         len(prompt),
-        settings.provider.value,
     )
 
-    if settings.supports_structured_output:
-        # Provider supports native structured output (OpenAI, xAI, Gemini)
-        structured_llm = llm.with_structured_output(response_model)
-        result = await structured_llm.ainvoke(prompt)
+    response = await llm.ainvoke(prompt)
+    content: str = response.content  # pyright: ignore[reportAssignmentType]
+
+    try:
+        parsed = _unwrap_k2_array(_extract_json_from_response(content))
+        result = response_model.model_validate(parsed)
         logger.info("LLM structured call ← %s OK", response_model.__name__)
-        return result  # type: ignore[return-value]
-    else:
-        # Fallback: inject schema into prompt, parse JSON response (K2)
-        schema = response_model.model_json_schema()
-        prompt_with_schema = (
-            f"{prompt}\n\n"
-            f"IMPORTANT: Respond with ONLY valid JSON (no markdown, no explanation) "
-            f"matching this schema:\n```json\n{json.dumps(schema, indent=2)}\n```"
+        return result
+    except Exception as e:
+        logger.warning(
+            "Failed to parse response for %s: %s\nContent: %s",
+            response_model.__name__,
+            e,
+            content[:500],
         )
-
-        response = await llm.ainvoke(prompt_with_schema)
-        content: str = response.content  # pyright: ignore[reportAssignmentType]
-
-        # Extract and parse JSON
-        json_str = _extract_json_from_response(content)
-        try:
-            result = response_model.model_validate_json(json_str)
-            logger.info(
-                "LLM structured call ← %s OK (JSON fallback)", response_model.__name__
-            )
-            return result
-        except Exception as e:
-            logger.warning(
-                "Failed to parse JSON response for %s: %s\nContent: %s",
-                response_model.__name__,
-                e,
-                content[:500],
-            )
-            raise
+        raise
 
 
 async def invoke_llm_json(
     prompt: str,
     max_tokens: int = 4096,
-    fallback: dict[str, Any] | None = None,
     llm: ChatOpenAI | None = None,
-    tier: str = "default",
+    **_kwargs: Any,
 ) -> dict[str, Any]:
-    """Invoke the LLM and parse the JSON response.
-
-    Fallback path for when structured output is not suitable.
-
-    Args:
-        prompt: The prompt to send
-        max_tokens: Maximum tokens for the response
-        fallback: Default value if parsing fails
-        llm: Optional pre-configured LLM instance
-        tier: Model tier if llm not provided
-
-    Returns:
-        Parsed JSON as dict
-    """
+    """Invoke K2 and return the parsed JSON response as a dict."""
     if llm is None:
-        llm = get_llm(max_tokens=max_tokens, tier=tier)
+        llm = get_llm(max_tokens=max_tokens)
 
     response = await llm.ainvoke(prompt)
     content: str = response.content  # pyright: ignore[reportAssignmentType]
 
-    json_str = _extract_json_from_response(content)
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        logger.warning("Failed to parse JSON: %s\nContent: %s", e, content[:500])
-        if fallback is not None:
-            return fallback
-        raise
+    return _unwrap_k2_array(_extract_json_from_response(content))

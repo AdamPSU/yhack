@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from models.schemas import PolicyInput
 from routers import extract as extract_router
@@ -42,41 +43,18 @@ class TestSourceIngestion:
         assert "Federal industrial policy" in source.summary
 
     @pytest.mark.asyncio
-    async def test_uploads_csv_trend_source_with_indicator_metadata(self) -> None:
-        source = await extract_router.upload_context_source(
-            file=DummyUploadFile(
-                "inflation.csv",
-                b"month,inflation_rate\n2024-01,3.1\n2024-02,3.4\n",
-            ),  # type: ignore[arg-type]
-            label=None,
-        )
-
-        assert source.kind == "csv"
-        assert source.filename == "inflation.csv"
-        assert source.metadata["row_count"] == 2
-        assert source.metadata["indicator_snapshots"][0]["metric"] == "inflation_rate"
-
-    @pytest.mark.asyncio
-    async def test_start_simulation_accepts_pdf_plus_csv_source_ids(self, monkeypatch) -> None:
+    async def test_start_simulation_accepts_pdf_source(self, monkeypatch) -> None:
         monkeypatch.setattr(extract_router, "_extract_pdf", _fake_extract_pdf)
 
         pdf_source = await extract_router.upload_context_source(
             file=DummyUploadFile("policy.pdf", b"%PDF-1.4 fake"),  # type: ignore[arg-type]
             label="Primary Policy PDF",
         )
-        csv_source = await extract_router.upload_context_source(
-            file=DummyUploadFile(
-                "gdp.csv",
-                b"quarter,gdp_growth\n2024-Q1,2.1\n2024-Q2,2.5\n",
-            ),  # type: ignore[arg-type]
-            label=None,
-        )
 
         response = await simulate_router.start_simulation(
             PolicyInput(
                 primary_policy_source_id=pdf_source.id,
                 notes_text="Focus on inflation and wages.",
-                trend_source_ids=[csv_source.id],
                 num_rounds=10,
                 num_npcs=20,
                 objective="Measure pressure on consumer prices.",
@@ -87,31 +65,21 @@ class TestSourceIngestion:
         assert response["simulation_id"]
 
     @pytest.mark.asyncio
-    async def test_uploads_markdown_text_source(self) -> None:
-        source = await extract_router.upload_context_source(
-            file=DummyUploadFile(
-                "memo.md",
-                b"# Tariffs\nDomestic manufacturing support with sector credits.",
-            ),  # type: ignore[arg-type]
-            label="Policy memo",
-        )
+    async def test_rejects_non_pdf_upload(self) -> None:
+        from fastapi import HTTPException
 
-        assert source.kind == "text"
-        assert source.filename == "memo.md"
-        assert "Tariffs" in (source.preview_text or "") or "Tariffs" in (source.summary or "")
+        with pytest.raises(HTTPException) as exc_info:
+            await extract_router.upload_context_source(
+                file=DummyUploadFile("memo.md", b"# Tariffs\nSome policy text."),  # type: ignore[arg-type]
+                label="Policy memo",
+            )
 
-    @pytest.mark.asyncio
-    async def test_start_simulation_notes_only_without_uploads(self) -> None:
-        response = await simulate_router.start_simulation(
+        assert exc_info.value.status_code == 415
+
+    def test_rejects_simulation_without_pdf_source(self) -> None:
+        with pytest.raises(ValidationError, match="PDF policy source"):
             PolicyInput(
-                notes_text="x" * 45
-                + " A standalone policy description with enough characters for validation.",
-                trend_source_ids=[],
+                primary_policy_source_id=None,
                 num_rounds=3,
                 num_npcs=5,
-                objective="Smoke test",
-                map_id="ccity",
             )
-        )
-
-        assert response["simulation_id"]

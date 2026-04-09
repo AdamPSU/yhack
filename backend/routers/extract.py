@@ -1,13 +1,9 @@
-"""File ingestion endpoints for policy narratives (PDF, text, books, video) and trend CSV sources."""
+"""File ingestion endpoint — PDF only."""
 
 from __future__ import annotations
 
-import csv
 import io
 import logging
-import re
-import zipfile
-from typing import Any
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile
 
@@ -18,9 +14,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_TEXT_EXTENSIONS = frozenset({".md", ".markdown", ".txt", ".text"})
-_VIDEO_EXTENSIONS = frozenset({".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"})
-_BOOK_EXTENSIONS = frozenset({".epub"})
 
 async def _extract_pdf(data: bytes) -> str:
     from pypdf import PdfReader
@@ -30,139 +23,14 @@ async def _extract_pdf(data: bytes) -> str:
     return "\n\n".join(p.strip() for p in pages if p.strip())
 
 
-def _safe_float(value: str | None) -> float | None:
-    cleaned = (value or "").strip().replace(",", "").replace("$", "").replace("%", "")
-    if not cleaned:
-        return None
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
-
-
-def _extract_csv(data: bytes, source_id: str) -> tuple[str, dict[str, Any]]:
-    text = data.decode("utf-8", errors="replace").strip()
-    reader = csv.DictReader(io.StringIO(text))
-    rows = list(reader)
-    columns = reader.fieldnames or []
-
-    if not columns or not rows:
-        raise HTTPException(status_code=422, detail="CSV file has no rows.")
-
-    period_col = next(
-        (col for col in columns if any(token in col.lower() for token in ("date", "time", "period", "quarter", "year", "month"))),
-        columns[0],
-    )
-
-    numeric_columns: list[str] = []
-    for col in columns:
-        values = [_safe_float(row.get(col, "")) for row in rows]
-        numeric_values = [value for value in values if value is not None]
-        if numeric_values:
-            numeric_columns.append(col)
-
-    indicators: list[dict[str, Any]] = []
-    summary_lines = [f"{len(rows)} rows across columns: {', '.join(columns)}."]
-    for col in numeric_columns[:5]:
-        numeric_points: list[tuple[str | None, float]] = []
-        for row in rows:
-            value = _safe_float(row.get(col, ""))
-            if value is None:
-                continue
-            numeric_points.append((str(row.get(period_col, "")).strip() or None, value))
-        if not numeric_points:
-            continue
-
-        first_period, first_value = numeric_points[0]
-        latest_period, latest_value = numeric_points[-1]
-        previous_value = numeric_points[-2][1] if len(numeric_points) > 1 else None
-        change = latest_value - previous_value if previous_value is not None else None
-
-        if change is None:
-            trend = "unknown"
-        elif abs(change) < 1e-9:
-            trend = "flat"
-        elif change > 0:
-            trend = "up"
-        else:
-            trend = "down"
-
-        unit = "%" if "%" in col or "rate" in col.lower() else "$" if "$" in col else None
-        indicator = {
-            "metric": col,
-            "latest_value": latest_value,
-            "previous_value": previous_value,
-            "change": change,
-            "trend": trend,
-            "latest_period": latest_period,
-            "source_id": source_id,
-            "unit": unit,
-        }
-        indicators.append(indicator)
-
-        if previous_value is None:
-            summary_lines.append(f"{col}: latest value {latest_value:g}{unit or ''} at {latest_period or first_period or 'latest period'}.")
-        else:
-            summary_lines.append(
-                f"{col}: {previous_value:g}{unit or ''} -> {latest_value:g}{unit or ''} ({trend}) by {latest_period or 'latest period'}."
-            )
-
-    metadata = {
-        "row_count": len(rows),
-        "columns": columns,
-        "period_column": period_col,
-        "indicator_snapshots": indicators,
-    }
-    return "\n".join(summary_lines), metadata
-
-
-def _strip_html_like(text: str) -> str:
-    text = re.sub(r"(?is)<script.*?>.*?</script>", "", text)
-    text = re.sub(r"(?is)<style.*?>.*?</style>", "", text)
-    text = re.sub(r"<[^>]+>", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def _extract_plain_text(data: bytes) -> str:
-    return data.decode("utf-8", errors="replace").strip()
-
-
-def _extract_epub(data: bytes) -> str:
-    chunks: list[str] = []
-    try:
-        with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
-            for name in zf.namelist():
-                lower = name.lower()
-                if not lower.endswith((".html", ".xhtml", ".htm")):
-                    continue
-                raw = zf.read(name)
-                text = _strip_html_like(raw.decode("utf-8", errors="replace"))
-                if text:
-                    chunks.append(text)
-    except zipfile.BadZipFile as e:
-        raise HTTPException(status_code=415, detail="Invalid EPUB (not a ZIP archive).") from e
-
-    return "\n\n".join(chunks).strip()
-
-
-def _video_placeholder(filename: str) -> str:
-    return (
-        f"[Video attachment: {filename}]\n"
-        "Automatic transcription is not available server-side. "
-        "The simulation combines this marker with your other uploads and the notes field "
-        "— summarize speeches, scenes, or claims from the video in notes if they matter."
-    )
-
-
 def _pdf_summary(text: str) -> str:
     paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
     if not paragraphs:
         return ""
-    summary = " ".join(paragraphs[:2]).strip()
-    return summary[:600]
+    return " ".join(paragraphs[:2]).strip()[:600]
 
 
-def _source_response(record: dict[str, Any]) -> ContextSourceResponse:
+def _source_response(record: dict) -> ContextSourceResponse:
     return ContextSourceResponse(
         id=record["id"],
         kind=record["kind"],
@@ -182,121 +50,46 @@ async def upload_context_source(
 ) -> ContextSourceResponse:
     data = await file.read()
     filename = (file.filename or "source").lower()
-    source_label = label or file.filename or "Source"
 
-    logger.info("context source upload: file=%s size=%d", filename, len(data))
+    if not filename.endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
 
-    if filename.endswith(".pdf"):
-        text = await _extract_pdf(data)
-        if not text.strip():
-            raise HTTPException(status_code=422, detail="No text could be extracted from the PDF.")
-        summary = _pdf_summary(text)
-        record = create_source_record(
-            kind="pdf",
-            filename=file.filename or "policy.pdf",
-            label=source_label,
-            preview_text=summary or text[:500],
-            summary=summary or "Primary policy document ready.",
-            metadata={"page_count_estimate": max(1, text.count("\n\n"))},
-            content_text=text.strip(),
-        )
-        return _source_response(record)
+    logger.info("PDF upload: file=%s size=%d", filename, len(data))
 
-    if filename.endswith(".csv"):
-        provisional_id = f"src_preview_{filename.replace('.', '_')}"
-        summary, metadata = _extract_csv(data, provisional_id)
-        record = create_source_record(
-            kind="csv",
-            filename=file.filename or "trend.csv",
-            label=source_label,
-            preview_text=summary[:500],
-            summary=summary,
-            metadata=metadata,
-            content_text=data.decode("utf-8", errors="replace").strip(),
-        )
-        for indicator in record["metadata"].get("indicator_snapshots", []):
-            indicator["source_id"] = record["id"]
-        return _source_response(record)
+    text = await _extract_pdf(data)
+    if not text.strip():
+        raise HTTPException(status_code=422, detail="No text could be extracted from the PDF.")
 
-    ext = "" if "." not in filename else filename[filename.rindex(".") :]
-    if ext in _TEXT_EXTENSIONS:
-        text = _extract_plain_text(data)
-        if not text:
-            raise HTTPException(status_code=422, detail="Text file is empty.")
-        summary = _pdf_summary(text) or text[:600]
-        record = create_source_record(
-            kind="text",
-            filename=file.filename or "notes.txt",
-            label=source_label,
-            preview_text=summary[:500],
-            summary=summary or "Text document ready.",
-            metadata={"extension": ext},
-            content_text=text,
-        )
-        return _source_response(record)
-
-    if ext in _BOOK_EXTENSIONS:
-        text = _extract_epub(data)
-        if not text:
-            raise HTTPException(status_code=422, detail="No readable text found in EPUB.")
-        summary = _pdf_summary(text) or text[:600]
-        record = create_source_record(
-            kind="book",
-            filename=file.filename or "book.epub",
-            label=source_label,
-            preview_text=summary[:500],
-            summary=summary or "Book text extracted.",
-            metadata={"format": "epub"},
-            content_text=text,
-        )
-        return _source_response(record)
-
-    if ext in _VIDEO_EXTENSIONS:
-        display_name = file.filename or f"clip{ext}"
-        placeholder = _video_placeholder(display_name)
-        record = create_source_record(
-            kind="video",
-            filename=display_name,
-            label=source_label,
-            preview_text=placeholder[:500],
-            summary="Video attached (see notes for semantic content).",
-            metadata={"format": ext.lstrip(".")},
-            content_text=placeholder,
-        )
-        return _source_response(record)
-
-    raise HTTPException(status_code=415, detail=f"Unsupported source type: {filename}")
+    summary = _pdf_summary(text)
+    record = create_source_record(
+        kind="pdf",
+        filename=file.filename or "policy.pdf",
+        label=label or file.filename or "Policy Document",
+        preview_text=summary or text[:500],
+        summary=summary or "Primary policy document ready.",
+        metadata={"page_count_estimate": max(1, text.count("\n\n"))},
+        content_text=text.strip(),
+    )
+    return _source_response(record)
 
 
 @router.post("/extract")
 async def extract_file(file: UploadFile) -> dict[str, str]:
     data = await file.read()
     filename = (file.filename or "").lower()
-    logger.info("extract: file=%s  size=%d", filename, len(data))
 
+    if not filename.endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Only PDF files are supported.")
+
+    logger.info("extract: file=%s size=%d", filename, len(data))
     try:
-        if filename.endswith(".pdf"):
-            text = await _extract_pdf(data)
-        elif filename.endswith(".csv"):
-            text, _ = _extract_csv(data, "extract_preview")
-        else:
-            ext = "" if "." not in filename else filename[filename.rindex(".") :]
-            if ext in _TEXT_EXTENSIONS:
-                text = _extract_plain_text(data)
-            elif ext in _BOOK_EXTENSIONS:
-                text = _extract_epub(data)
-            elif ext in _VIDEO_EXTENSIONS:
-                text = _video_placeholder(file.filename or f"video{ext}")
-            else:
-                raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename}")
-    except HTTPException:
-        raise
+        text = await _extract_pdf(data)
     except Exception as e:
         logger.exception("extract: failed for %s", filename)
         raise HTTPException(status_code=500, detail=f"Extraction failed: {e}") from e
 
     if not text.strip():
-        raise HTTPException(status_code=422, detail="No text could be extracted from the file.")
+        raise HTTPException(status_code=422, detail="No text could be extracted from the PDF.")
 
     logger.info("extract: extracted %d chars from %s", len(text), filename)
     return {"text": text.strip()}

@@ -1,5 +1,16 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# Next.js 16 — Breaking Changes
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+Before using any unfamiliar Next.js API, read the relevant guide in `node_modules/next/dist/docs/`.
+
+## Commands
+| Task | Command |
+|------|---------|
+| Dev | `bun dev` |
+| Build | `bun build` |
+| Lint | `bun lint` |
+| Format | `bun format` |
+
+## Key Conventions
+- Phaser pages must be `"use client"` with `next/dynamic` + `ssr: false`
+- Linter: Biome (`biome.json`) — not ESLint
+- React Compiler is enabled — avoid manual `useMemo`/`useCallback` unless profiling shows a need

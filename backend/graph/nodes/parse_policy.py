@@ -12,13 +12,6 @@ from models.state import SimState
 
 logger = logging.getLogger(__name__)
 
-_EMPTY_ENTITIES: dict[str, Any] = {
-    "sectors": [],
-    "stakeholders": [],
-    "economic_impacts": [],
-    "controversy_level": "medium",
-}
-
 
 async def parse_policy(state: SimState) -> dict[str, Any]:
     """Analyse raw policy text and extract sectors, stakeholders, and impacts."""
@@ -33,19 +26,14 @@ async def parse_policy(state: SimState) -> dict[str, Any]:
         or "No historical trend context provided.",
         objective=state.get("objective", "") or "general economic and social impact",
     )
-    try:
-        llm = get_llm(max_tokens=4096, tier="reasoning")
-        result = await invoke_llm_structured(prompt, PolicyAnalysis, llm=llm)
-        entities = result.model_dump()
-        logger.info(
-            "parse_policy: sectors=%d  stakeholders=%d  impacts=%d  controversy=%s",
-            len(entities.get("sectors", [])),
-            len(entities.get("stakeholders", [])),
-            len(entities.get("economic_impacts", [])),
-            entities.get("controversy_level", "?"),
-        )
-    except Exception:
-        logger.exception("parse_policy: structured output failed, using fallback")
-        entities = dict(_EMPTY_ENTITIES)
-
+    llm = get_llm()
+    result = await invoke_llm_structured(prompt, PolicyAnalysis, llm=llm)
+    entities = result.model_dump()
+    logger.info(
+        "parse_policy: sectors=%d  stakeholders=%d  impacts=%d  controversy=%s",
+        len(entities["sectors"]),
+        len(entities["stakeholders"]),
+        len(entities["economic_impacts"]),
+        entities["controversy_level"],
+    )
     return {"entities": [entities]}

@@ -172,12 +172,13 @@ def _fallback_narrative(
     top_impacts: list[ReportImpact] = []
 
     for impact in impacts[:3]:
+        desc = impact if isinstance(impact, str) else impact.get("description", "Economic ripple")
         top_impacts.append(
             ReportImpact(
-                title=_truncate(impact.get("description", "Economic ripple"), 48),
-                description=impact.get("description", "Simulation highlighted a meaningful downstream effect."),
-                direction=impact.get("direction", "mixed"),
-                severity=impact.get("magnitude", "medium"),
+                title=_truncate(desc, 48),
+                description=desc or "Simulation highlighted a meaningful downstream effect.",
+                direction="mixed" if isinstance(impact, str) else impact.get("direction", "mixed"),
+                severity="medium" if isinstance(impact, str) else impact.get("magnitude", "medium"),
             )
         )
 

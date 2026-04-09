@@ -95,50 +95,33 @@ class PolicyContextBundle(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    """Simulation input: ordered narrative files, optional legacy single PDF id, notes, and trend CSVs."""
+    """Simulation input: a single uploaded PDF source."""
 
     primary_policy_source_id: str | None = None
     policy_source_ids: list[str] = Field(default_factory=list)
     notes_text: str = Field(default="", max_length=4000)
-    trend_source_ids: list[str] = Field(default_factory=list)
-    num_rounds: int = 75
-    num_npcs: int = 25
+    num_rounds: int = 3
+    num_npcs: int = 5
     objective: str = Field(default="", max_length=500)
     map_id: str = Field(default="ccity")
 
     @model_validator(mode="after")
-    def require_mergeable_policy_content(self) -> PolicyInput:
+    def require_policy_source(self) -> PolicyInput:
         has_files = bool(self.policy_source_ids) or bool(self.primary_policy_source_id)
-        notes = (self.notes_text or "").strip()
-        if not has_files and len(notes) < 40:
-            raise ValueError(
-                "Provide at least one policy source upload, or at least 40 characters in notes_text."
-            )
+        if not has_files:
+            raise ValueError("Provide at least one PDF policy source.")
         return self
 
 
 # --- Structured output response models for LLM calls ---
 
 
-class StakeholderInfo(BaseModel):
-    name: str
-    type: Literal["individual", "group", "institution"]
-    impact: str
-
-
-class EconomicImpact(BaseModel):
-    description: str
-    direction: Literal["positive", "negative"]
-    magnitude: Literal["low", "medium", "high"]
-    timeframe: Literal["immediate", "short-term", "long-term"]
-
-
 class PolicyAnalysis(BaseModel):
     """Structured response from the policy parsing LLM call."""
 
     sectors: list[str]
-    stakeholders: list[StakeholderInfo]
-    economic_impacts: list[EconomicImpact]
+    stakeholders: list[str]
+    economic_impacts: list[str]
     controversy_level: Literal["low", "medium", "high"]
 
 
@@ -149,29 +132,37 @@ class NPCGenerationResponse(BaseModel):
     relationships: list[Relationship]
 
 
-class RawNPCEvent(BaseModel):
+MemType = Literal["observation", "reflection", "plan"]
+
+
+class NPCEvent(BaseModel):
     """A single event produced by an NPC during a simulation round."""
 
     event_type: Literal["chat", "move", "protest", "price_change", "mood_shift"]
     message: str
-    is_controversial: bool = Field(default=False, description="Whether this action expresses a highly controversial or polarizing idea.")
-    data: dict[str, Any] = Field(default_factory=dict)
+    # chat
+    target_npc_id: str = ""
+    dialogue: str = ""
+    # move
+    to_x: int | None = None
+    to_y: int | None = None
+    # mood_shift
+    new_mood: str = ""
 
 
-MemType = Literal["observation", "reflection", "plan"]
+class NPCRoundResponse(BaseModel):
+    """Simplified NPC round response — flat events, optional perception."""
 
+    events: list[NPCEvent]
+    perception: str = ""
 
-class NPCRoundResponseV2(BaseModel):
-    """Extended response capturing internal reasoning for memory creation.
-
-    Based on the generative agents architecture (Park et al., 2023).
-    """
-
-    perception: str = Field(
-        description="What you notice about the situation, your emotional reaction to it, and your social strategy for how you will interact with others this round."
-    )
-    plan_update: str | None = None
-    events: list[RawNPCEvent]
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_shape(cls, data: Any) -> Any:
+        # K2 sometimes returns a single event dict instead of {"events": [...]}
+        if isinstance(data, dict) and "event_type" in data:
+            return {"events": [data]}
+        return data
 
 
 class ReflectionResponse(BaseModel):

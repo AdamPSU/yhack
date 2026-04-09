@@ -32,9 +32,9 @@ from graph.memory import (
     maybe_reflect,
     retrieve_memories,
 )
-from graph.prompts import NPC_ROUND_PROMPT_V2
+from graph.prompts import MBTI_DESC, NPC_ROUND_PROMPT_V2
 from graph.utils import clamp, normalize_npc_id
-from models.schemas import NPCRoundResponseV2
+from models.schemas import NPCRoundResponse
 from models.state import SimState
 
 logger = logging.getLogger(__name__)
@@ -229,56 +229,26 @@ def _validate_chat_target(
     if event.get("event_type") != "chat":
         return event
 
-    ev_data = event.get("data", {})
-    target_id = ev_data.get("target_npc_id", "")
+    target_id = event.get("data", {}).get("target_npc_id", "")
 
-    # If no target specified or target is valid, return as-is
-    if not target_id:
-        # No target specified - if neighbors exist, pick the closest one
-        if neighbor_ids:
-            closest = _find_closest_neighbor(speaker_id, all_npcs, neighbor_ids)
-            if closest:
-                ev_data = dict(ev_data)
-                ev_data["target_npc_id"] = closest
-                event = dict(event)
-                event["data"] = ev_data
-                logger.debug(
-                    "NPC %s chat had no target, auto-assigned to nearby %s",
-                    speaker_id,
-                    closest,
-                )
-        return event
+    if target_id and target_id in neighbor_ids:
+        return event  # Target is valid and within proximity
 
-    if target_id in neighbor_ids:
-        # Target is valid and within proximity
-        return event
+    # Need to assign/re-assign a target (no target specified, or target out of range)
+    new_target = _find_closest_neighbor(speaker_id, all_npcs, neighbor_ids) if neighbor_ids else None
 
-    # Target is out of range - auto-correct to closest neighbor
-    if neighbor_ids:
-        closest = _find_closest_neighbor(speaker_id, all_npcs, neighbor_ids)
-        if closest:
-            ev_data = dict(ev_data)
-            ev_data["target_npc_id"] = closest
-            event = dict(event)
-            event["data"] = ev_data
-            logger.debug(
-                "NPC %s chat target %s out of range, corrected to nearby %s",
-                speaker_id,
-                target_id,
-                closest,
-            )
-            return event
-
-    # No valid neighbors - clear target (monologue)
-    ev_data = dict(ev_data)
-    ev_data["target_npc_id"] = ""
     event = dict(event)
-    event["data"] = ev_data
-    logger.debug(
-        "NPC %s chat target %s out of range with no neighbors, cleared target",
-        speaker_id,
-        target_id,
-    )
+    data = dict(event.get("data", {}))
+    data["target_npc_id"] = new_target or ""
+    event["data"] = data
+
+    if not target_id and new_target:
+        logger.debug("NPC %s chat had no target, auto-assigned to nearby %s", speaker_id, new_target)
+    elif target_id and new_target:
+        logger.debug("NPC %s chat target %s out of range, corrected to nearby %s", speaker_id, target_id, new_target)
+    elif target_id and not new_target:
+        logger.debug("NPC %s chat target %s out of range with no neighbors, cleared target", speaker_id, target_id)
+
     return event
 
 
@@ -400,10 +370,12 @@ def _policy_summary(entities: list[dict[str, Any]], context_summary: str = "") -
     sectors = ", ".join(e.get("sectors", [])[:6]) or "various sectors"
     impacts: list[str] = []
     for imp in e.get("economic_impacts", [])[:4]:
-        direction = imp.get("direction", "unknown")
-        desc = imp.get("description", "")
-        if desc:
-            impacts.append(f"  - ({direction}) {desc}")
+        if isinstance(imp, str):
+            impacts.append(f"  - {imp}")
+        else:
+            desc = imp.get("description", "") or imp.get("desc", "")
+            if desc:
+                impacts.append(f"  - {desc}")
     impacts_str = "\n".join(impacts) if impacts else "  - Details still emerging"
     controversy = e.get("controversy_level", "medium")
 
@@ -419,11 +391,10 @@ def _policy_summary(entities: list[dict[str, Any]], context_summary: str = "") -
 
 @dataclass
 class NPCRoundResult:
-    """Output from a single NPC's round, including internals for memory creation."""
+    """Output from a single NPC's round."""
 
     events: list[dict[str, Any]] = field(default_factory=list)
     perception: str = ""
-    plan_update: str | None = None
 
 
 async def _simulate_single_npc(
@@ -439,7 +410,6 @@ async def _simulate_single_npc(
     all_npcs: list[dict[str, Any]],
     name_to_id: dict[str, str],
     objective: str = "",
-    neighbor_id_set: set[str] | None = None,
 ) -> NPCRoundResult:
     """Full per-agent cognitive loop (Park et al. 2023):
     Retrieve → Reflect → Plan → Perceive/React/Act → Store memories.
@@ -473,90 +443,54 @@ async def _simulate_single_npc(
     # ---- 4. Build context and run main LLM call ----
     nearby_npcs_str = _format_nearby_npcs(neighbor_ids, all_npcs, npc_rels)
     social_targets_str = _format_social_targets(npc, npc_rels, neighbor_ids, all_npcs)
+    mbti = npc.get("mbti", "")
 
     prompt = NPC_ROUND_PROMPT_V2.format(
         npc_name=npc_name,
-        npc_gender=npc.get("gender", ""),
         npc_profession=npc.get("profession", "local resident"),
-        npc_country=npc.get("country", "USA"),
-        npc_mbti=npc.get("mbti", ""),
+        npc_mbti=mbti,
+        npc_mbti_style=MBTI_DESC.get(mbti, mbti),
         npc_bio=npc.get("bio", ""),
         npc_beliefs=", ".join(npc.get("beliefs", [])),
-        npc_controversial_ideas=", ".join(npc.get("controversial_ideas", [])),
-        npc_persona=npc.get("persona", ""),
-        npc_interested_topics=", ".join(npc.get("interested_topics", [])),
         npc_income=npc.get("income_level", "medium"),
-        npc_leaning=f"{npc.get('political_leaning', 0.0)} ({_political_label(npc.get('political_leaning', 0.0))})",
+        npc_leaning=_political_label(npc.get("political_leaning", 0.0)),
         npc_reputation=f"{npc.get('reputation', 0.5):.2f}",
         npc_x=npc.get("x", 0),
         npc_y=npc.get("y", 0),
         policy_summary=policy_text,
-        objective=objective or "general economic and social impact",
         current_round=current_round + 1,
         max_rounds=max_rounds,
         round_context=round_context,
         nearby_npcs=nearby_npcs_str,
         social_targets=social_targets_str,
         retrieved_memories=memories_str,
-        current_plan=plan_str or "No plan yet — form one this round.",
+        current_plan=plan_str or "None yet.",
     )
 
-    perception = ""
-    plan_update = None
-
-    try:
-        result = await invoke_llm_structured(
-            prompt,
-            NPCRoundResponseV2,
-            llm=llm,
-        )
-        raw_events = [ev.model_dump() for ev in result.events]
-        perception = result.perception
-        plan_update = result.plan_update
-    except Exception:
-        logger.warning("NPC %s structured output failed, using fallback", npc_name)
-        raw_events = []
-
-    if not raw_events:
-        raw_events = [
-            {
-                "event_type": "chat",
-                "message": f"{npc_name} is processing the news quietly.",
-                "data": {"dialogue": "Hmm, I need to think about this..."},
-            }
-        ]
+    result = await invoke_llm_structured(prompt, NPCRoundResponse, llm=llm)
+    perception = result.perception
 
     # Tag each event with round and NPC id, and validate chat targets.
     sim_events: list[dict[str, Any]] = []
-    for ev in raw_events:
-        ev_data = dict(ev.get("data", {}))
-        raw_target = ev_data.get("target_npc_id")
+    for ev in result.events:
+        ev_dict = ev.model_dump()
+        raw_target = ev_dict.get("target_npc_id")
         if raw_target:
-            ev_data["target_npc_id"] = normalize_npc_id(
-                raw_target, name_to_id
-            )
+            ev_dict["target_npc_id"] = normalize_npc_id(raw_target, name_to_id)
         sim_event = {
             "round": current_round,
             "npc_id": npc_id,
-            "event_type": ev.get("event_type", "chat"),
-            "message": ev.get("message", ""),
-            "is_controversial": ev.get("is_controversial", False),
-            "data": ev_data,
+            "event_type": ev_dict.get("event_type", "chat"),
+            "message": ev_dict.get("message", ""),
+            "data": ev_dict,
         }
-        # Validate chat targets are within proximity (Chebyshev distance <= 2)
         sim_event = _validate_chat_target(sim_event, npc_id, neighbor_ids, all_npcs)
         sim_events.append(sim_event)
 
     # ---- 5. Store memories from this round ----
     if perception:
         npc_memories.append(
-            create_memory(
-                npc_id,
-                perception,
-                current_round,
-                importance=6,
-                mem_type="observation",
-            )
+            create_memory(npc_id, perception, current_round, importance=6, mem_type="observation")
         )
     for ev in sim_events:
         npc_memories.append(
@@ -568,25 +502,8 @@ async def _simulate_single_npc(
                 mem_type="observation",
             )
         )
-    if plan_update:
-        for mem in npc_memories:
-            if mem.get("mem_type") == "plan":
-                mem["importance"] = 3
-        npc_memories.append(
-            create_memory(
-                npc_id,
-                plan_update,
-                current_round,
-                importance=7,
-                mem_type="plan",
-            )
-        )
 
-    return NPCRoundResult(
-        events=sim_events,
-        perception=perception,
-        plan_update=plan_update,
-    )
+    return NPCRoundResult(events=sim_events, perception=perception)
 
 
 def _mood_to_continuous(mood: str) -> float:
@@ -598,13 +515,7 @@ def _mood_to_continuous(mood: str) -> float:
 def _continuous_to_mood(value: float) -> str:
     """Map a continuous [0, 1] value back to the closest discrete mood."""
     value = clamp(value, 0.0, 1.0)
-    best_idx = 0
-    best_dist = abs(value - _MOOD_BREAKPOINTS[0])
-    for i in range(1, len(_MOOD_BREAKPOINTS)):
-        dist = abs(value - _MOOD_BREAKPOINTS[i])
-        if dist < best_dist:
-            best_dist = dist
-            best_idx = i
+    best_idx = min(range(len(_MOOD_BREAKPOINTS)), key=lambda i: abs(value - _MOOD_BREAKPOINTS[i]))
     return _MOOD_LADDER[best_idx]
 
 
@@ -634,7 +545,7 @@ def _apply_opinion_dynamics(
     current_round: int,
     rel_map: dict[str, list[tuple[str, float, float]]],
     controversy: str,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, float]], list[dict[str, Any]]]:
     """Apply opinion dynamics from Peralta et al. (2022) to NPC interactions.
 
     Returns (updated_npcs, updated_relationships, influence_log).
@@ -773,6 +684,25 @@ def _apply_opinion_dynamics(
     return list(npc_lookup.values()), rel_updates, influence_log
 
 
+def _deduplicate_moves(
+    npcs: list[dict],
+    move_updates: dict[str, tuple[int, int]],
+) -> dict[str, tuple[int, int]]:
+    """Block moves that would land on an occupied tile (stationary NPC wins)."""
+    occupied_targets: set[tuple[int, int]] = set()
+    for npc in npcs:
+        npc_id = npc.get("id", "")
+        if npc_id not in move_updates:
+            occupied_targets.add((npc.get("x", 0), npc.get("y", 0)))
+
+    deduplicated: dict[str, tuple[int, int]] = {}
+    for npc_id, pos in move_updates.items():
+        if pos not in occupied_targets:
+            occupied_targets.add(pos)
+            deduplicated[npc_id] = pos
+    return deduplicated
+
+
 def _compute_economic_indicators(
     npcs: list[dict[str, Any]],
     events: list[dict[str, Any]],
@@ -801,20 +731,21 @@ def _compute_economic_indicators(
     biz_sentiment = sum(mood_scores.get(n.get("mood", "neutral"), 0.5) for n in biz_npcs) / max(len(biz_npcs), 1)
     worker_sentiment = sum(mood_scores.get(n.get("mood", "neutral"), 0.5) for n in worker_npcs) / max(len(worker_npcs), 1)
 
+    protest_rate = protests / total
     return {
         "consumer_confidence": round(avg_sentiment * 100, 1),
         "business_climate": round(biz_sentiment * 100, 1),
         "worker_welfare": round(worker_sentiment * 100, 1),
         "price_pressure": round(avg_price_change, 1),
-        "social_unrest_index": round((protests / total) * 100, 1),
-        "policy_approval": round(avg_sentiment * 100, 1),
+        "social_unrest_index": round(protest_rate * 100, 1),
+        "policy_approval": round((avg_sentiment * 0.7 + (1 - protest_rate) * 0.3) * 100, 1),
     }
 
 
 async def run_round(state: SimState) -> dict[str, Any]:
     """Run one simulation round for all 25 NPCs in parallel."""
 
-    llm = get_llm(max_tokens=2048, tier="fast")
+    llm = get_llm(max_tokens=4096)
 
     npcs = state["npcs"]
     events = state.get("events", [])
@@ -867,21 +798,21 @@ async def run_round(state: SimState) -> dict[str, Any]:
         )
         tasks.append(asyncio.create_task(coro))
 
-    results: list[NPCRoundResult] = await asyncio.gather(*tasks)
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+    results: list[NPCRoundResult] = []
+    for npc, outcome in zip(npcs, raw_results):
+        if isinstance(outcome, BaseException):
+            logger.warning("NPC %s failed this round: %s", npc.get("id"), outcome)
+            results.append(NPCRoundResult())
+        else:
+            results.append(outcome)
 
     for npc, npc_result in zip(npcs, results):
         npc_id = npc.get("id", "")
         npc["perception"] = npc_result.perception
-        npc["current_plan"] = (
-            npc_result.plan_update
-            or get_current_plan(memory_streams.get(npc_id, []))
-            or ""
-        )
+        npc["current_plan"] = get_current_plan(memory_streams.get(npc_id, [])) or ""
         if callback and npc_result.events:
-            try:
-                await callback(npc_result.events)
-            except Exception:
-                pass
+            await callback(npc_result.events)
 
     all_events: list[dict[str, Any]] = []
     for r in results:
@@ -890,10 +821,11 @@ async def run_round(state: SimState) -> dict[str, Any]:
     for ev in all_events:
         target_id = ev.get("data", {}).get("target_npc_id")
         if target_id and target_id in memory_streams:
+            dialogue = ev.get("data", {}).get("dialogue") or ev.get("message", "")
             memory_streams[target_id].append(
                 create_memory(
                     target_id,
-                    f"{ev.get('npc_id', 'someone')} said to me: {ev.get('data', {}).get('dialogue', ev.get('message', ''))}",
+                    f"{ev.get('npc_id', 'someone')} said to me: {dialogue}",
                     current_round,
                     importance=heuristic_importance(ev.get("event_type", "chat")),
                     mem_type="observation",
@@ -917,18 +849,7 @@ async def run_round(state: SimState) -> dict[str, Any]:
                     int(clamp(int(to_y), 0, MAX_Y)),
                 )
 
-    occupied_targets: set[tuple[int, int]] = set()
-    for npc in npcs:
-        npc_id = npc.get("id", "")
-        if npc_id not in move_updates:
-            occupied_targets.add((npc.get("x", 0), npc.get("y", 0)))
-
-    deduplicated_moves: dict[str, tuple[int, int]] = {}
-    for npc_id, pos in move_updates.items():
-        if pos not in occupied_targets:
-            occupied_targets.add(pos)
-            deduplicated_moves[npc_id] = pos
-    move_updates = deduplicated_moves
+    move_updates = _deduplicate_moves(npcs, move_updates)
 
     for npc in npcs:
         npc_id = npc.get("id", "")

@@ -28,10 +28,6 @@ class SimulationRecord:
     policy: PolicyInput
     status: SimulationStatus = "pending"
     policy_text: str = ""
-    trend_summary: str = ""
-    context_summary: str = ""
-    indicator_snapshots: list[dict[str, Any]] = field(default_factory=list)
-    source_summaries: list[str] = field(default_factory=list)
     entities: list[dict[str, Any]] = field(default_factory=list)
     final_npcs: list[dict[str, Any]] = field(default_factory=list)
     relationships: list[dict[str, Any]] = field(default_factory=list)
@@ -43,8 +39,6 @@ class SimulationRecord:
 
 
 simulations: dict[str, SimulationRecord] = {}
-
-_POLICY_SOURCE_KINDS = frozenset({"pdf", "text", "book", "video"})
 
 
 def _resolved_policy_source_ids(policy: PolicyInput) -> list[str]:
@@ -60,26 +54,19 @@ async def start_simulation(policy: PolicyInput):
     policy_ids = _resolved_policy_source_ids(policy)
     for source_id in policy_ids:
         src = get_source(source_id)
-        if src is None or src.get("kind") not in _POLICY_SOURCE_KINDS:
+        if src is None or src.get("kind") != "pdf":
             raise HTTPException(
                 status_code=404,
-                detail="One or more policy sources were not found or are not a narrative type (pdf/text/book/video).",
+                detail="Policy source not found or is not a PDF.",
             )
-
-    trend_sources = [get_source(source_id) for source_id in policy.trend_source_ids]
-    if any(source is None or source.get("kind") != "csv" for source in trend_sources):
-        raise HTTPException(
-            status_code=404, detail="One or more CSV trend sources were not found."
-        )
 
     simulation_id = str(uuid.uuid4())
     simulations[simulation_id] = SimulationRecord(policy=policy)
     logger.info(
-        "POST /simulate → id=%s  rounds=%d  policy_sources=%d  trends=%d",
+        "POST /simulate → id=%s  rounds=%d  policy_sources=%d",
         simulation_id,
         policy.num_rounds,
         len(policy_ids),
-        len(policy.trend_source_ids),
     )
     return {"simulation_id": simulation_id}
 
@@ -105,10 +92,6 @@ async def start_sim(sid: str, data: dict) -> None:
     record.final_npcs = []
     record.relationships = []
     record.policy_text = ""
-    record.trend_summary = ""
-    record.context_summary = ""
-    record.indicator_snapshots = []
-    record.source_summaries = []
 
     graph = build_graph()
 
@@ -132,7 +115,7 @@ async def start_sim(sid: str, data: dict) -> None:
         "indicator_snapshots": [],
         "source_summaries": [],
         "policy_sources": _resolved_policy_source_ids(policy),
-        "trend_sources": policy.trend_source_ids,
+        "trend_sources": [],
         "objective": policy.objective,
         "max_rounds": policy.num_rounds,
         "num_npcs": policy.num_npcs,
@@ -153,10 +136,6 @@ async def start_sim(sid: str, data: dict) -> None:
             if "build_context" in chunk:
                 update = chunk["build_context"]
                 record.policy_text = update.get("policy_text", "")
-                record.trend_summary = update.get("trend_summary", "")
-                record.context_summary = update.get("context_summary", "")
-                record.indicator_snapshots = update.get("indicator_snapshots", [])
-                record.source_summaries = update.get("source_summaries", [])
 
             elif "parse_policy" in chunk:
                 update = chunk["parse_policy"]
@@ -226,6 +205,24 @@ async def start_sim(sid: str, data: dict) -> None:
         logger.info("sim=%s  done", simulation_id)
         await sio.emit("done", {}, to=sid)
 
+        try:
+            report = await generate_economic_report(
+                policy_text=record.policy_text,
+                objective=record.policy.objective,
+                entities=record.entities,
+                source_summaries=[],
+                indicator_snapshots=[],
+                final_npcs=record.final_npcs,
+                events=record.events,
+                completed_rounds=record.current_round,
+                max_rounds=record.policy.num_rounds,
+            )
+            record.economic_report = report
+            await sio.emit("economic_report", report.model_dump(), to=sid)
+            logger.info("sim=%s  economic_report emitted", simulation_id)
+        except Exception:
+            logger.exception("sim=%s  economic_report generation failed", simulation_id)
+
     except Exception as exc:
         record.status = "error"
         record.error_message = str(exc)
@@ -253,8 +250,8 @@ async def get_economic_report(simulation_id: str):
         policy_text=record.policy_text,
         objective=record.policy.objective,
         entities=record.entities,
-        source_summaries=record.source_summaries,
-        indicator_snapshots=record.indicator_snapshots,
+        source_summaries=[],
+        indicator_snapshots=[],
         final_npcs=record.final_npcs,
         events=record.events,
         completed_rounds=record.current_round,

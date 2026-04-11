@@ -95,11 +95,12 @@ class PolicyContextBundle(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    """Simulation input: a single uploaded PDF source."""
+    """Simulation input: policy PDF sources, optional CSV trend data, and notes."""
 
     primary_policy_source_id: str | None = None
     policy_source_ids: list[str] = Field(default_factory=list)
     notes_text: str = Field(default="", max_length=4000)
+    trend_source_ids: list[str] = Field(default_factory=list)
     num_rounds: int = 3
     num_npcs: int = 5
     objective: str = Field(default="", max_length=500)
@@ -108,8 +109,11 @@ class PolicyInput(BaseModel):
     @model_validator(mode="after")
     def require_policy_source(self) -> PolicyInput:
         has_files = bool(self.policy_source_ids) or bool(self.primary_policy_source_id)
-        if not has_files:
-            raise ValueError("Provide at least one PDF policy source.")
+        notes = (self.notes_text or "").strip()
+        if not has_files and len(notes) < 40:
+            raise ValueError(
+                "Provide at least one policy source upload, or at least 40 characters in notes_text."
+            )
         return self
 
 

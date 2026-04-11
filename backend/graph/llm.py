@@ -25,15 +25,24 @@ def get_llm(max_tokens: int | None = None, **_kwargs: Any) -> ChatOpenAI:
     return ChatOpenAI(**kwargs)  # pyright: ignore[reportCallIssue]
 
 
+def strip_think_tags(content: str) -> str:
+    """Remove K2 <think>...</think> reasoning blocks from raw model output.
+
+    K2 sometimes omits the opening tag, emitting raw reasoning text up to </think>.
+    Both forms are stripped so only the final answer remains.
+    """
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    content = re.sub(r"^.*?</think>", "", content, flags=re.DOTALL)
+    return content.strip()
+
+
 def _extract_json_from_response(content: str) -> Any:
     """Extract and parse JSON from LLM response (strips <think> tags and markdown fences).
 
     Returns the parsed Python object, or raises json.JSONDecodeError if nothing found.
     """
     original = content
-    # K2 sometimes omits the opening <think> tag, outputting reasoning directly up to </think>
-    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
-    content = re.sub(r"^.*?</think>", "", content, flags=re.DOTALL)
+    content = strip_think_tags(content)
 
     json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", content)
     if json_match:
@@ -126,17 +135,37 @@ async def invoke_llm_structured(
     llm: ChatOpenAI | None = None,
     **_kwargs: Any,
 ) -> T:
-    """Invoke K2 and parse the response into a Pydantic model."""
+    """Invoke K2 and parse the response into a Pydantic model.
+
+    Injects the Pydantic JSON schema into the prompt so K2 knows the exact
+    field names and types expected. Uses response_format=json_object when the
+    LLM instance supports it (suppresses <think> bleed into JSON).
+    """
     if llm is None:
         llm = get_llm(max_tokens=max_tokens)
+
+    # Inject the schema so K2 knows exactly what fields to produce.
+    schema = response_model.model_json_schema()
+    augmented_prompt = (
+        f"{prompt}\n\n"
+        f"IMPORTANT: Respond with ONLY valid JSON matching this schema exactly "
+        f"(no markdown fences, no commentary, no extra fields):\n"
+        f"{json.dumps(schema, indent=2)}"
+    )
 
     logger.info(
         "LLM structured call → %s (prompt %d chars)",
         response_model.__name__,
-        len(prompt),
+        len(augmented_prompt),
     )
 
-    response = await llm.ainvoke(prompt)
+    # Try json_object mode first; fall back silently if K2 rejects it.
+    try:
+        json_llm = llm.bind(response_format={"type": "json_object"})
+        response = await json_llm.ainvoke(augmented_prompt)
+    except Exception:
+        response = await llm.ainvoke(augmented_prompt)
+
     content: str = response.content  # pyright: ignore[reportAssignmentType]
 
     try:
@@ -164,7 +193,12 @@ async def invoke_llm_json(
     if llm is None:
         llm = get_llm(max_tokens=max_tokens)
 
-    response = await llm.ainvoke(prompt)
+    try:
+        json_llm = llm.bind(response_format={"type": "json_object"})
+        response = await json_llm.ainvoke(prompt)
+    except Exception:
+        response = await llm.ainvoke(prompt)
+
     content: str = response.content  # pyright: ignore[reportAssignmentType]
 
     return _unwrap_k2_array(_extract_json_from_response(content))

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from graph.llm import get_llm
+from graph.llm import get_llm, strip_think_tags
 from graph.memory import format_memories_for_prompt, get_current_plan, retrieve_memories
 from graph.prompts import MBTI_DESC, NPC_CHAT_PROMPT
 
@@ -104,18 +104,21 @@ async def generate_npc_chat_response(
     )
 
     # Use a smaller max_tokens since chat responses should be concise
-    llm = get_llm(max_tokens=256)
+    llm = get_llm(max_tokens=512)
     response = await llm.ainvoke(prompt)
 
-    # Extract the content and clean it up
     content: str = response.content  # type: ignore[assignment]
-    content = content.strip()
+
+    # Strip K2 <think> reasoning blocks — only the spoken words should remain.
+    content = strip_think_tags(content)
 
     # Remove any accidental quotation marks wrapping the response
     if content.startswith('"') and content.endswith('"'):
         content = content[1:-1]
     if content.startswith("'") and content.endswith("'"):
         content = content[1:-1]
+
+    content = content.strip()
 
     logger.info(
         "NPC chat: %s responded with %d chars", npc.get("name", "?"), len(content)

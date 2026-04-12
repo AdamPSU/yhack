@@ -24,6 +24,30 @@ const INCOME_LABEL: Record<string, { text: string; color: string }> = {
   high: { text: "HIGH", color: "#3E7C34" },
 };
 
+const ROLE_COLOR: Record<string, string> = {
+  activist: "#B83A52",
+  politician: "#7B68EE",
+  business_owner: "#D4A520",
+  farmer: "#3E7C34",
+  worker: "#5A8DB8",
+  shopkeeper: "#C97D1A",
+  driver: "#8B6914",
+  student: "#7B68EE",
+  retiree: "#A0824A",
+};
+
+const ROLE_INITIAL: Record<string, string> = {
+  activist: "A",
+  politician: "P",
+  business_owner: "B",
+  farmer: "F",
+  worker: "W",
+  shopkeeper: "S",
+  driver: "D",
+  student: "U",
+  retiree: "R",
+};
+
 function politicalLabel(v: number): string {
   if (v <= -0.6) return "strongly progressive";
   if (v <= -0.2) return "leaning progressive";
@@ -140,6 +164,25 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
           className="flex items-start justify-between px-3 py-3"
           style={{ background: "#E8D5A3", borderBottom: "2px solid #C4A46C" }}
         >
+          {/* Role portrait */}
+          <div
+            className="shrink-0 flex items-center justify-center pixel-crisp"
+            style={{
+              width: 48,
+              height: 48,
+              background: ROLE_COLOR[npc.role] ?? "#6B4226",
+              border: "3px solid #6B4226",
+              borderRadius: "2px",
+              boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.2), inset -2px -2px 0 rgba(0,0,0,0.2), 2px 2px 0 rgba(61,37,16,0.4)",
+            }}
+          >
+            <span
+              className="text-[20px] font-pixel"
+              style={{ color: "rgba(255,255,255,0.95)", lineHeight: 1 }}
+            >
+              {ROLE_INITIAL[npc.role] ?? "?"}
+            </span>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span
@@ -192,11 +235,25 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
             </span>
           </div>
           <div className="ml-3">
-            <StatRow
-              label="Mood"
-              value={npc.mood.toUpperCase()}
-              valueColor={moodColor}
-            />
+            <div className="flex items-center justify-between py-[3px]">
+              <span
+                className="text-[9px] font-mono uppercase tracking-widest"
+                style={{ color: "#A0824A" }}
+              >
+                Mood
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-0.5 text-[8px] font-pixel uppercase"
+                style={{
+                  background: `${moodColor}22`,
+                  border: `1px solid ${moodColor}`,
+                  borderRadius: "2px",
+                  color: moodColor,
+                }}
+              >
+                {npc.mood.toUpperCase()}
+              </span>
+            </div>
             <StatRow
               label="Reputation"
               value={`${(npc.reputation * 100).toFixed(0)}%`}
@@ -208,11 +265,59 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
               value={income.text}
               valueColor={income.color}
             />
-            <StatRow
-              label="Political"
-              value={`${npc.political_leaning > 0 ? "+" : ""}${npc.political_leaning.toFixed(1)} ${polLabel}`}
-              valueColor={polColor}
-            />
+            {/* Political leaning with bar */}
+            <div className="flex flex-col py-[3px] gap-1">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-[9px] font-mono uppercase tracking-widest"
+                  style={{ color: "#A0824A" }}
+                >
+                  Political
+                </span>
+                <span
+                  className="text-[9px] font-mono"
+                  style={{ color: polColor }}
+                >
+                  {polLabel}
+                </span>
+              </div>
+              {/* Bar: left half = progressive (blue), right half = conservative (red) */}
+              <div
+                className="relative h-2 w-full overflow-hidden"
+                style={{
+                  background: "#E8D5A3",
+                  border: "1px solid #C4A46C",
+                  borderRadius: "2px",
+                }}
+              >
+                {npc.political_leaning < 0 ? (
+                  /* Progressive: fill from center going left */
+                  <div
+                    className="absolute top-0 h-full"
+                    style={{
+                      right: "50%",
+                      width: `${Math.abs(npc.political_leaning) * 50}%`,
+                      background: "#5A8DB8",
+                    }}
+                  />
+                ) : (
+                  /* Conservative: fill from center going right */
+                  <div
+                    className="absolute top-0 h-full"
+                    style={{
+                      left: "50%",
+                      width: `${npc.political_leaning * 50}%`,
+                      background: "#B83A52",
+                    }}
+                  />
+                )}
+                {/* Center marker */}
+                <div
+                  className="absolute top-0 h-full w-px"
+                  style={{ left: "50%", background: "#C4A46C" }}
+                />
+              </div>
+            </div>
             <StatRow label="Position" value={`(${npc.x}, ${npc.y})`} />
           </div>
         </div>
@@ -224,12 +329,37 @@ export function NPCProfileModal({ npc, onClose, onOpenChat }: NPCProfileModalPro
           content={npc.perception}
           fallback="No thoughts yet..."
         />
-        <SectionBlock
-          label="Beliefs"
-          symbol="!"
-          content={npc.beliefs?.join(" · ")}
-          fallback="No defined beliefs..."
-        />
+        {/* Beliefs section */}
+        <div className="px-3 py-2" style={{ borderTop: "1px solid #E8D5A3" }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[10px] font-mono" style={{ color: "#C4A46C" }}>!</span>
+            <span className="text-[8px] font-pixel uppercase" style={{ color: "#A0824A" }}>
+              Beliefs
+            </span>
+          </div>
+          {npc.beliefs && npc.beliefs.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {npc.beliefs.map((belief, i) => (
+                <span
+                  key={`belief-${i}`}
+                  className="inline-block text-[9px] font-mono px-2 py-0.5"
+                  style={{
+                    background: "#EDE4D3",
+                    border: "1px solid #C4A46C",
+                    borderRadius: "2px",
+                    color: "#6B4C2A",
+                  }}
+                >
+                  {belief}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] font-mono" style={{ color: "#C4A46C" }}>
+              No defined beliefs...
+            </p>
+          )}
+        </div>
         <SectionBlock
           label="Controversial Ideas"
           symbol="*"

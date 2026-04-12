@@ -27,6 +27,13 @@ export interface GraphData {
   version: number;
 }
 
+export interface SetupProgress {
+  stage: "waiting" | "analyzing" | "generating" | "ready";
+  npcsReady: number;
+  numNpcs: number;
+  label: string;
+}
+
 const USE_MOCK = process.env.NEXT_PUBLIC_MOCK_BACKEND === "true";
 
 const INITIAL_METRICS: SimMetrics = {
@@ -138,6 +145,13 @@ export function useSimulation(simulationId?: string, record = false) {
     isComplete: false,
     latestEvent: null,
     error: null,
+  });
+
+  const [setupProgress, setSetupProgress] = useState<SetupProgress>({
+    stage: "waiting",
+    npcsReady: 0,
+    numNpcs: 0,
+    label: "",
   });
 
   const [graphData, setGraphData] = useState<GraphData>({
@@ -362,6 +376,7 @@ export function useSimulation(simulationId?: string, record = false) {
       influenceEvents: [],
       version: 0,
     });
+    setSetupProgress({ stage: "waiting", npcsReady: 0, numNpcs: 0, label: "" });
     setReport(null);
     setReportLoading(false);
     setReportError(null);
@@ -391,6 +406,7 @@ export function useSimulation(simulationId?: string, record = false) {
       getBridge().then(({ eventBridge }) => {
         eventBridge.emitInitNPCs(mock.initMsg.npcs);
       });
+      setSetupProgress({ stage: "ready", npcsReady: mock.initMsg.npcs.length, numNpcs: mock.initMsg.npcs.length, label: "Loading world..." });
       let i = 0;
       const feedNext = () => {
         if (i >= mock.rounds.length) {
@@ -435,6 +451,11 @@ export function useSimulation(simulationId?: string, record = false) {
             "[sim] policy_analysis received — %d entities",
             msg.entities?.length ?? 0,
           );
+          setSetupProgress(p => ({ ...p, stage: "analyzing", label: "Analyzing policy..." }));
+        },
+
+        onSetupProgress: (msg) => {
+          setSetupProgress(p => ({ ...p, label: msg.label }));
         },
 
         onNPCAdded: (msg) => {
@@ -442,9 +463,16 @@ export function useSimulation(simulationId?: string, record = false) {
           npcLookupRef.current.set(npc.id, npc);
           npcsStreamedRef.current = true;
           getBridge().then(({ eventBridge }) => eventBridge.emitAddNPC(npc));
+          setSetupProgress(p => ({
+            stage: "generating",
+            npcsReady: p.npcsReady + 1,
+            numNpcs: p.numNpcs,
+            label: `Generating personalities... ${p.npcsReady + 1}${p.numNpcs > 0 ? `/${p.numNpcs}` : ""}`,
+          }));
         },
 
         onInit: (msg) => {
+          setSetupProgress({ stage: "ready", npcsReady: msg.npcs.length, numNpcs: msg.npcs.length, label: "Loading world..." });
           console.log(
             "[sim] init received — %d NPCs, %d relationships",
             msg.npcs.length,
@@ -564,6 +592,7 @@ export function useSimulation(simulationId?: string, record = false) {
         influenceEvents: [],
         version: 0,
       });
+      setSetupProgress({ stage: "waiting", npcsReady: 0, numNpcs: 0, label: "" });
       setReport(null);
       setReportLoading(false);
       setReportError(null);
@@ -582,6 +611,7 @@ export function useSimulation(simulationId?: string, record = false) {
       getBridge().then(({ eventBridge }) => {
         eventBridge.emitInitNPCs(recording.initMsg.npcs);
       });
+      setSetupProgress({ stage: "ready", npcsReady: recording.initMsg.npcs.length, numNpcs: recording.initMsg.npcs.length, label: "Loading world..." });
 
       let i = 0;
       const feedNext = () => {
@@ -622,5 +652,6 @@ export function useSimulation(simulationId?: string, record = false) {
     report,
     reportLoading,
     reportError,
+    setupProgress,
   };
 }

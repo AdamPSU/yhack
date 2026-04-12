@@ -256,10 +256,21 @@ async def generate_npcs(state: SimState) -> dict:
     llm = get_llm(max_tokens=8192)
     entities_json = json.dumps(state["entities"])
     callback = state.get("npc_added_callback")
+    progress_cb = state.get("setup_progress_callback")
+
+    async def _progress(label: str, current: int = 0, total: int = 0) -> None:
+        if progress_cb:
+            try:
+                await progress_cb(label, current, total)
+            except Exception:
+                pass
+
+    await _progress(f"Starting simulation with {num_npcs} residents...", 0, num_npcs)
 
     extracted = await _extract_characters(state["policy_text"], entities_json, llm)
     extracted = extracted[:num_npcs]
     logger.info("generate_npcs: extracted %d characters from policy", len(extracted))
+    await _progress(f"Extracted {len(extracted)} characters from source", len(extracted), num_npcs)
 
     used_names: set[str] = {c.get("name", "") for c in extracted if c.get("name")}
 
@@ -281,6 +292,7 @@ async def generate_npcs(state: SimState) -> dict:
     needed = num_npcs - len(npc_bases)
     if needed > 0:
         logger.info("generate_npcs: generating %d random NPC bases …", needed)
+        await _progress(f"Generating {needed} random residents...", 0, needed)
         npc_bases.extend(
             [_random_base(len(npc_bases) + i, used_names) for i in range(needed)]
         )
@@ -290,6 +302,7 @@ async def generate_npcs(state: SimState) -> dict:
         base["id"] = f"npc_{i + 1:02d}"
 
     logger.info("generate_npcs: generating personalities for %d NPCs …", len(npc_bases))
+    await _progress(f"Generating {len(npc_bases)} personalities...", 0, len(npc_bases))
     tasks = [
         asyncio.create_task(_generate_personality(b, entities_json, llm))
         for b in npc_bases
@@ -305,6 +318,7 @@ async def generate_npcs(state: SimState) -> dict:
             await callback(npc)
 
     logger.info("generate_npcs: generating relationships …")
+    await _progress("Building social network...", 0, 0)
     relationships = await _generate_relationships(npcs, entities_json, llm)
 
     logger.info("generate_npcs: created %d relationships", len(relationships))

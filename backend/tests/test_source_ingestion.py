@@ -77,7 +77,7 @@ class TestSourceIngestion:
         assert exc_info.value.status_code == 415
 
     def test_rejects_simulation_without_pdf_source(self) -> None:
-        with pytest.raises(ValidationError, match="PDF policy source"):
+        with pytest.raises(ValidationError, match="policy source upload"):
             PolicyInput(
                 primary_policy_source_id=None,
                 num_rounds=3,

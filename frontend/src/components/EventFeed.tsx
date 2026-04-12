@@ -10,22 +10,28 @@ interface EventFeedProps {
 
 function eventIcon(type: SimEvent["type"]): string {
   switch (type) {
-    case "reaction":
-      return "\u25B7";
-    case "price_change":
-      return "\u25B2";
-    case "layoff":
-      return "\u25A0";
+    case "chat":
+      return "\u275D";
+    case "move":
+      return "\u2192";
     case "protest":
       return "!";
+    case "mood_shift":
+      return "\u007E";
+    case "price_change":
+      return "$";
+    case "layoff":
+      return "\u2715";
     case "closure":
-      return "\u2716";
+      return "\u2715";
     case "strike":
       return "\u26A0";
     case "policy_response":
       return "\u2605";
     case "phase_change":
       return "\u25C6";
+    case "reaction":
+      return "\u25B7";
     default:
       return "\u25CB";
   }
@@ -54,6 +60,27 @@ function eventAccent(type: SimEvent["type"]): string {
   }
 }
 
+function eventBorderColor(type: SimEvent["type"]): string {
+  switch (type) {
+    case "chat":
+      return "#3E7C34";
+    case "move":
+      return "#5A8DB8";
+    case "protest":
+    case "layoff":
+    case "closure":
+    case "strike":
+      return "#B83A52";
+    case "price_change":
+      return "#D4A520";
+    case "mood_shift":
+    case "policy_response":
+      return "#7B68EE";
+    default:
+      return "#C4A46C";
+  }
+}
+
 // Stardew color classes applied via inline style below
 const SDV_COLORS: Record<string, string> = {
   "sdv-text-muted": "#8B7355",
@@ -71,6 +98,18 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [events.length]);
 
+  const eventRows: Array<{ event: SimEvent; showRoundSep: boolean }> = [];
+  let prevRound = -1;
+  for (const event of events) {
+    const showRoundSep =
+      event.type !== "phase_change" &&
+      event.round !== undefined &&
+      event.round !== prevRound &&
+      prevRound !== -1;
+    if (event.round !== undefined) prevRound = event.round;
+    eventRows.push({ event, showRoundSep });
+  }
+
   return (
     <div className="flex h-full flex-col" data-testid="event-feed">
       {/* Events */}
@@ -84,7 +123,7 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
           </div>
         )}
 
-        {events.map((event) => {
+        {eventRows.map(({ event, showRoundSep }) => {
           if (event.type === "phase_change") {
             return (
               <div
@@ -106,62 +145,81 @@ export function EventFeed({ events, onEventClick }: EventFeedProps) {
           const accentColor = SDV_COLORS[accentClass] ?? "#8B7355";
 
           return (
-            <div
-              key={event.id}
-              className={`mb-1 px-2 py-1.5 rounded ${onEventClick ? "cursor-pointer transition-colors" : ""}`}
-              style={onEventClick ? {} : undefined}
-              onMouseEnter={
-                onEventClick
-                  ? (e) => {
-                      (e.currentTarget as HTMLElement).style.background =
-                        "rgba(196,164,108,0.15)";
-                    }
-                  : undefined
-              }
-              onMouseLeave={
-                onEventClick
-                  ? (e) => {
-                      (e.currentTarget as HTMLElement).style.background = "";
-                    }
-                  : undefined
-              }
-              data-testid="event-item"
-              onClick={onEventClick ? () => onEventClick(event) : undefined}
-            >
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="text-[10px] font-mono"
-                  style={{ color: accentColor }}
+            <div key={event.id}>
+              {showRoundSep && (
+                <div
+                  className="my-2 flex items-center gap-2"
+                  data-testid="round-separator"
                 >
-                  {eventIcon(event.type)}
-                </span>
-                <span
-                  className="text-[10px] font-mono font-bold"
-                  style={{ color: "#3D2510" }}
-                >
-                  {event.agentName}
-                </span>
-                {event.agentCategory && (
+                  <div className="flex-1" style={{ borderTop: "1px dashed #C4A46C" }} />
                   <span
-                    className="text-[9px] font-mono"
+                    className="text-[7px] font-pixel uppercase tracking-widest"
                     style={{ color: "#A0824A" }}
                   >
-                    {event.agentCategory}
+                    ◆ Round {event.round}
                   </span>
-                )}
-                <span
-                  className="ml-auto text-[9px] font-mono tabular-nums"
-                  style={{ color: "#A0824A" }}
-                >
-                  R{event.round}
-                </span>
-              </div>
-              <p
-                className="mt-0.5 text-[10px] font-mono leading-relaxed"
-                style={{ color: "#6B4C2A" }}
+                  <div className="flex-1" style={{ borderTop: "1px dashed #C4A46C" }} />
+                </div>
+              )}
+              <div
+                className={`event-entry mb-1 py-1.5 rounded ${onEventClick ? "cursor-pointer transition-colors" : ""}`}
+                style={{
+                  borderLeft: `3px solid ${eventBorderColor(event.type)}`,
+                  paddingLeft: '10px',
+                }}
+                onMouseEnter={
+                  onEventClick
+                    ? (e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "rgba(196,164,108,0.15)";
+                      }
+                    : undefined
+                }
+                onMouseLeave={
+                  onEventClick
+                    ? (e) => {
+                        (e.currentTarget as HTMLElement).style.background = "";
+                      }
+                    : undefined
+                }
+                data-testid="event-item"
+                onClick={onEventClick ? () => onEventClick(event) : undefined}
               >
-                {event.message}
-              </p>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="text-[10px] font-mono"
+                    style={{ color: accentColor }}
+                  >
+                    {eventIcon(event.type)}
+                  </span>
+                  <span
+                    className="text-[9px] font-pixel"
+                    style={{ color: "#3D2510" }}
+                  >
+                    {event.agentName}
+                  </span>
+                  {event.agentCategory && (
+                    <span
+                      className="text-[9px] font-mono"
+                      style={{ color: "#A0824A" }}
+                    >
+                      {event.agentCategory}
+                    </span>
+                  )}
+                  <span
+                    className="ml-auto text-[9px] font-mono tabular-nums"
+                    style={{ color: "#A0824A" }}
+                  >
+                    R{event.round}
+                  </span>
+                </div>
+                <p
+                  className="mt-0.5 text-[10px] font-mono leading-relaxed"
+                  style={{ color: "#6B4C2A" }}
+                >
+                  {event.message}
+                </p>
+              </div>
             </div>
           );
         })}

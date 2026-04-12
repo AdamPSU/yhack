@@ -162,6 +162,16 @@ async def start_sim(sid: str, data: dict) -> None:
         except Exception:
             pass
 
+    async def stream_setup_progress(label: str, current: int, total: int) -> None:
+        try:
+            await sio.emit(
+                "setup_progress",
+                {"label": label, "current": current, "total": total},
+                to=sid,
+            )
+        except Exception:
+            pass
+
     initial_state: SimState = {
         "policy_text": "",
         "notes_text": policy.notes_text,
@@ -184,6 +194,7 @@ async def start_sim(sid: str, data: dict) -> None:
         "memory_streams": {},
         "npc_stream_callback": stream_npc_events,
         "npc_added_callback": stream_npc_added,
+        "setup_progress_callback": stream_setup_progress,
     }
 
     try:
@@ -195,6 +206,11 @@ async def start_sim(sid: str, data: dict) -> None:
                 record.context_summary = update.get("context_summary", "")
                 record.indicator_snapshots = update.get("indicator_snapshots", [])
                 record.source_summaries = update.get("source_summaries", [])
+                await sio.emit(
+                    "setup_progress",
+                    {"label": "Analyzing policy...", "current": 0, "total": 0},
+                    to=sid,
+                )
 
             elif "parse_policy" in chunk:
                 update = chunk["parse_policy"]

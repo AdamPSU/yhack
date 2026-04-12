@@ -1,13 +1,42 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import type { SetupProgress } from "@/hooks/useSimulation";
 import { Particles } from "./Particles/Particles";
 
 interface SimLoadingScreenProps {
   isVisible: boolean;
+  stage?: SetupProgress["stage"];
+  npcsReady?: number;
+  numNpcs?: number;
+  label?: string;
 }
 
-export function SimLoadingScreen({ isVisible }: SimLoadingScreenProps) {
+export function SimLoadingScreen({ isVisible, stage, npcsReady = 0, numNpcs = 0, label }: SimLoadingScreenProps) {
+  const stageLabel = label ||
+    (stage === "analyzing" ? "Analyzing policy..." :
+    stage === "generating" ? `Generating personalities... ${npcsReady}${numNpcs > 0 ? `/${numNpcs}` : ""}` :
+    stage === "ready" ? "Loading world..." :
+    "Connecting...");
+
+  // Evenly distribute progress across known stages based on label content
+  function getFill(): number {
+    if (stage === "waiting") return 2;
+    if (stage === "ready") return 100;
+    const l = label || "";
+    if (l.includes("Analyzing policy")) return 12;
+    if (l.includes("Starting simulation")) return 20;
+    if (l.includes("Extracted")) return 30;
+    if (l.includes("random residents")) return 40;
+    if (l.includes("personalities") && !l.includes("/")) return 46;
+    if (stage === "generating" && numNpcs > 0) {
+      return 46 + Math.round((npcsReady / numNpcs) * 36); // 46→82
+    }
+    if (l.includes("Building social network")) return 88;
+    if (stage === "analyzing") return 12;
+    return 8; // connected but no label yet
+  }
+  const fill = getFill();
   return (
     <AnimatePresence>
       {isVisible && (
@@ -68,7 +97,7 @@ export function SimLoadingScreen({ isVisible }: SimLoadingScreenProps) {
               className="text-[10px] font-mono uppercase tracking-[0.3em]"
               style={{ color: "#8B7355" }}
             >
-              Preparing simulation...
+              {stageLabel}
             </motion.div>
 
             <motion.div
@@ -87,19 +116,23 @@ export function SimLoadingScreen({ isVisible }: SimLoadingScreenProps) {
                 }}
               >
                 <motion.div
-                  initial={{ width: "0%" }}
-                  animate={{ width: "92%" }}
-                  transition={{
-                    delay: 2.2,
-                    duration: 4,
-                    ease: "easeInOut",
-                  }}
                   className="h-full rounded-sm progress-glow"
-                  style={{
-                    background: "linear-gradient(90deg, #D4A520, #C97D1A)",
-                  }}
+                  animate={{ width: `${fill}%` }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                  style={{ background: "linear-gradient(90deg, #D4A520, #C97D1A)" }}
                 />
               </div>
+              {stage === "generating" && numNpcs > 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex justify-between text-[8px] font-pixel mt-1 px-0.5"
+                  style={{ color: "#A0824A" }}
+                >
+                  <span>RESIDENTS</span>
+                  <span>{npcsReady}/{numNpcs}</span>
+                </motion.div>
+              )}
             </motion.div>
           </div>
         </motion.div>

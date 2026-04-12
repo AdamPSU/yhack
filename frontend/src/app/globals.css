@@ -275,3 +275,19 @@ body {
               border 0.3s ease,
               box-shadow 0.3s ease;
 }
+
+/* Event feed entry animation */
+@keyframes eventSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.event-entry {
+  animation: eventSlideIn 180ms ease-out both;
+}

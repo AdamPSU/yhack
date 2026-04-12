@@ -268,29 +268,3 @@ Conversation so far:
 Someone says to you: "{user_message}"
 
 Stay in character. Respond with ONLY your spoken words — no narration, no "I say". 1-3 sentences."""
-
-SWARM_ORCHESTRATOR_PROMPT = """\
-You are the director of a social simulation in the town of Millfield. A new economic policy has been announced.
-
-Decide which NPCs will INITIATE action first this round (they act before others can react).
-Choose approximately {num_initiators} NPCs based on:
-- Role: activists, politicians, business owners, farmers initiate more
-- Strong political views (|political_leaning| > 0.5)
-- Low income when policy affects cost of living
-- Angry/anxious mood
-- Later rounds: reactions become initiations as news spreads
-
-<policy_summary>
-{policy_summary}
-</policy_summary>
-
-<round_info>
-Round {current_round} of {max_rounds}. {round_context}
-</round_info>
-
-<npcs>
-{npc_list}
-</npcs>
-
-Select exactly {num_initiators} NPC IDs. Prioritise diversity across roles, income levels, and political leanings.
-"""

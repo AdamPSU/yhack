@@ -27,4 +27,5 @@ class SimState(TypedDict):
     memory_streams: dict[str, list[dict[str, Any]]]
     npc_stream_callback: NotRequired[Callable[[list[dict[str, Any]]], Awaitable[None]] | None]
     npc_added_callback: NotRequired[Callable[[dict[str, Any]], Awaitable[None]] | None]
+    setup_progress_callback: NotRequired[Callable[[str, int, int], Awaitable[None]] | None]
     initiator_ids: NotRequired[list[str]]  # swarm mode only; NPC IDs chosen as round initiators

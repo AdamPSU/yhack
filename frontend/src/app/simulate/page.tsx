@@ -3,11 +3,13 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { motion } from "motion/react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Dashboard } from "@/components/Dashboard";
 import { EconomicReportModal } from "@/components/EconomicReportModal";
 import { EventFeed } from "@/components/EventFeed";
 import { NPCInteractionModal } from "@/components/NPCInteractionModal";
+import { SimLoadingScreen } from "@/components/SimLoadingScreen";
 import { useSimulation } from "@/hooks/useSimulation";
 import { clearReplayData, getReplayData } from "@/lib/replayStore";
 import type { NPCHoverInfo, SimEvent } from "@/types";
@@ -46,12 +48,8 @@ const GameCanvas = dynamic(
 function GameCanvasPlaceholder() {
   return (
     <div
-      className="rpg-panel flex items-center justify-center box-border"
-      style={{
-        width: GAME_WIDTH * SCALE_FACTOR,
-        height: GAME_HEIGHT * SCALE_FACTOR,
-        background: "#E8D5A3",
-      }}
+      className="rpg-panel flex items-center justify-center box-border w-full h-full"
+      style={{ background: "#E8D5A3" }}
     >
       <span
         className="text-[8px] font-pixel uppercase tracking-widest animate-pulse"
@@ -101,11 +99,12 @@ function NPCTooltip({
       }}
     >
       <div
-        className="rounded px-2 py-1 shadow-md"
+        className="px-2 py-1"
         style={{
           background: "#FDF5E6",
           border: "2px solid #A0824A",
-          boxShadow: "2px 2px 0 rgba(61,37,16,.3)",
+          borderRadius: "0px",
+          boxShadow: "2px 2px 0 rgba(61,37,16,0.5)",
         }}
       >
         <div className="flex items-center gap-1.5">
@@ -123,7 +122,7 @@ function NPCTooltip({
           className="text-[8px] font-mono tracking-widest uppercase"
           style={{ color: "#8B7355" }}
         >
-          {info.role}
+          {info.role?.toUpperCase?.() ?? info.role}
         </div>
       </div>
     </div>
@@ -154,6 +153,10 @@ function SimulateContent() {
   const isReplay = searchParams.get("mode") === "replay";
   const isRecording = searchParams.get("record") === "true";
   const sim = useSimulation(simulationId || undefined, isRecording);
+  const { stage, npcsReady, numNpcs } = sim.setupProgress;
+  const showSetupOverlay = !sim.isRunning
+    ? false  // not started yet, don't show
+    : stage !== "ready";  // show while generating
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
 
   const handleEventClick = useCallback((event: SimEvent) => {
@@ -423,11 +426,26 @@ function SimulateContent() {
       setShowReport(true);
     }
   }, [sim.isComplete, sim.reportLoading, sim.report]);
+
+  const PHASE_CHIPS = [
+    { label: "SPRING", activeColor: "#3E7C34", activeBorder: "#2A5424", activeText: "#FDF5E6" },
+    { label: "SUMMER", activeColor: "#C97D1A", activeBorder: "#8B5510", activeText: "#FDF5E6" },
+    { label: "HARVEST", activeColor: "#B83A52", activeBorder: "#7A2538", activeText: "#FDF5E6" },
+  ] as const;
+
+  const woodenBtnStyle = {
+    background: "#D4A044",
+    border: "2px solid #5B3010",
+    borderRadius: "2px",
+    boxShadow: "inset 1px 1px 0 #E8C874, inset -1px -1px 0 #A07028, 2px 2px 0 #3D1E08",
+    color: "#5B3010",
+  };
+
   if (!simulationId && !isMock && !isReplay) {
     return (
       <div
         className="flex min-h-screen flex-col items-center justify-center px-6"
-        style={{ background: "#4a7a3b" }}
+        style={{ background: "#1a1208" }}
       >
         <div
           className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
@@ -473,7 +491,7 @@ function SimulateContent() {
   return (
     <div
       className="relative flex h-screen flex-col overflow-clip"
-      style={{ background: "#4a7a3b" }}
+      style={{ background: "#1a1208" }}
       data-testid="simulate-page"
     >
       {/* Phase indicator bar */}
@@ -493,23 +511,49 @@ function SimulateContent() {
             |
           </span>
           <div className="flex gap-1">
-            {[1, 2, 3].map((p) => (
+            {PHASE_CHIPS.map((chip, i) => {
+              const p = i + 1;
+              const active = sim.phase >= p;
+              return (
+                <div
+                  key={chip.label}
+                  className="px-2 py-0.5 text-[7px] font-pixel uppercase transition-colors duration-500"
+                  style={{
+                    border: `1px solid ${active ? chip.activeBorder : "#C4A46C"}`,
+                    borderRadius: "2px",
+                    background: active ? chip.activeColor : "#F5E6C8",
+                    color: active ? chip.activeText : "#C4A46C",
+                  }}
+                >
+                  {chip.label}
+                </div>
+              );
+            })}
+          </div>
+          {/* Round progress bar */}
+          <div className="flex items-center gap-2 ml-2">
+            <div
+              className="h-1.5 w-20 overflow-hidden"
+              style={{
+                background: "#E8D5A3",
+                border: "1px solid #C4A46C",
+                borderRadius: "2px",
+              }}
+            >
               <div
-                key={p}
-                className="h-2 w-12 rounded-sm transition-colors duration-500"
+                className="h-full transition-all duration-500"
                 style={{
-                  border: "1px solid #C4A46C",
-                  background:
-                    sim.phase >= p
-                      ? p === 3
-                        ? "#B83A52"
-                        : p === 2
-                          ? "#C97D1A"
-                          : "#3E7C34"
-                      : "#F5E6C8",
+                  width: `${sim.maxRounds > 0 ? (sim.round / sim.maxRounds) * 100 : 0}%`,
+                  background: "linear-gradient(90deg, #D4A520, #C97D1A)",
                 }}
               />
-            ))}
+            </div>
+            <span
+              className="text-[9px] font-mono tabular-nums"
+              style={{ color: "#8B7355" }}
+            >
+              {sim.round}/{sim.maxRounds}
+            </span>
           </div>
           {sim.phase > 0 && (
             <span
@@ -600,7 +644,7 @@ function SimulateContent() {
       </div>
 
       {/* Main layout */}
-      <div className="flex flex-1 gap-2 overflow-hidden p-2">
+      <div className="flex flex-1 overflow-hidden">
         {/* Left: Event feed */}
         <div
           className={`rpg-panel flex h-full w-64 shrink-0 flex-col panel-slide-left ${focusMode ? "panel-hidden-left" : ""}`}
@@ -635,70 +679,72 @@ function SimulateContent() {
           className={
             focusMode
               ? "fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
-              : "relative flex min-w-0 flex-1 items-center justify-center overflow-hidden"
+              : "relative min-w-0 flex-1 overflow-hidden"
           }
           style={focusMode ? { background: "#060010" } : undefined}
         >
           <div
             ref={canvasContainerRef}
-            className="relative shrink-0 canvas-glow canvas-expand"
-            style={{
-              border: "3px solid #6B4226",
-              borderRadius: 4,
-              ...(focusMode
+            className={`canvas-expand ${focusMode ? "relative shrink-0 canvas-glow" : "absolute inset-0"}`}
+            style={
+              focusMode
                 ? {
+                    width: GAME_WIDTH,
+                    height: GAME_HEIGHT,
                     transform: `scale(${focusScale})`,
                     transformOrigin: "center center",
                     border: "none",
                     padding: 0,
                     boxShadow: "none",
                   }
-                : {}),
-            }}
+                : {}
+            }
           >
             <GameCanvas />
 
             {/* Fullscreen toggle + Zoom controls */}
             <div className="absolute top-2 right-2 z-40 flex gap-1">
-              <button
+              <motion.button
                 type="button"
                 onClick={() => {
-                  import("@/game/bridge/EventBridge").then(
-                    ({ eventBridge }) => {
-                      eventBridge.emitCameraZoom(1);
-                    },
-                  );
+                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+                    eventBridge.emitCameraZoom(1);
+                  });
                 }}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono transition-opacity hover:opacity-70"
-                style={{ color: "#5B3A1E", background: "#E8D5A3" }}
+                whileHover={{ y: -1 }}
+                whileTap={{ y: 1 }}
+                className="px-2 py-1 text-[9px] font-pixel uppercase cursor-pointer pixel-crisp"
+                style={woodenBtnStyle}
                 title="Zoom in"
               >
-                ZOOM+
-              </button>
-              <button
+                +
+              </motion.button>
+              <motion.button
                 type="button"
                 onClick={() => {
-                  import("@/game/bridge/EventBridge").then(
-                    ({ eventBridge }) => {
-                      eventBridge.emitCameraZoom(-1);
-                    },
-                  );
+                  import("@/game/bridge/EventBridge").then(({ eventBridge }) => {
+                    eventBridge.emitCameraZoom(-1);
+                  });
                 }}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono transition-opacity hover:opacity-70"
-                style={{ color: "#5B3A1E", background: "#E8D5A3" }}
+                whileHover={{ y: -1 }}
+                whileTap={{ y: 1 }}
+                className="px-2 py-1 text-[9px] font-pixel uppercase cursor-pointer pixel-crisp"
+                style={woodenBtnStyle}
                 title="Zoom out"
               >
-                ZOOM-
-              </button>
-              <button
+                -
+              </motion.button>
+              <motion.button
                 type="button"
                 onClick={toggleFullscreen}
-                className="rpg-panel px-1.5 py-1 text-[10px] font-mono transition-opacity hover:opacity-70"
-                style={{ color: "#5B3A1E", background: "#E8D5A3" }}
+                whileHover={{ y: -1 }}
+                whileTap={{ y: 1 }}
+                className="px-2 py-1 text-[9px] font-pixel uppercase cursor-pointer pixel-crisp"
+                style={woodenBtnStyle}
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? "EXIT" : "FULL"}
-              </button>
+                {isFullscreen ? "\u2199" : "\u26F6"}
+              </motion.button>
             </div>
 
             {/* NPC hover tooltip */}
@@ -823,6 +869,15 @@ function SimulateContent() {
           onClose={() => setShowReport(false)}
         />
       )}
+
+      {/* NPC generation progress overlay — visible from connection until init */}
+      <SimLoadingScreen
+        isVisible={showSetupOverlay}
+        stage={stage}
+        npcsReady={npcsReady}
+        numNpcs={numNpcs}
+        label={sim.setupProgress.label}
+      />
 
       {/* Error overlay — shown when backend restarts or simulation is lost */}
       {sim.error && (

@@ -179,6 +179,13 @@ export interface WSNPCAddedMsg {
   npc: BackendNPC;
 }
 
+export interface WSSetupProgressMsg {
+  type: "setup_progress";
+  label: string;
+  current: number;
+  total: number;
+}
+
 export interface WSNPCEventsMsg {
   type: "npc_events";
   events: BackendSimEvent[];
@@ -239,7 +246,8 @@ export type WSMessage =
   | WSRoundMsg
   | WSNPCEventsMsg
   | WSDoneMsg
-  | WSErrorMsg;
+  | WSErrorMsg
+  | WSSetupProgressMsg;
 
 export interface SavedSimulation {
   version: 1;

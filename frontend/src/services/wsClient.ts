@@ -11,6 +11,7 @@ import type {
   WSNPCEventsMsg,
   WSPolicyAnalysisMsg,
   WSRoundMsg,
+  WSSetupProgressMsg,
 } from "@/types/backend";
 
 const API_BASE = "http://localhost:8000";
@@ -18,6 +19,7 @@ const API_BASE = "http://localhost:8000";
 export interface WSCallbacks {
   onPolicyAnalysis: (msg: WSPolicyAnalysisMsg) => void;
   onNPCAdded?: (msg: WSNPCAddedMsg) => void;
+  onSetupProgress?: (msg: WSSetupProgressMsg) => void;
   onInit: (msg: WSInitMsg) => void;
   onRound: (msg: WSRoundMsg) => void;
   onNPCEvents?: (msg: WSNPCEventsMsg) => void;
@@ -140,6 +142,10 @@ export function connectSimulation(
 
   socket.on("npc_added", (data: WSNPCAddedMsg) => {
     callbacks.onNPCAdded?.(data);
+  });
+
+  socket.on("setup_progress", (data: WSSetupProgressMsg) => {
+    callbacks.onSetupProgress?.(data);
   });
 
   socket.on("init", (data: WSInitMsg) => {

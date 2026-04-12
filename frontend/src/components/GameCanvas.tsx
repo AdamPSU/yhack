@@ -132,11 +132,7 @@ export function GameCanvas() {
     <div
       ref={containerRef}
       data-testid="game-canvas"
-      className="rpg-panel overflow-hidden pixel-crisp box-border"
-      style={{
-        width: GAME_WIDTH * SCALE_FACTOR,
-        height: GAME_HEIGHT * SCALE_FACTOR,
-      }}
+      className="overflow-hidden pixel-crisp w-full h-full"
     />
   );
 }

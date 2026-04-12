@@ -116,22 +116,6 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
 }}
 </output_format>"""
 
-GENERATE_RELATIONSHIPS_PROMPT = """\
-Generate {num_relationships} social relationships between the NPCs listed below. Include coworker bonds, neighbor ties, and a few unlikely friendships. Each NPC must appear at least once.
-
-NPCs:
-{npcs_summary}
-
-<think>Plan your relationship pairs here.</think>
-
-Output ONLY valid JSON after your think block, no markdown, no commentary:
-{{
-  "relationships": [
-    {{"source_id": "npc_01", "target_id": "npc_02"}},
-    {{"source_id": "npc_02", "target_id": "npc_03"}}
-  ]
-}}"""
-
 # One-line personality descriptions keyed by MBTI type.
 # Used by both NPC_ROUND_PROMPT_V2 and NPC_CHAT_PROMPT via {npc_mbti_style}.
 MBTI_DESC: dict[str, str] = {
@@ -177,18 +161,14 @@ Your memories:
 
 Your current plan: {current_plan}
 
-Output ONLY valid JSON, no markdown, no commentary:
-{{
-  "perception": "one sentence about how you feel right now",
-  "events": [
-    {{"event_type": "chat", "message": "I walk over and say something.", "target_npc_id": "npc_01", "dialogue": "exact words you speak aloud"}},
-    {{"event_type": "move", "message": "I head toward the factory.", "to_x": 5, "to_y": 3}},
-    {{"event_type": "protest", "message": "I join the crowd outside city hall."}},
-    {{"event_type": "mood_shift", "message": "I feel a surge of anger.", "new_mood": "angry"}},
-    {{"event_type": "price_change", "message": "I raise bread prices by 20 cents."}}
-  ]
-}}
-Choose 1-3 events. new_mood must be one of: angry, anxious, worried, skeptical, neutral, determined, hopeful, excited. Chat targets must be in the Nearby list. Stay in character."""
+Choose 1-3 events from these types. Be specific, personal, and in-character — no generic filler text:
+- "chat": speak to someone in the Nearby list → target_npc_id (their ID), dialogue (your exact words), message (what you do)
+- "move": go somewhere → to_x, to_y (grid coords), message (where and why)
+- "protest": take public action → message (what you do and why)
+- "mood_shift": emotional shift → new_mood (angry/anxious/worried/skeptical/neutral/determined/hopeful/excited), message
+- "price_change": change a price → message (what you change and why)
+
+Chat targets must be in the Nearby list. Stay in character."""
 
 REFLECTION_PROMPT = """\
 You are {npc_name}, a {npc_profession} in Millfield. Below are your recent memories and experiences from the policy simulation.
@@ -288,3 +268,29 @@ Conversation so far:
 Someone says to you: "{user_message}"
 
 Stay in character. Respond with ONLY your spoken words — no narration, no "I say". 1-3 sentences."""
+
+SWARM_ORCHESTRATOR_PROMPT = """\
+You are the director of a social simulation in the town of Millfield. A new economic policy has been announced.
+
+Decide which NPCs will INITIATE action first this round (they act before others can react).
+Choose approximately {num_initiators} NPCs based on:
+- Role: activists, politicians, business owners, farmers initiate more
+- Strong political views (|political_leaning| > 0.5)
+- Low income when policy affects cost of living
+- Angry/anxious mood
+- Later rounds: reactions become initiations as news spreads
+
+<policy_summary>
+{policy_summary}
+</policy_summary>
+
+<round_info>
+Round {current_round} of {max_rounds}. {round_context}
+</round_info>
+
+<npcs>
+{npc_list}
+</npcs>
+
+Select exactly {num_initiators} NPC IDs. Prioritise diversity across roles, income levels, and political leanings.
+"""

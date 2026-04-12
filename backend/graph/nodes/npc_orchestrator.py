@@ -15,7 +15,6 @@ from graph.names import FIRST_NAMES_F, FIRST_NAMES_M, LAST_NAMES
 from graph.prompts import (
     EXTRACT_CHARACTERS_PROMPT,
     GENERATE_NPC_PERSONALITY_PROMPT,
-    GENERATE_RELATIONSHIPS_PROMPT,
 )
 from models.state import SimState
 
@@ -169,24 +168,68 @@ async def _generate_personality(
     return {**base, **data}
 
 
+def _affinity_heuristic(npc_a: dict, npc_b: dict) -> tuple[float, float]:
+    """Compute affinity and trust between two NPCs heuristically."""
+    affinity = 0.0
+
+    # Same profession keywords → cooperative bond
+    prof_a = npc_a.get("profession", "").lower()
+    prof_b = npc_b.get("profession", "").lower()
+    PROF_KEYWORDS = ["steel", "metal", "factory", "union", "worker", "retail", "shop",
+                     "teacher", "school", "medical", "farm", "driver", "tech", "build"]
+    if any(k in prof_a and k in prof_b for k in PROF_KEYWORDS):
+        affinity += 0.3
+    elif any(k in prof_a for k in PROF_KEYWORDS) and any(k in prof_b for k in PROF_KEYWORDS):
+        # Different industries but both working class
+        affinity += 0.1
+
+    # Same income level → shared economic reality
+    if npc_a.get("income_level") == npc_b.get("income_level"):
+        affinity += 0.2
+
+    # Political divergence → tension
+    delta_politics = abs(
+        npc_a.get("political_leaning", 0.0) - npc_b.get("political_leaning", 0.0)
+    ) / 2.0  # normalise: max delta is 2.0
+    affinity -= 0.4 * delta_politics
+
+    # Grid proximity → familiarity
+    dx = abs(npc_a.get("x", 0) - npc_b.get("x", 0))
+    dy = abs(npc_a.get("y", 0) - npc_b.get("y", 0))
+    if max(dx, dy) < 3:
+        affinity += 0.15
+
+    affinity = round(max(-1.0, min(1.0, affinity)), 2)
+    trust = round(max(0.1, min(0.95, 0.5 + 0.3 * affinity)), 2)
+    return affinity, trust
+
+
 async def _generate_relationships(
     npcs: list[dict], entities_json: str, llm: ChatOpenAI
 ) -> list[dict]:
-    """Generate a social network across the assembled NPC roster."""
-    summary_lines = [
-        f"{n['id']}: {n.get('name', '?')} — {n.get('profession', '?')} x={n.get('x')}, y={n.get('y')}"
-        for n in npcs
-    ]
+    """Generate a social network across the assembled NPC roster using heuristics."""
     n = len(npcs)
+    if n < 2:
+        return []
+
     max_unique = n * (n - 1) // 2
     target_rels = min(max(n, int(n * 1.5)), max_unique)
-    prompt = GENERATE_RELATIONSHIPS_PROMPT.format(
-        npcs_summary="\n".join(summary_lines),
-        num_relationships=str(target_rels),
-    )
-    # Relationships prompt triggers heavy K2 reasoning — give it room to finish
-    data = await invoke_llm_json(prompt, llm=get_llm(max_tokens=8192))
-    return data.get("relationships", [])
+
+    # Build every candidate pair and shuffle, then pick target_rels of them.
+    all_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+    random.shuffle(all_pairs)
+    selected_pairs = all_pairs[:target_rels]
+
+    result = []
+    for i, j in selected_pairs:
+        affinity, trust = _affinity_heuristic(npcs[i], npcs[j])
+        result.append({
+            "source_id": npcs[i]["id"],
+            "target_id": npcs[j]["id"],
+            "affinity": affinity,
+            "trust": trust,
+        })
+    return result
 
 
 def _initial_reputation(npc: dict) -> float:

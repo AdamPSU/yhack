@@ -325,7 +325,7 @@ async def generate_economic_report(
         narrative = await invoke_llm_structured(
             prompt,
             EconomicReportNarrative,
-            max_tokens=2048,
+            max_tokens=6000,
         )
     except Exception:
         logger.exception("economic_report: structured output failed, using fallback narrative")

@@ -36,3 +36,6 @@ K2_API_KEY = os.environ.get("K2_API_KEY", "")
 if not K2_API_KEY:
     import warnings
     warnings.warn("K2_API_KEY is not set — LLM calls will fail", stacklevel=1)
+
+# Swarm mode: two-phase NPC round execution (orchestrator picks initiators first)
+SWARM = os.environ.get("SWARM", "").lower() in ("true", "1", "yes")

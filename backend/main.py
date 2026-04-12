@@ -4,7 +4,7 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import K2_API_KEY, K2_BASE_URL, K2_MODEL
+from config import K2_API_KEY, K2_BASE_URL, K2_MODEL, SWARM
 from routers.extract import router as extract_router
 from routers.simulate import router, sio
 
@@ -38,7 +38,10 @@ app.include_router(extract_router)
 sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
 app = sio_asgi  # type: ignore[assignment]
 
-logger.info("SIMULACRA ready — model=%s base_url=%s", K2_MODEL, K2_BASE_URL)
+logger.info(
+    "SIMULACRA ready — model=%s base_url=%s swarm=%s",
+    K2_MODEL, K2_BASE_URL, "ON" if SWARM else "OFF",
+)
 
 if __name__ == "__main__":
     import uvicorn

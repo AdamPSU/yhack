@@ -7,6 +7,8 @@ import socketio
 from fastapi import APIRouter, HTTPException
 
 from graph.builder import build_graph
+from config import SWARM
+from graph.builder_swarm import build_swarm_graph
 from graph.chat import generate_npc_chat_response
 from models.schemas import EconomicReportResponse, PolicyInput
 from models.state import SimState
@@ -84,6 +86,41 @@ async def start_simulation(policy: PolicyInput):
     return {"simulation_id": simulation_id}
 
 
+async def _handle_round_update(
+    update: dict,
+    record: "SimulationRecord",
+    simulation_id: str,
+    sid: str,
+    max_rounds: int,
+) -> None:
+    """Shared handler for run_round and run_round_swarm chunk updates."""
+    record.current_round = update.get("current_round", record.current_round)
+    record.final_npcs = update.get("npcs", record.final_npcs)
+    record.events.extend(update.get("events", []))
+    record.memory_streams = update.get("memory_streams", record.memory_streams)
+    record.relationships = update.get("relationships", record.relationships)
+    round_num = update["current_round"] - 1
+    logger.info(
+        "sim=%s  round %d  events=%d",
+        simulation_id,
+        round_num,
+        len(update["events"]),
+    )
+    await sio.emit(
+        "round",
+        {
+            "round": round_num,
+            "events": update["events"],
+            "npcs": update["npcs"],
+            "influence_events": update.get("influence_events", []),
+            "economic_indicators": update.get("economic_indicators", {}),
+            "relationships": update.get("relationships", []),
+            "max_rounds": max_rounds,
+        },
+        to=sid,
+    )
+
+
 @sio.event
 async def start_sim(sid: str, data: dict) -> None:
     """Client emits 'start_sim' with {simulation_id} to begin streaming."""
@@ -110,7 +147,8 @@ async def start_sim(sid: str, data: dict) -> None:
     record.indicator_snapshots = []
     record.source_summaries = []
 
-    graph = build_graph()
+    graph = build_swarm_graph() if SWARM else build_graph()
+    logger.info("sim=%s  mode=%s", simulation_id, "swarm" if SWARM else "standard")
 
     async def stream_npc_events(events: list) -> None:
         try:
@@ -191,35 +229,20 @@ async def start_sim(sid: str, data: dict) -> None:
                 )
 
             elif "run_round" in chunk:
-                update = chunk["run_round"]
-                record.current_round = update.get("current_round", record.current_round)
-                record.final_npcs = update.get("npcs", record.final_npcs)
-                record.events.extend(update.get("events", []))
-                record.memory_streams = update.get(
-                    "memory_streams", record.memory_streams
+                await _handle_round_update(
+                    chunk["run_round"], record, simulation_id, sid, policy.num_rounds
                 )
-                record.relationships = update.get(
-                    "relationships", record.relationships
-                )
-                round_num = update["current_round"] - 1
+
+            elif "swarm_orchestrator" in chunk:
                 logger.info(
-                    "sim=%s  round %d  events=%d",
+                    "sim=%s  swarm_orchestrator  initiators=%d",
                     simulation_id,
-                    round_num,
-                    len(update["events"]),
+                    len(chunk["swarm_orchestrator"].get("initiator_ids", [])),
                 )
-                await sio.emit(
-                    "round",
-                    {
-                        "round": round_num,
-                        "events": update["events"],
-                        "npcs": update["npcs"],
-                        "influence_events": update.get("influence_events", []),
-                        "economic_indicators": update.get("economic_indicators", {}),
-                        "relationships": update.get("relationships", []),
-                        "max_rounds": policy.num_rounds,
-                    },
-                    to=sid,
+
+            elif "run_round_swarm" in chunk:
+                await _handle_round_update(
+                    chunk["run_round_swarm"], record, simulation_id, sid, policy.num_rounds
                 )
 
         record.status = "complete"

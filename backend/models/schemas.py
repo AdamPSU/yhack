@@ -117,6 +117,25 @@ class PolicyInput(BaseModel):
         return self
 
 
+class OrchestratorPlan(BaseModel):
+    """Swarm orchestrator output: which NPCs initiate this round."""
+    initiator_ids: list[str]
+    rationale: str = ""
+
+
+class RelationshipRecord(BaseModel):
+    """A directed social relationship between two NPCs."""
+    source_id: str
+    target_id: str
+    affinity: float = 0.5   # -1.0 (hostile) to 1.0 (close friend)
+    trust: float = 0.5      # 0.0 (distrustful) to 1.0 (fully trusted)
+
+
+class RelationshipsResponse(BaseModel):
+    """Wrapper for the relationship generation LLM call."""
+    relationships: list[RelationshipRecord]
+
+
 # --- Structured output response models for LLM calls ---
 
 

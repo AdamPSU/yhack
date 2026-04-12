@@ -492,6 +492,9 @@ async def _simulate_single_npc(
         npc_memories.append(
             create_memory(npc_id, perception, current_round, importance=6, mem_type="observation")
         )
+        npc_memories.append(
+            create_memory(npc_id, perception, current_round, importance=5, mem_type="plan")
+        )
     for ev in sim_events:
         npc_memories.append(
             create_memory(
@@ -742,6 +745,75 @@ def _compute_economic_indicators(
     }
 
 
+def _apply_post_round(
+    npcs: list[dict[str, Any]],
+    all_events: list[dict[str, Any]],
+    current_round: int,
+    max_rounds: int,
+    relationships: list[dict[str, Any]],
+    rel_map: dict[str, list[tuple[str, float, float]]],
+    entities: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, float]]:
+    """Apply mood shifts, moves, opinion dynamics, and relationship updates.
+
+    Returns (updated_npcs, updated_rels, influence_log, indicators).
+    Shared by run_round and run_round_swarm.
+    """
+    mood_updates: dict[str, str] = {}
+    move_updates: dict[str, tuple[int, int]] = {}
+
+    for ev in all_events:
+        if ev["event_type"] == "mood_shift":
+            new_mood = ev.get("data", {}).get("new_mood")
+            if new_mood:
+                mood_updates[ev["npc_id"]] = _fuzzy_mood_to_ladder(new_mood)
+        elif ev["event_type"] == "move":
+            to_x = ev.get("data", {}).get("to_x")
+            to_y = ev.get("data", {}).get("to_y")
+            if to_x is not None and to_y is not None:
+                move_updates[ev["npc_id"]] = (
+                    int(clamp(int(to_x), 0, MAX_X)),
+                    int(clamp(int(to_y), 0, MAX_Y)),
+                )
+
+    move_updates = _deduplicate_moves(npcs, move_updates)
+
+    for npc in npcs:
+        npc_id = npc.get("id", "")
+        if npc_id in mood_updates:
+            npc["mood"] = mood_updates[npc_id]
+
+    controversy = entities[0].get("controversy_level", "medium") if entities else "medium"
+    npcs, rel_updates, influence_log = _apply_opinion_dynamics(
+        npcs, all_events, current_round, rel_map, controversy
+    )
+
+    updated_rels = []
+    for rel in relationships:
+        src = rel["source_id"]
+        tgt = rel["target_id"]
+        pair = (src, tgt)
+        if pair in rel_updates:
+            rel["affinity"] = round(
+                clamp(rel.get("affinity", 0.0) + rel_updates[pair]["affinity"], -1.0, 1.0), 3
+            )
+            rel["trust"] = round(
+                clamp(rel.get("trust", 0.5) + rel_updates[pair]["trust"], 0.0, 1.0), 3
+            )
+        updated_rels.append(rel)
+
+    updated_npcs = []
+    for npc in npcs:
+        npc_copy = dict(npc)
+        npc_id = npc_copy.get("id", "")
+        if npc_id in move_updates:
+            npc_copy["x"], npc_copy["y"] = move_updates[npc_id]
+        updated_npcs.append(npc_copy)
+
+    indicators = _compute_economic_indicators(updated_npcs, all_events, current_round, max_rounds)
+    return updated_npcs, updated_rels, influence_log, indicators
+
+
 async def run_round(state: SimState) -> dict[str, Any]:
     """Run one simulation round for all 25 NPCs in parallel."""
 
@@ -832,66 +904,10 @@ async def run_round(state: SimState) -> dict[str, Any]:
                 )
             )
 
-    mood_updates: dict[str, str] = {}
-    move_updates: dict[str, tuple[int, int]] = {}
-
-    for ev in all_events:
-        if ev["event_type"] == "mood_shift":
-            new_mood = ev.get("data", {}).get("new_mood")
-            if new_mood:
-                mood_updates[ev["npc_id"]] = _fuzzy_mood_to_ladder(new_mood)
-        elif ev["event_type"] == "move":
-            to_x = ev.get("data", {}).get("to_x")
-            to_y = ev.get("data", {}).get("to_y")
-            if to_x is not None and to_y is not None:
-                move_updates[ev["npc_id"]] = (
-                    int(clamp(int(to_x), 0, MAX_X)),
-                    int(clamp(int(to_y), 0, MAX_Y)),
-                )
-
-    move_updates = _deduplicate_moves(npcs, move_updates)
-
-    for npc in npcs:
-        npc_id = npc.get("id", "")
-        if npc_id in mood_updates:
-            npc["mood"] = mood_updates[npc_id]
-
-    entities = state.get("entities", [])
-    controversy = (
-        entities[0].get("controversy_level", "medium") if entities else "medium"
+    updated_npcs, updated_rels, influence_log, indicators = _apply_post_round(
+        npcs, all_events, current_round, max_rounds, relationships, rel_map,
+        state.get("entities", []),
     )
-    npcs, rel_updates, influence_log = _apply_opinion_dynamics(
-        npcs, all_events, current_round, rel_map, controversy
-    )
-
-    # Apply relationship updates back to state
-    updated_rels = []
-    for rel in relationships:
-        src = rel["source_id"]
-        tgt = rel["target_id"]
-        pair = (src, tgt)
-        if pair in rel_updates:
-            rel["affinity"] = round(
-                clamp(
-                    rel.get("affinity", 0.0) + rel_updates[pair]["affinity"], -1.0, 1.0
-                ),
-                3,
-            )
-            rel["trust"] = round(
-                clamp(rel.get("trust", 0.5) + rel_updates[pair]["trust"], 0.0, 1.0), 3
-            )
-        updated_rels.append(rel)
-
-    updated_npcs = []
-    for npc in npcs:
-        npc_copy = dict(npc)
-        npc_id = npc_copy.get("id", "")
-        if npc_id in move_updates:
-            npc_copy["x"], npc_copy["y"] = move_updates[npc_id]
-        updated_npcs.append(npc_copy)
-
-    indicators = _compute_economic_indicators(updated_npcs, all_events, current_round, max_rounds)
-
     return {
         "events": all_events,
         "current_round": current_round + 1,

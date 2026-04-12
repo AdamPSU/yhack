@@ -9,6 +9,7 @@ itself is ephemeral and doesn't affect the main simulation.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from graph.llm import get_llm, strip_think_tags
@@ -104,13 +105,26 @@ async def generate_npc_chat_response(
     )
 
     # Use a smaller max_tokens since chat responses should be concise
-    llm = get_llm(max_tokens=512)
+    llm = get_llm(max_tokens=1024)
     response = await llm.ainvoke(prompt)
 
     content: str = response.content  # type: ignore[assignment]
 
     # Strip K2 <think> reasoning blocks — only the spoken words should remain.
     content = strip_think_tags(content)
+
+    _META_PREFIXES = (
+        "we need to", "the user has", "produce a response", "the instruction",
+        "as the npc", "i need to", "let me", "okay so", "alright,",
+    )
+    if content and content.lower()[:60].lstrip().startswith(_META_PREFIXES):
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', content) if s.strip()]
+        for sentence in reversed(sentences):
+            if not sentence.lower().startswith(_META_PREFIXES):
+                content = sentence
+                break
+        else:
+            content = ""
 
     # Remove any accidental quotation marks wrapping the response
     if content.startswith('"') and content.endswith('"'):
